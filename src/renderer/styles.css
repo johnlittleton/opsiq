@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS Variables for Glass Design System */
+:root {
+  /* Backgrounds */
+  --bg-primary: #0b0c0e;
+  --bg-secondary: #111217;
+  --bg-tertiary: #18181b;
+  
+  /* Glass Panels */
+  --panel-bg: rgba(24, 24, 27, 0.7);
+  --panel-bg-solid: #18181b;
+  --panel-border: rgba(46, 46, 50, 0.5);
+  --panel-hover: rgba(31, 31, 35, 0.8);
+  
+  /* Text */
+  --text-primary: #d8d9da;
+  --text-muted: #9fa0a3;
+  --text-subtle: #6e6f73;
+  
+  /* Accents */
+  --accent-blue: #52a8ff;
+  --accent-blue-hover: #3871dc;
+  --accent-green: #73bf69;
+  --accent-yellow: #fade2a;
+  --accent-red: #dc3545;
+  --accent-purple: #b877d9;
+  
+  /* Status Colors */
+  --status-open: #73bf69;
+  --status-offload: #52a8ff;
+  --status-loading: #fade2a;
+  --status-blocked: #1a1a1a;
+  --status-waiting: #b877d9;
+  --status-parked: #dc3545;
+}
+
+/* Base Styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3e3e42;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4e4e52;
+}
+
+/* Glass Effect Utility Class */
+.glass {
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.glass-strong {
+  background: rgba(24, 24, 27, 0.85);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Animation Classes */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(82, 168, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(82, 168, 255, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Status Badge Glow */
+.status-glow-open {
+  box-shadow: 0 0 12px rgba(115, 191, 105, 0.4);
+}
+
+.status-glow-offload {
+  box-shadow: 0 0 12px rgba(82, 168, 255, 0.4);
+}
+
+.status-glow-loading {
+  box-shadow: 0 0 12px rgba(250, 222, 42, 0.4);
+}
+
+.status-glow-waiting {
+  box-shadow: 0 0 12px rgba(184, 119, 217, 0.4);
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.status-glow-parked {
+  box-shadow: 0 0 12px rgba(220, 53, 69, 0.4);
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Typography */
+.text-gradient-blue {
+  background: linear-gradient(135deg, #52a8ff 0%, #3871dc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-green {
+  background: linear-gradient(135deg, #73bf69 0%, #5fa055 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-red {
+  background: linear-gradient(135deg, #dc3545 0%, #a82833 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Utility: Timer Font */
+.font-mono-timer {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
+}
