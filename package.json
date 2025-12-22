@@ -1,0 +1,398 @@
+{
+  "name": "opsiq",
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+**Built with ❤️ by the OpsIQ Team**---For issues or questions, contact the development team.## 🆘 SupportProprietary - Slingshot Transportation, Inc.## 📄 License- `docs:` - Documentation updates- `build:` - Build system changes- `chore:` - Maintenance tasks- `fix:` - Bug fixes- `feat:` - New featuresCommits follow conventional commits:## 🤝 Git WorkflowSee `package.json` > `build` section for electron-builder configuration.### Build Configuration- Auto-update ready (configure in package.json)- Includes OpsIQ icon integration- `release/OpsIQ Setup {version}.exe` - NSIS installerCreates:```npm run dist:win```bash### Windows Installer## 📦 Building & Distribution3. Verify updates appear in all instances immediately2. Make changes in one instance1. Launch multiple instances with `--multi` flag### Testing Real-Time Sync- Check `npm run dev:server` logs for database issues- Server logs appear in terminal- Press F12 in the app to open Chrome DevTools### Debugging- Production: `%APPDATA%/OpsIQ/opsiq.db`- Development: `./opsiq.db` (project root)### Database LocationReact components hot-reload automatically. Electron main process changes require restart.### Hot Reload## 🧪 Development Tips```}  }    }      "height": 1080      "width": 1920,      "y": 0,      "x": 0,      "display": 0,    "monitor1": {  "windowPresets": {  "flashThreshold": 15,  "allowMultiInstance": false,{```jsonLocation: `%APPDATA%/OpsIQ/settings.json`### Settings File- `PORT=3000` - Server port (default 3000)- `NODE_ENV=development` - Development mode (auto-opens DevTools)- `OPSIQ_MULTI_INSTANCE=true` - Enable multi-instance mode### Environment Variables## 🔧 Configuration- Grafana-style alert indicators- Subtle animation on any status change- Doors in Waiting/Parked status > threshold (default 15 min) pulse### Flashing Rules- **RED** = Parked- **PURPLE** = Waiting- **BLACK** = Blocked- **YELLOW** = Loading- **BLUE** = Offload- **GREEN** = Open### Status Colors (Strict)- Smooth animations and transitions- Consistent color palette and spacing- Dense, information-rich panels- Professional control room aesthetic### Grafana-Inspired Dark Theme## 🎨 UI/UX Design- Shift-based tracking (A/B)- Tracks labor hours, costs, output, and scrap- 6 production lines### production_entries- Tracks who made changes and optional notes- Records all status changes with elapsed times- Comprehensive audit log### dock_events- Idempotency via clientRequestId- Tracks lifecycle (created, updated, closed)- Links to assigned door- Complete driver and shipment information### dock_checkins- Records statusStartTime for elapsed timer calculations- Tracks current status and check-in association- 39 doors (1-39) pre-seeded### dock_doors## 📊 Database Schema```OpsIQ.exe --multi --screen=checkin --display=1 --x=1920 --y=0 --w=1920 --h=1080OpsIQ.exe --multi --screen=dockboard --display=0 --x=0 --y=0 --w=1920 --h=1080# Display number, position, and size```bashPosition windows on specific monitors:### Window Placement```OpsIQ.exe --multi --screen=executiveOpsIQ.exe --multi --screen=shippingOpsIQ.exe --multi --screen=productionOpsIQ.exe --multi --screen=historyOpsIQ.exe --multi --screen=checkinOpsIQ.exe --multi --screen=dockboard```bashLaunch directly to specific pages:### Screen Routing```}  "allowMultiInstance": true{# Method 3: Settings file (settings.json)OpsIQ.exeset OPSIQ_MULTI_INSTANCE=true# Method 2: Environment variableOpsIQ.exe --multi --screen=dockboard# Method 1: CLI flag```bashEnable multi-instance mode for control room setups with multiple monitors:### Multi-Instance Mode (Shipping/Receiving PC)By default, OpsIQ allows only one instance per user. Attempting to launch a second instance will focus the existing window.### Single Instance (Default)## 🖥️ Multi-Instance / Control Room Mode- `production:updated` - Production entry created- `dock:bulk-update` - Multiple door updates- `dock:updated` - Single door update- `sync:response` - Full state payload**Server → Client**- `sync:request` - Request full state sync**Client → Server**### Socket Events- Supports 4+ simultaneous instances with perfect sync- Automatic reconnection and state sync on network issues- Server broadcasts updates to all connected clients- All data mutations go through the serverOpsIQ uses Socket.IO for perfect real-time synchronization across multiple instances:## 🔄 Real-Time Synchronization```└── README.md├── vite.config.ts├── tsconfig.json├── package.json│   └── OpsIQ.ico          # Application icon├── assets/│       └── types.ts       # Complete type definitions│   └── shared/            # Shared TypeScript types│   │   └── main.tsx       # React entry point│   │   ├── App.css        # Dark theme styling│   │   ├── App.tsx        # Main app component with routing│   │   ├── store/         # Zustand state management│   │   ├── services/      # API client and services│   │   ├── pages/         # All application pages│   ├── renderer/          # React frontend│   │   └── database.ts    # SQLite service with full CRUD operations│   │   ├── index.ts       # Express + Socket.IO server│   ├── server/            # Backend server│   │   └── preload.ts     # Context bridge for IPC│   │   ├── main.ts        # App lifecycle, window management, multi-instance logic│   ├── electron/          # Electron main process├── src/OPSIQKPI/```### Project Structure- **Build**: Vite + TypeScript + electron-builder- **UI**: Recharts for visualizations, custom Grafana-inspired theme- **Desktop**: Electron 28- **Database**: SQLite (better-sqlite3)- **Backend**: Express + Socket.IO (real-time updates)- **Frontend**: React 18 + TypeScript + Zustand (state management)### Tech Stack## 🏗️ ArchitectureThe packaged app will be in the `release` folder.```npm run dist:win# Package for Windowsnpm run build# Build all components```bash### Building for Production- Enable hot-reload for React components- Open the Electron window- Start the real-time Socket.IO server- Initialize SQLite database with 39 dock doorsThe app will automatically:```# 3. Electron app# 2. React dev server (http://localhost:5173)# 1. Backend server (http://localhost:3000)# This will start:npm run dev# Start the development environment (all 3 services)```bash### Development```npm install# Install dependenciescd OPSIQKPIgit clone <your-repo-url># Clone the repository```bash### Installation- Git- Windows OS (for packaging)- Node.js 18+ and npm### Prerequisites## 🚀 Quick Start- Labor budget tracking- KPI warning and critical thresholds- Production line targets- Multi-instance control for control room mode- Configurable thresholds and targets### Settings- Comprehensive performance metrics- Visual health indicators- Production and shipping rollups- High-level operational overview### Executive Dashboard- Waiting queue monitoring- Status distribution charts- Dock utilization percentage- Average turnaround times- Inbound/outbound totals### Shipping & Receiving KPIs- Per-line performance breakdown- 7-day trend charts- Pallets, cases, and scrap rate monitoring- Labor hours and cost calculations- 6-line production tracking### Production KPI Dashboard- Elapsed time tracking for all status changes- Sortable and exportable data- Search by date range, door number, status- Complete event log with advanced filtering### Dock History- Real-time broadcast to all connected instances- Support for inbound/outbound tracking- Idempotency protection against duplicate submissions- Automatic dock assignment and immediate tile updates- Comprehensive check-in form with validation### Driver Check-In- Complete driver/shipment information display- One-click status changes and door clearing- Flashing alerts for doors exceeding threshold times- Visual status indicators (Open, Offload, Loading, Blocked, Waiting, Parked)- Automatic status tracking with elapsed timers- Real-time monitoring of all 39 dock doors### Live Dock Board (39 Doors)## 🎯 Features**Enterprise-grade Electron desktop application for real-time dock management, production tracking, and operational KPIs.**  "version": "1.0.0",
+  "description": "OpsIQ - Production-ready dock and production management system",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:react\" \"npm run dev:electron\"",
+    "dev:server": "tsx watch src/server/index.ts",
+    "dev:react": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .",
+    "build": "npm run build:react && npm run build:electron && npm run build:server",
+    "build:react": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:server": "tsc -p tsconfig.server.json",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "start": "electron .",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": ["electron", "dock-management", "production", "kpi"],
+  "author": "Slingshot Transportation, Inc",
+  "license": "PROPRIETARY",
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.5",
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@types/uuid": "^9.0.7",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.3",
+    "electron-builder": "^24.9.1",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.11",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.2.2",
+    "express": "^4.18.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.2",
+    "socket.io": "^4.6.1",
+    "socket.io-client": "^4.6.1",
+    "zustand": "^4.5.0",
+    "date-fns": "^3.2.0",
+    "recharts": "^2.10.4",
+    "uuid": "^9.0.1"
+  },
+  "build": {
+    "appId": "com.slingshot.opsiq",
+    "productName": "OpsIQ",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/OpsIQ.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

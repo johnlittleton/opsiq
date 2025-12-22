@@ -1,0 +1,399 @@
+import Database from 'better-sqlite3';
+import path from 'path';
+import fs from 'fs';
+import {
+  DockDoor,
+  DockCheckin,
+  DockEvent,
+  ProductionEntry,
+  DockDoorWithCheckin,
+  CreateCheckinRequest,
+  UpdateDoorStatusRequest,
+  ClearDoorRequest,
+  CreateProductionEntryRequest,
+  DoorStatus,
+} from '../shared/types';
+
+export class DatabaseService {
+  private db: Database.Database;
+
+  constructor(dbPath?: string) {
+    const defaultPath = path.join(process.cwd(), 'opsiq.db');
+    const finalPath = dbPath || defaultPath;
+    
+    // Ensure directory exists
+    const dir = path.dirname(finalPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    this.db = new Database(finalPath);
+    this.db.pragma('journal_mode = WAL');
+    this.initialize();
+  }
+
+  private initialize() {
+    // Create tables
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS dock_doors (
+        doorId INTEGER PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT 'Open',
+        currentCheckinId INTEGER,
+        statusStartTime TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (currentCheckinId) REFERENCES dock_checkins(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS dock_checkins (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        inboundOutbound TEXT NOT NULL,
+        company TEXT NOT NULL,
+        driverName TEXT NOT NULL,
+        pickupNumber TEXT NOT NULL,
+        pallets INTEGER NOT NULL,
+        commodity TEXT NOT NULL,
+        forkliftDriver TEXT NOT NULL,
+        checker TEXT NOT NULL,
+        plateNumber TEXT NOT NULL,
+        phoneNumber TEXT NOT NULL,
+        doorId INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        statusStartTime TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        closedAt TEXT,
+        clientRequestId TEXT NOT NULL UNIQUE,
+        FOREIGN KEY (doorId) REFERENCES dock_doors(doorId)
+      );
+
+      CREATE TABLE IF NOT EXISTS dock_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doorId INTEGER NOT NULL,
+        checkinId INTEGER,
+        oldStatus TEXT,
+        newStatus TEXT NOT NULL,
+        eventTime TEXT NOT NULL,
+        elapsedSeconds INTEGER NOT NULL,
+        updatedBy TEXT NOT NULL,
+        note TEXT,
+        FOREIGN KEY (doorId) REFERENCES dock_doors(doorId),
+        FOREIGN KEY (checkinId) REFERENCES dock_checkins(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS production_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        shift TEXT NOT NULL,
+        lineNumber INTEGER NOT NULL,
+        laborHours REAL NOT NULL,
+        laborRate REAL NOT NULL,
+        pallets INTEGER NOT NULL,
+        cases INTEGER NOT NULL,
+        scrapCases INTEGER NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_checkins_door ON dock_checkins(doorId);
+      CREATE INDEX IF NOT EXISTS idx_checkins_status ON dock_checkins(status);
+      CREATE INDEX IF NOT EXISTS idx_checkins_created ON dock_checkins(createdAt);
+      CREATE INDEX IF NOT EXISTS idx_events_door ON dock_events(doorId);
+      CREATE INDEX IF NOT EXISTS idx_events_checkin ON dock_events(checkinId);
+      CREATE INDEX IF NOT EXISTS idx_events_time ON dock_events(eventTime);
+      CREATE INDEX IF NOT EXISTS idx_production_date ON production_entries(date);
+    `);
+
+    // Seed dock doors if empty
+    const doorCount = this.db.prepare('SELECT COUNT(*) as count FROM dock_doors').get() as { count: number };
+    if (doorCount.count === 0) {
+      const now = new Date().toISOString();
+      const insertDoor = this.db.prepare(`
+        INSERT INTO dock_doors (doorId, status, currentCheckinId, statusStartTime, updatedAt)
+        VALUES (?, 'Open', NULL, ?, ?)
+      `);
+
+      const insertMany = this.db.transaction(() => {
+        for (let i = 1; i <= 39; i++) {
+          insertDoor.run(i, now, now);
+        }
+      });
+
+      insertMany();
+      console.log('✓ Initialized 39 dock doors');
+    }
+  }
+
+  // ==================== DOCK OPERATIONS ====================
+
+  getAllDoors(): DockDoor[] {
+    return this.db.prepare(`
+      SELECT * FROM dock_doors ORDER BY doorId
+    `).all() as DockDoor[];
+  }
+
+  getDoorWithCheckin(doorId: number): DockDoorWithCheckin | null {
+    const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(doorId) as DockDoor | undefined;
+    if (!door) return null;
+
+    let checkin: DockCheckin | null = null;
+    if (door.currentCheckinId) {
+      checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as DockCheckin | undefined || null;
+    }
+
+    return { ...door, checkin };
+  }
+
+  getAllDoorsWithCheckins(): DockDoorWithCheckin[] {
+    const doors = this.getAllDoors();
+    return doors.map(door => {
+      let checkin: DockCheckin | null = null;
+      if (door.currentCheckinId) {
+        checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as DockCheckin | undefined || null;
+      }
+      return { ...door, checkin };
+    });
+  }
+
+  createCheckin(data: CreateCheckinRequest): DockDoorWithCheckin {
+    const now = new Date().toISOString();
+
+    // Check if door is available
+    const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(data.doorId) as DockDoor;
+    if (door.currentCheckinId !== null) {
+      throw new Error(`Door ${data.doorId} is already occupied`);
+    }
+
+    // Check idempotency
+    const existing = this.db.prepare('SELECT * FROM dock_checkins WHERE clientRequestId = ?').get(data.clientRequestId);
+    if (existing) {
+      return this.getDoorWithCheckin(data.doorId)!;
+    }
+
+    const transaction = this.db.transaction(() => {
+      // Insert checkin
+      const result = this.db.prepare(`
+        INSERT INTO dock_checkins (
+          inboundOutbound, company, driverName, pickupNumber, pallets,
+          commodity, forkliftDriver, checker, plateNumber, phoneNumber,
+          doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        data.inboundOutbound,
+        data.company,
+        data.driverName,
+        data.pickupNumber,
+        data.pallets,
+        data.commodity,
+        data.forkliftDriver,
+        data.checker,
+        data.plateNumber,
+        data.phoneNumber,
+        data.doorId,
+        data.status,
+        now,
+        now,
+        now,
+        data.clientRequestId
+      );
+
+      const checkinId = result.lastInsertRowid as number;
+
+      // Calculate elapsed time from previous status
+      const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
+
+      // Update door
+      this.db.prepare(`
+        UPDATE dock_doors
+        SET status = ?, currentCheckinId = ?, statusStartTime = ?, updatedAt = ?
+        WHERE doorId = ?
+      `).run(data.status, checkinId, now, now, data.doorId);
+
+      // Log event
+      this.db.prepare(`
+        INSERT INTO dock_events (doorId, checkinId, oldStatus, newStatus, eventTime, elapsedSeconds, updatedBy, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(data.doorId, checkinId, door.status, data.status, now, elapsedSeconds, 'System', 'Driver checked in');
+    });
+
+    transaction();
+
+    return this.getDoorWithCheckin(data.doorId)!;
+  }
+
+  updateDoorStatus(data: UpdateDoorStatusRequest): DockDoorWithCheckin {
+    const now = new Date().toISOString();
+    const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(data.doorId) as DockDoor;
+
+    if (!door) {
+      throw new Error(`Door ${data.doorId} not found`);
+    }
+
+    const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
+
+    const transaction = this.db.transaction(() => {
+      // Update door
+      this.db.prepare(`
+        UPDATE dock_doors
+        SET status = ?, statusStartTime = ?, updatedAt = ?
+        WHERE doorId = ?
+      `).run(data.newStatus, now, now, data.doorId);
+
+      // Update checkin if exists
+      if (door.currentCheckinId) {
+        this.db.prepare(`
+          UPDATE dock_checkins
+          SET status = ?, statusStartTime = ?, updatedAt = ?
+          WHERE id = ?
+        `).run(data.newStatus, now, now, door.currentCheckinId);
+      }
+
+      // Log event
+      this.db.prepare(`
+        INSERT INTO dock_events (doorId, checkinId, oldStatus, newStatus, eventTime, elapsedSeconds, updatedBy, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(data.doorId, door.currentCheckinId, door.status, data.newStatus, now, elapsedSeconds, data.updatedBy, data.note || null);
+    });
+
+    transaction();
+
+    return this.getDoorWithCheckin(data.doorId)!;
+  }
+
+  clearDoor(data: ClearDoorRequest): DockDoorWithCheckin {
+    const now = new Date().toISOString();
+    const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(data.doorId) as DockDoor;
+
+    if (!door) {
+      throw new Error(`Door ${data.doorId} not found`);
+    }
+
+    const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
+
+    const transaction = this.db.transaction(() => {
+      // Close checkin if exists
+      if (door.currentCheckinId) {
+        this.db.prepare(`
+          UPDATE dock_checkins
+          SET closedAt = ?, updatedAt = ?
+          WHERE id = ?
+        `).run(now, now, door.currentCheckinId);
+      }
+
+      // Update door to Open
+      this.db.prepare(`
+        UPDATE dock_doors
+        SET status = 'Open', currentCheckinId = NULL, statusStartTime = ?, updatedAt = ?
+        WHERE doorId = ?
+      `).run(now, now, data.doorId);
+
+      // Log event
+      this.db.prepare(`
+        INSERT INTO dock_events (doorId, checkinId, oldStatus, newStatus, eventTime, elapsedSeconds, updatedBy, note)
+        VALUES (?, ?, ?, 'Open', ?, ?, ?, 'Door cleared')
+      `).run(data.doorId, door.currentCheckinId, door.status, now, elapsedSeconds, data.updatedBy);
+    });
+
+    transaction();
+
+    return this.getDoorWithCheckin(data.doorId)!;
+  }
+
+  // ==================== DOCK HISTORY ====================
+
+  getDockEvents(filters?: {
+    startDate?: string;
+    endDate?: string;
+    doorId?: number;
+    status?: DoorStatus;
+  }): DockEvent[] {
+    let query = 'SELECT * FROM dock_events WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.startDate) {
+      query += ' AND eventTime >= ?';
+      params.push(filters.startDate);
+    }
+
+    if (filters?.endDate) {
+      query += ' AND eventTime <= ?';
+      params.push(filters.endDate);
+    }
+
+    if (filters?.doorId) {
+      query += ' AND doorId = ?';
+      params.push(filters.doorId);
+    }
+
+    if (filters?.status) {
+      query += ' AND newStatus = ?';
+      params.push(filters.status);
+    }
+
+    query += ' ORDER BY eventTime DESC LIMIT 1000';
+
+    return this.db.prepare(query).all(...params) as DockEvent[];
+  }
+
+  // ==================== PRODUCTION ====================
+
+  createProductionEntry(data: CreateProductionEntryRequest): ProductionEntry {
+    const now = new Date().toISOString();
+
+    const result = this.db.prepare(`
+      INSERT INTO production_entries (
+        date, shift, lineNumber, laborHours, laborRate, pallets, cases, scrapCases, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      data.date,
+      data.shift,
+      data.lineNumber,
+      data.laborHours,
+      data.laborRate,
+      data.pallets,
+      data.cases,
+      data.scrapCases,
+      now
+    );
+
+    return this.db.prepare('SELECT * FROM production_entries WHERE id = ?').get(result.lastInsertRowid) as ProductionEntry;
+  }
+
+  getProductionEntries(filters?: {
+    startDate?: string;
+    endDate?: string;
+    shift?: string;
+    lineNumber?: number;
+  }): ProductionEntry[] {
+    let query = 'SELECT * FROM production_entries WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.startDate) {
+      query += ' AND date >= ?';
+      params.push(filters.startDate);
+    }
+
+    if (filters?.endDate) {
+      query += ' AND date <= ?';
+      params.push(filters.endDate);
+    }
+
+    if (filters?.shift) {
+      query += ' AND shift = ?';
+      params.push(filters.shift);
+    }
+
+    if (filters?.lineNumber) {
+      query += ' AND lineNumber = ?';
+      params.push(filters.lineNumber);
+    }
+
+    query += ' ORDER BY date DESC, shift, lineNumber';
+
+    return this.db.prepare(query).all(...params) as ProductionEntry[];
+  }
+
+  close() {
+    this.db.close();
+  }
+}
+
+export const db = new DatabaseService();
