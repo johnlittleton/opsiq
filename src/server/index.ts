@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import { db } from './database';
@@ -21,6 +22,7 @@ const io = new SocketServer(httpServer, {
   },
 });
 
+app.use(cors());
 app.use(express.json());
 
 // ==================== REST API ====================

@@ -17,6 +17,14 @@ const DEFAULT_API_URL = 'http://localhost:3000';
 const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 const SOCKET_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
+// Debug logging
+console.log('🔧 API Configuration:', {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  API_BASE,
+  SOCKET_URL,
+  allEnvVars: import.meta.env
+});
+
 class ApiClient {
   private socket: Socket | null = null;
   private reconnectAttempts = 0;
@@ -27,6 +35,7 @@ class ApiClient {
   }
 
   private initSocket() {
+    console.log('🔌 Connecting to:', SOCKET_URL);
     this.socket = io(SOCKET_URL, {
       reconnection: true,
       reconnectionDelay: 1000,
@@ -93,7 +102,7 @@ class ApiClient {
       return response.json();
     } catch (error: any) {
       if (error.message === 'Failed to fetch') {
-        throw new Error('Cannot connect to server. Make sure the backend is running on port 3000.');
+        throw new Error(`Cannot connect to server at ${API_BASE}. Please check your connection.`);
       }
       throw error;
     }
