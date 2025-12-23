@@ -26,6 +26,9 @@
   ],
   "author": "Slingshot Transportation, Inc",
   "license": "PROPRIETARY",
+  "engines": {
+    "node": "20.x"
+  },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.9",
     "@types/express": "^4.17.21",
