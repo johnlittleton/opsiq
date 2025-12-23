@@ -1,6 +1,7 @@
 import { app, BrowserWindow, screen, ipcMain } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { exec } from 'child_process';
 
 // ==================== CONFIGURATION ====================
 
@@ -126,6 +127,7 @@ function createWindow() {
   const mainWindow = new BrowserWindow({
     ...bounds,
     icon: fs.existsSync(ICON_PATH) ? ICON_PATH : undefined,
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -135,9 +137,38 @@ function createWindow() {
     show: false,
   });
 
+  // Remove menu bar
+  mainWindow.setMenuBarVisibility(false);
+
   // Show window when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // Window control handlers
+  ipcMain.on('window-minimize', () => {
+    mainWindow.minimize();
+  });
+
+  ipcMain.on('window-maximize', () => {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  });
+
+  ipcMain.on('window-close', () => {
+    mainWindow.close();
+  });
+
+  ipcMain.on('window-toggle-fullscreen', () => {
+    mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  });
+
+  ipcMain.on('window-toggle-always-on-top', () => {
+    const isOnTop = mainWindow.isAlwaysOnTop();
+    mainWindow.setAlwaysOnTop(!isOnTop);
   });
 
   // Load URL based on environment
@@ -157,11 +188,6 @@ function createWindow() {
   }
 
   mainWindow.loadURL(url);
-
-  // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
-  }
 
   return mainWindow;
 }
@@ -219,4 +245,27 @@ ipcMain.handle('get-displays', () => {
     workArea: display.workArea,
     primary: display.bounds.x === 0 && display.bounds.y === 0,
   }));
+});
+
+// ==================== TOUCH KEYBOARD ====================
+
+ipcMain.on('show-touch-keyboard', () => {
+  if (process.platform === 'win32') {
+    // Path to Windows on-screen keyboard
+    const tabtipPath = 'C:\\\\Program Files\\\\Common Files\\\\microsoft shared\\\\ink\\\\TabTip.exe';
+    exec(`"${tabtipPath}"`, (error) => {
+      if (error) {
+        console.error('Failed to open touch keyboard:', error);
+      }
+    });
+  }
+});
+
+ipcMain.on('hide-touch-keyboard', () => {
+  if (process.platform === 'win32') {
+    // Kill the touch keyboard process
+    exec('taskkill /IM TabTip.exe /F', (error) => {
+      // Ignore errors - keyboard might not be open
+    });
+  }
 });

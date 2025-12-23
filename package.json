@@ -12,9 +12,10 @@
     "build:react": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
     "build:server": "tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
+    "start:electron": "electron .",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
-    "start": "electron .",
     "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [

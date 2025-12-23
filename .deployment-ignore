@@ -1,0 +1,16 @@
+node_modules
+dist-electron
+release
+.git
+.vscode
+*.md
+.env
+.env.local
+assets
+src/electron
+src/renderer
+index.html
+vite.config.ts
+tsconfig.electron.json
+postcss.config.js
+tailwind.config.js

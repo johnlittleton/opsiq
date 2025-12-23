@@ -1,0 +1,71 @@
+/* OpsIQ Design Tokens - Control Room Theme */
+
+:root {
+  /* Background Layers */
+  --bg0: #0a0e14;
+  --bg1: #141923;
+  --bg2: #1a202c;
+  --bg-gradient: linear-gradient(135deg, #0a0e14 0%, #141923 50%, #1a202c 100%);
+  --vignette: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.6) 100%);
+  
+  /* Glass Panels */
+  --glass: rgba(20, 25, 35, 0.75);
+  --glass2: rgba(26, 32, 44, 0.85);
+  --glass-blur: blur(16px);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-bright: rgba(255, 255, 255, 0.15);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-heavy: 0 16px 48px rgba(0, 0, 0, 0.6);
+  
+  /* Typography */
+  --text: #e8eaed;
+  --text-bright: #ffffff;
+  --text-muted: #9ca3af;
+  --text-subtle: #6b7280;
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
+  
+  /* Dock Tile Base */
+  --tile-bg: linear-gradient(145deg, rgba(26, 32, 44, 0.7) 0%, rgba(20, 25, 35, 0.9) 100%);
+  --tile-radius: 14px;
+  --tile-border: 2px;
+  --tile-size: 135px;
+  --tile-gap: 12px;
+  
+  /* Status Glow Colors - Neon Theme */
+  --glow-open: #22c55e;
+  --glow-open-bright: #4ade80;
+  --glow-open-shadow: 0 0 20px rgba(34, 197, 94, 0.6), 0 0 40px rgba(34, 197, 94, 0.3), inset 0 0 10px rgba(34, 197, 94, 0.2);
+  
+  --glow-waiting: #3b82f6;
+  --glow-waiting-bright: #60a5fa;
+  --glow-waiting-shadow: 0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.3), inset 0 0 10px rgba(59, 130, 246, 0.2);
+  
+  --glow-loading: #eab308;
+  --glow-loading-bright: #facc15;
+  --glow-loading-shadow: 0 0 20px rgba(234, 179, 8, 0.6), 0 0 40px rgba(234, 179, 8, 0.3), inset 0 0 10px rgba(234, 179, 8, 0.2);
+  
+  --glow-offload: #ef4444;
+  --glow-offload-bright: #f87171;
+  --glow-offload-shadow: 0 0 20px rgba(239, 68, 68, 0.6), 0 0 40px rgba(239, 68, 68, 0.3), inset 0 0 10px rgba(239, 68, 68, 0.2);
+  
+  --glow-offline: #6b7280;
+  --glow-offline-bright: #9ca3af;
+  --glow-offline-shadow: 0 0 20px rgba(107, 114, 128, 0.4), 0 0 40px rgba(107, 114, 128, 0.2), inset 0 0 10px rgba(107, 114, 128, 0.1);
+
+  --glow-purple: #a855f7;
+  --glow-purple-bright: #c084fc;
+  --glow-purple-shadow: 0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(168, 85, 247, 0.3), inset 0 0 10px rgba(168, 85, 247, 0.2);
+  
+  /* UI Accent */
+  --accent-primary: #3b82f6;
+  --accent-hover: #60a5fa;
+  
+  /* Rail */
+  --rail-width: 280px;
+  --rail-gap: 16px;
+  
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}

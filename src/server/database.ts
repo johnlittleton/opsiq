@@ -100,6 +100,28 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_events_checkin ON dock_events(checkinId);
       CREATE INDEX IF NOT EXISTS idx_events_time ON dock_events(eventTime);
       CREATE INDEX IF NOT EXISTS idx_production_date ON production_entries(date);
+
+      CREATE TABLE IF NOT EXISTS appointments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        appointmentDate TEXT NOT NULL,
+        appointmentTime TEXT NOT NULL,
+        company TEXT NOT NULL,
+        contactName TEXT NOT NULL,
+        contactPhone TEXT NOT NULL,
+        type TEXT NOT NULL,
+        doorId INTEGER,
+        pallets INTEGER,
+        commodity TEXT,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'Scheduled',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (doorId) REFERENCES dock_doors(doorId)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointmentDate);
+      CREATE INDEX IF NOT EXISTS idx_appointments_type ON appointments(type);
+      CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
     `);
 
     // Seed dock doors if empty
@@ -333,6 +355,71 @@ export class DatabaseService {
     return this.db.prepare(query).all(...params) as DockEvent[];
   }
 
+  getActiveCheckins(): DockCheckin[] {
+    return this.db.prepare(`
+      SELECT * FROM dock_checkins 
+      WHERE closedAt IS NULL 
+      ORDER BY createdAt DESC
+    `).all() as DockCheckin[];
+  }
+
+  getAllCheckins(filters?: {
+    startDate?: string;
+    endDate?: string;
+    doorId?: number;
+    company?: string;
+    driverName?: string;
+    pickupNumber?: string;
+    type?: string;
+    includeActive?: boolean;
+  }): DockCheckin[] {
+    let query = 'SELECT * FROM dock_checkins WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.startDate) {
+      query += ' AND createdAt >= ?';
+      params.push(filters.startDate);
+    }
+
+    if (filters?.endDate) {
+      query += ' AND createdAt <= ?';
+      params.push(filters.endDate);
+    }
+
+    if (filters?.doorId) {
+      query += ' AND doorId = ?';
+      params.push(filters.doorId);
+    }
+
+    if (filters?.company) {
+      query += ' AND company LIKE ?';
+      params.push(`%${filters.company}%`);
+    }
+
+    if (filters?.driverName) {
+      query += ' AND driverName LIKE ?';
+      params.push(`%${filters.driverName}%`);
+    }
+
+    if (filters?.pickupNumber) {
+      query += ' AND pickupNumber LIKE ?';
+      params.push(`%${filters.pickupNumber}%`);
+    }
+
+    if (filters?.type) {
+      query += ' AND inboundOutbound = ?';
+      params.push(filters.type);
+    }
+
+    if (filters?.includeActive === false) {
+      query += ' AND closedAt IS NOT NULL';
+    }
+
+    query += ' ORDER BY createdAt DESC';
+
+    return this.db.prepare(query).all(...params) as DockCheckin[];
+  }
+
   // ==================== PRODUCTION ====================
 
   createProductionEntry(data: CreateProductionEntryRequest): ProductionEntry {
@@ -389,6 +476,155 @@ export class DatabaseService {
     query += ' ORDER BY date DESC, shift, lineNumber';
 
     return this.db.prepare(query).all(...params) as ProductionEntry[];
+  }
+
+  // ==================== APPOINTMENTS ====================
+
+  createAppointment(data: {
+    appointmentDate: string;
+    appointmentTime: string;
+    company: string;
+    contactName: string;
+    contactPhone: string;
+    type: 'Inbound' | 'Outbound';
+    doorId?: number;
+    pallets?: number;
+    commodity?: string;
+    notes?: string;
+    status?: string;
+  }) {
+    const now = new Date().toISOString();
+    const result = this.db.prepare(`
+      INSERT INTO appointments (
+        appointmentDate, appointmentTime, company, contactName, contactPhone,
+        type, doorId, pallets, commodity, notes, status, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      data.appointmentDate,
+      data.appointmentTime,
+      data.company,
+      data.contactName,
+      data.contactPhone,
+      data.type,
+      data.doorId || null,
+      data.pallets || null,
+      data.commodity || null,
+      data.notes || null,
+      data.status || 'Scheduled',
+      now,
+      now
+    );
+
+    return this.db.prepare('SELECT * FROM appointments WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  getAppointments(filters?: {
+    startDate?: string;
+    endDate?: string;
+    type?: string;
+    status?: string;
+  }) {
+    let query = 'SELECT * FROM appointments WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.startDate) {
+      query += ' AND appointmentDate >= ?';
+      params.push(filters.startDate);
+    }
+
+    if (filters?.endDate) {
+      query += ' AND appointmentDate <= ?';
+      params.push(filters.endDate);
+    }
+
+    if (filters?.type) {
+      query += ' AND type = ?';
+      params.push(filters.type);
+    }
+
+    if (filters?.status) {
+      query += ' AND status = ?';
+      params.push(filters.status);
+    }
+
+    query += ' ORDER BY appointmentDate, appointmentTime';
+
+    return this.db.prepare(query).all(...params);
+  }
+
+  updateAppointment(id: number, data: {
+    appointmentDate?: string;
+    appointmentTime?: string;
+    company?: string;
+    contactName?: string;
+    contactPhone?: string;
+    type?: 'Inbound' | 'Outbound';
+    doorId?: number;
+    pallets?: number;
+    commodity?: string;
+    notes?: string;
+    status?: string;
+  }) {
+    const now = new Date().toISOString();
+    const fields: string[] = [];
+    const params: any[] = [];
+
+    if (data.appointmentDate !== undefined) {
+      fields.push('appointmentDate = ?');
+      params.push(data.appointmentDate);
+    }
+    if (data.appointmentTime !== undefined) {
+      fields.push('appointmentTime = ?');
+      params.push(data.appointmentTime);
+    }
+    if (data.company !== undefined) {
+      fields.push('company = ?');
+      params.push(data.company);
+    }
+    if (data.contactName !== undefined) {
+      fields.push('contactName = ?');
+      params.push(data.contactName);
+    }
+    if (data.contactPhone !== undefined) {
+      fields.push('contactPhone = ?');
+      params.push(data.contactPhone);
+    }
+    if (data.type !== undefined) {
+      fields.push('type = ?');
+      params.push(data.type);
+    }
+    if (data.doorId !== undefined) {
+      fields.push('doorId = ?');
+      params.push(data.doorId);
+    }
+    if (data.pallets !== undefined) {
+      fields.push('pallets = ?');
+      params.push(data.pallets);
+    }
+    if (data.commodity !== undefined) {
+      fields.push('commodity = ?');
+      params.push(data.commodity);
+    }
+    if (data.notes !== undefined) {
+      fields.push('notes = ?');
+      params.push(data.notes);
+    }
+    if (data.status !== undefined) {
+      fields.push('status = ?');
+      params.push(data.status);
+    }
+
+    fields.push('updatedAt = ?');
+    params.push(now);
+    params.push(id);
+
+    this.db.prepare(`UPDATE appointments SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+
+    return this.db.prepare('SELECT * FROM appointments WHERE id = ?').get(id);
+  }
+
+  deleteAppointment(id: number) {
+    return this.db.prepare('DELETE FROM appointments WHERE id = ?').run(id);
   }
 
   close() {

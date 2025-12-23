@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { TitleBar } from '../../components/layout/TitleBar';
 import { apiClient } from '../services/api';
 import { InboundOutbound, DoorStatus } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
+import './DriverCheckIn.css';
 
 const DriverCheckIn: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -21,9 +24,43 @@ const DriverCheckIn: React.FC = () => {
     checker: '',
     plateNumber: '',
     phoneNumber: '',
-    doorId: '',
+    doorId: (location.state as any)?.selectedDoor?.toString() || '',
     status: 'Waiting' as DoorStatus,
   });
+
+  // Touch keyboard support
+  useEffect(() => {
+    const handleFocus = () => {
+      if (window.electron?.showTouchKeyboard) {
+        window.electron.showTouchKeyboard();
+      }
+    };
+
+    const handleBlur = (e: FocusEvent) => {
+      // Only hide if not moving to another input
+      setTimeout(() => {
+        if (!document.activeElement?.matches('input, select, textarea')) {
+          if (window.electron?.hideTouchKeyboard) {
+            window.electron.hideTouchKeyboard();
+          }
+        }
+      }, 100);
+    };
+
+    // Add listeners to all inputs and selects
+    const inputs = document.querySelectorAll('input, select');
+    inputs.forEach(input => {
+      input.addEventListener('focus', handleFocus);
+      input.addEventListener('blur', handleBlur);
+    });
+
+    return () => {
+      inputs.forEach(input => {
+        input.removeEventListener('focus', handleFocus);
+        input.removeEventListener('blur', handleBlur);
+      });
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -36,11 +73,6 @@ const DriverCheckIn: React.FC = () => {
     if (!formData.driverName.trim()) return 'Driver name is required';
     if (!formData.pickupNumber.trim()) return 'Pickup number is required';
     if (!formData.pallets || parseInt(formData.pallets) < 1) return 'Valid pallet count is required';
-    if (!formData.commodity.trim()) return 'Commodity is required';
-    if (!formData.forkliftDriver.trim()) return 'Forklift driver is required';
-    if (!formData.checker.trim()) return 'Checker is required';
-    if (!formData.plateNumber.trim()) return 'Plate number is required';
-    if (!formData.phoneNumber.trim()) return 'Phone number is required';
     if (!formData.doorId || parseInt(formData.doorId) < 1 || parseInt(formData.doorId) > 39) {
       return 'Valid door number (1-39) is required';
     }
@@ -67,9 +99,9 @@ const DriverCheckIn: React.FC = () => {
         driverName: formData.driverName,
         pickupNumber: formData.pickupNumber,
         pallets: parseInt(formData.pallets),
-        commodity: formData.commodity,
-        forkliftDriver: formData.forkliftDriver,
-        checker: formData.checker,
+        commodity: formData.commodity || 'General',
+        forkliftDriver: formData.forkliftDriver || 'TBD',
+        checker: formData.checker || 'TBD',
         plateNumber: formData.plateNumber,
         phoneNumber: formData.phoneNumber,
         doorId: parseInt(formData.doorId),
@@ -79,26 +111,9 @@ const DriverCheckIn: React.FC = () => {
 
       setSuccess(true);
       
-      // Reset form
-      setFormData({
-        inboundOutbound: 'Inbound',
-        company: '',
-        driverName: '',
-        pickupNumber: '',
-        pallets: '',
-        commodity: '',
-        forkliftDriver: '',
-        checker: '',
-        plateNumber: '',
-        phoneNumber: '',
-        doorId: '',
-        status: 'Waiting',
-      });
-
-      // Navigate to dock board after 1 second
       setTimeout(() => {
         navigate('/dockboard');
-      }, 1000);
+      }, 1500);
 
     } catch (err: any) {
       setError(err.message || 'Failed to check in driver');
@@ -108,197 +123,229 @@ const DriverCheckIn: React.FC = () => {
   };
 
   return (
-    <div>
-      <h1 className="page-title">Driver Check-In</h1>
+    <div className="driver-checkin">
+      <TitleBar />
+      
+      <div className="driver-checkin__container">
+        <div className="driver-checkin__header">
+          <h1 className="driver-checkin__title">Driver Check-In</h1>
+          <button 
+            className="driver-checkin__back"
+            onClick={() => navigate('/dockboard')}
+          >
+            ← Back to Dock Board
+          </button>
+        </div>
 
-      <div className="card" style={{ maxWidth: '800px', margin: '0 auto' }}>
-        {error && <div className="error">{error}</div>}
-        {success && <div className="success">✓ Driver checked in successfully! Redirecting to dock board...</div>}
+        {error && (
+          <div className="driver-checkin__alert driver-checkin__alert--error">
+            <span className="driver-checkin__alert-icon">⚠</span>
+            {error}
+          </div>
+        )}
+        
+        {success && (
+          <div className="driver-checkin__alert driver-checkin__alert--success">
+            <span className="driver-checkin__alert-icon">✓</span>
+            Driver checked in successfully! Redirecting...
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className="form-group">
-              <label>Inbound / Outbound *</label>
-              <select
-                name="inboundOutbound"
-                value={formData.inboundOutbound}
-                onChange={handleChange}
-                className="form-select"
-                disabled={submitting}
-              >
-                <option value="Inbound">Inbound</option>
-                <option value="Outbound">Outbound</option>
-              </select>
-            </div>
+        <form className="driver-checkin__form" onSubmit={handleSubmit}>
+          <div className="driver-checkin__section">
+            <h2 className="driver-checkin__section-title">TRIP INFORMATION</h2>
+            <div className="driver-checkin__grid">
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Type *</label>
+                <select
+                  name="inboundOutbound"
+                  value={formData.inboundOutbound}
+                  onChange={handleChange}
+                  className="driver-checkin__select"
+                  disabled={submitting}
+                >
+                  <option value="Inbound">Inbound</option>
+                  <option value="Outbound">Outbound</option>
+                </select>
+              </div>
 
-            <div className="form-group">
-              <label>Initial Status *</label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleChange}
-                className="form-select"
-                disabled={submitting}
-              >
-                <option value="Waiting">Waiting</option>
-                <option value="Offload">Offload</option>
-                <option value="Loading">Loading</option>
-                <option value="Blocked">Blocked</option>
-                <option value="Parked">Parked</option>
-              </select>
-            </div>
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Door # *</label>
+                <input
+                  type="number"
+                  name="doorId"
+                  value={formData.doorId}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="1-39"
+                  min="1"
+                  max="39"
+                  disabled={submitting}
+                />
+              </div>
 
-            <div className="form-group">
-              <label>Company *</label>
-              <input
-                type="text"
-                name="company"
-                value={formData.company}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Company name"
-                disabled={submitting}
-              />
-            </div>
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Status *</label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="driver-checkin__select"
+                  disabled={submitting}
+                >
+                  <option value="Waiting">Waiting</option>
+                  <option value="Offload">Offload</option>
+                  <option value="Loading">Loading</option>
+                </select>
+              </div>
 
-            <div className="form-group">
-              <label>Driver Name *</label>
-              <input
-                type="text"
-                name="driverName"
-                value={formData.driverName}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Driver full name"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Pickup Number *</label>
-              <input
-                type="text"
-                name="pickupNumber"
-                value={formData.pickupNumber}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Pickup #"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Total Pallets *</label>
-              <input
-                type="number"
-                name="pallets"
-                value={formData.pallets}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Number of pallets"
-                min="1"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Commodity *</label>
-              <input
-                type="text"
-                name="commodity"
-                value={formData.commodity}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Product type"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Forklift Driver *</label>
-              <input
-                type="text"
-                name="forkliftDriver"
-                value={formData.forkliftDriver}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Forklift operator name"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Checker *</label>
-              <input
-                type="text"
-                name="checker"
-                value={formData.checker}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Checker name"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Truck Plate # *</label>
-              <input
-                type="text"
-                name="plateNumber"
-                value={formData.plateNumber}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="License plate"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Phone Number *</label>
-              <input
-                type="tel"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Contact number"
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>Dock Door (1-39) *</label>
-              <input
-                type="number"
-                name="doorId"
-                value={formData.doorId}
-                onChange={handleChange}
-                className="form-input"
-                placeholder="Door number"
-                min="1"
-                max="39"
-                disabled={submitting}
-              />
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Pickup # *</label>
+                <input
+                  type="text"
+                  name="pickupNumber"
+                  value={formData.pickupNumber}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Enter pickup number"
+                  disabled={submitting}
+                />
+              </div>
             </div>
           </div>
 
-          <div style={{ marginTop: '24px', display: 'flex', gap: '12px' }}>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting}
-            >
-              {submitting ? 'Checking In...' : 'Check In Driver'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/dockboard')}
-              disabled={submitting}
-            >
-              Cancel
-            </button>
+          <div className="driver-checkin__section">
+            <h2 className="driver-checkin__section-title">DRIVER & TRUCK</h2>
+            <div className="driver-checkin__grid">
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Driver Name *</label>
+                <input
+                  type="text"
+                  name="driverName"
+                  value={formData.driverName}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Full name"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Company *</label>
+                <input
+                  type="text"
+                  name="company"
+                  value={formData.company}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Company name"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Plate Number</label>
+                <input
+                  type="text"
+                  name="plateNumber"
+                  value={formData.plateNumber}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="License plate"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Phone Number</label>
+                <input
+                  type="tel"
+                  name="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="(555) 555-5555"
+                  disabled={submitting}
+                />
+              </div>
+            </div>
           </div>
+
+          <div className="driver-checkin__section">
+            <h2 className="driver-checkin__section-title">CARGO DETAILS</h2>
+            <div className="driver-checkin__grid">
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Pallets *</label>
+                <input
+                  type="number"
+                  name="pallets"
+                  value={formData.pallets}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Count"
+                  min="1"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Commodity</label>
+                <input
+                  type="text"
+                  name="commodity"
+                  value={formData.commodity}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Product type"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Forklift Driver</label>
+                <input
+                  type="text"
+                  name="forkliftDriver"
+                  value={formData.forkliftDriver}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Operator name"
+                  disabled={submitting}
+                />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Checker</label>
+                <input
+                  type="text"
+                  name="checker"
+                  value={formData.checker}
+                  onChange={handleChange}
+                  className="driver-checkin__input"
+                  placeholder="Checker name"
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="driver-checkin__submit"
+            disabled={submitting}
+          >
+            {submitting ? (
+              <>
+                <span className="driver-checkin__submit-spinner"></span>
+                Checking In...
+              </>
+            ) : (
+              <>
+                <span className="driver-checkin__submit-icon">✓</span>
+                Check In Driver
+              </>
+            )}
+          </button>
         </form>
       </div>
     </div>

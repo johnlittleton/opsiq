@@ -12,7 +12,10 @@ import {
   DoorStatus,
 } from '../shared/types';
 
-const API_BASE = 'http://localhost:3000';
+// Use environment variable if set, otherwise default to localhost
+const DEFAULT_API_URL = 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
+const SOCKET_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
 
 class ApiClient {
   private socket: Socket | null = null;
@@ -24,7 +27,7 @@ class ApiClient {
   }
 
   private initSocket() {
-    this.socket = io(API_BASE, {
+    this.socket = io(SOCKET_URL, {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -77,16 +80,23 @@ class ApiClient {
   }
 
   async createCheckin(data: CreateCheckinRequest): Promise<DockDoorWithCheckin> {
-    const response = await fetch(`${API_BASE}/api/checkins`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to create checkin');
+    try {
+      const response = await fetch(`${API_BASE}/api/checkins`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create checkin');
+      }
+      return response.json();
+    } catch (error: any) {
+      if (error.message === 'Failed to fetch') {
+        throw new Error('Cannot connect to server. Make sure the backend is running on port 3000.');
+      }
+      throw error;
     }
-    return response.json();
   }
 
   async updateDoorStatus(data: UpdateDoorStatusRequest): Promise<DockDoorWithCheckin> {
@@ -129,6 +139,37 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}/api/events?${params}`);
     if (!response.ok) throw new Error('Failed to fetch events');
+    return response.json();
+  }
+
+  async getActiveCheckins(): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/api/checkins/active`);
+    if (!response.ok) throw new Error('Failed to fetch active checkins');
+    return response.json();
+  }
+
+  async getAllCheckins(filters?: {
+    startDate?: string;
+    endDate?: string;
+    doorId?: number;
+    company?: string;
+    driverName?: string;
+    pickupNumber?: string;
+    type?: string;
+    includeActive?: boolean;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.doorId) params.append('doorId', filters.doorId.toString());
+    if (filters?.company) params.append('company', filters.company);
+    if (filters?.driverName) params.append('driverName', filters.driverName);
+    if (filters?.pickupNumber) params.append('pickupNumber', filters.pickupNumber);
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.includeActive === false) params.append('includeActive', 'false');
+
+    const response = await fetch(`${API_BASE}/api/checkins?${params}`);
+    if (!response.ok) throw new Error('Failed to fetch checkins');
     return response.json();
   }
 
@@ -180,6 +221,84 @@ class ApiClient {
     const response = await fetch(`${API_BASE}/api/kpi/production?${params}`);
     if (!response.ok) throw new Error('Failed to fetch production KPI');
     return response.json();
+  }
+
+  // Appointments API
+  async getAppointments(filters?: {
+    startDate?: string;
+    endDate?: string;
+    type?: string;
+    status?: string;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.status) params.append('status', filters.status);
+
+    const response = await fetch(`${API_BASE}/api/appointments?${params}`);
+    if (!response.ok) throw new Error('Failed to fetch appointments');
+    return response.json();
+  }
+
+  async createAppointment(data: {
+    appointmentDate: string;
+    appointmentTime: string;
+    company: string;
+    contactName: string;
+    contactPhone: string;
+    type: 'Inbound' | 'Outbound';
+    doorId?: number;
+    pallets?: number;
+    commodity?: string;
+    notes?: string;
+    status?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/appointments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create appointment');
+    }
+    return response.json();
+  }
+
+  async updateAppointment(id: number, data: any): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/appointments/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update appointment');
+    }
+    return response.json();
+  }
+
+  async deleteAppointment(id: number): Promise<void> {
+    const response = await fetch(`${API_BASE}/api/appointments/${id}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete appointment');
+    }
+  }
+
+  onAppointmentCreated(callback: (appointment: any) => void) {
+    this.socket?.on('appointment:created', callback);
+  }
+
+  onAppointmentUpdated(callback: (appointment: any) => void) {
+    this.socket?.on('appointment:updated', callback);
+  }
+
+  onAppointmentDeleted(callback: (data: { id: number }) => void) {
+    this.socket?.on('appointment:deleted', callback);
   }
 
   disconnect() {

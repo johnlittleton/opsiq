@@ -102,6 +102,36 @@ app.get('/api/events', (req, res) => {
   }
 });
 
+// Get active checkins
+app.get('/api/checkins/active', (req, res) => {
+  try {
+    const checkins = db.getActiveCheckins();
+    res.json(checkins);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all checkins with filters
+app.get('/api/checkins', (req, res) => {
+  try {
+    const filters = {
+      startDate: req.query.startDate as string | undefined,
+      endDate: req.query.endDate as string | undefined,
+      doorId: req.query.doorId ? parseInt(req.query.doorId as string) : undefined,
+      company: req.query.company as string | undefined,
+      driverName: req.query.driverName as string | undefined,
+      pickupNumber: req.query.pickupNumber as string | undefined,
+      type: req.query.type as string | undefined,
+      includeActive: req.query.includeActive === 'false' ? false : undefined,
+    };
+    const checkins = db.getAllCheckins(filters);
+    res.json(checkins);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create production entry
 app.post('/api/production', (req, res) => {
   try {
@@ -291,6 +321,68 @@ function calculateProductionKPI(startDate: string, endDate: string, shift?: stri
     lineBreakdown: Object.values(lineBreakdown).sort((a, b) => a.lineNumber - b.lineNumber),
   };
 }
+
+// ==================== APPOINTMENTS API ====================
+
+// Get appointments
+app.get('/api/appointments', (req, res) => {
+  try {
+    const filters = {
+      startDate: req.query.startDate as string | undefined,
+      endDate: req.query.endDate as string | undefined,
+      type: req.query.type as string | undefined,
+      status: req.query.status as string | undefined,
+    };
+    const appointments = db.getAppointments(filters);
+    res.json(appointments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create appointment
+app.post('/api/appointments', (req, res) => {
+  try {
+    const appointment = db.createAppointment(req.body);
+    
+    // Broadcast update to all clients
+    io.emit('appointment:created', appointment);
+    
+    res.json(appointment);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update appointment
+app.put('/api/appointments/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const appointment = db.updateAppointment(id, req.body);
+    
+    // Broadcast update to all clients
+    io.emit('appointment:updated', appointment);
+    
+    res.json(appointment);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete appointment
+app.delete('/api/appointments/:id', (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    db.deleteAppointment(id);
+    
+    // Broadcast update to all clients
+    io.emit('appointment:deleted', { id });
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 // ==================== SOCKET.IO ====================
 

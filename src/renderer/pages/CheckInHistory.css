@@ -1,0 +1,205 @@
+.checkin-history {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: var(--text);
+}
+
+.checkin-history__content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.checkin-history__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.checkin-history__title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.checkin-history__back-btn {
+  padding: 8px 16px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.checkin-history__back-btn:hover {
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.checkin-history__filters,
+.checkin-history__results {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  backdrop-filter: blur(10px);
+}
+
+.checkin-history__filters-title,
+.checkin-history__results-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 16px;
+}
+
+.checkin-history__filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.checkin-history__field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.checkin-history__field input,
+.checkin-history__field select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.checkin-history__field input:focus,
+.checkin-history__field select:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.checkin-history__field--checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.checkin-history__field--checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.checkin-history__field--checkbox input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.checkin-history__loading,
+.checkin-history__empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted);
+}
+
+.checkin-history__table-wrapper {
+  overflow-x: auto;
+}
+
+.checkin-history__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.checkin-history__table thead {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.checkin-history__table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.checkin-history__table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.checkin-history__table tbody tr {
+  transition: background 0.2s;
+}
+
+.checkin-history__table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.checkin-history__row--active {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.checkin-history__badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.checkin-history__badge--inbound {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.checkin-history__badge--outbound {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+.checkin-history__badge--waiting {
+  background: rgba(184, 119, 217, 0.2);
+  color: #b877d9;
+}
+
+.checkin-history__badge--loading {
+  background: rgba(250, 222, 42, 0.2);
+  color: #fade2a;
+}
+
+.checkin-history__badge--offload {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.checkin-history__badge--open {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.checkin-history__active {
+  color: var(--accent-primary);
+  font-weight: 600;
+}

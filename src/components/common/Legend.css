@@ -1,0 +1,64 @@
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.legend__title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.legend__items {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.legend__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 8px currentColor, 0 0 16px currentColor;
+}
+
+.legend__dot--open {
+  background: var(--glow-open);
+  color: var(--glow-open);
+}
+
+.legend__dot--loading {
+  background: var(--glow-loading);
+  color: var(--glow-loading);
+}
+
+.legend__dot--offload {
+  background: var(--glow-offload);
+  color: var(--glow-offload);
+}
+
+.legend__dot--waiting {
+  background: var(--glow-waiting);
+  color: var(--glow-waiting);
+}
+
+.legend__dot--offline {
+  background: var(--glow-offline);
+  color: var(--glow-offline);
+}
+
+.legend__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
