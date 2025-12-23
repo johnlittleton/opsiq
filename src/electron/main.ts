@@ -35,18 +35,21 @@ function loadSettings(): AppSettings {
 }
 
 function isMultiInstanceAllowed(): boolean {
-  // Check CLI flags
+  // Multi-instance is ENABLED BY DEFAULT for warehouse/dock environments
+  // where multiple screens are standard workflow
+  
+  // Check CLI flag to DISABLE multi-instance if needed
   const args = process.argv.slice(1);
-  if (args.includes('--multi')) return true;
+  if (args.includes('--single')) return false;
   
-  // Check environment variable
-  if (process.env.OPSIQ_MULTI_INSTANCE === 'true') return true;
+  // Check environment variable to disable
+  if (process.env.OPSIQ_MULTI_INSTANCE === 'false') return false;
   
-  // Check settings file
+  // Check settings file to disable
   const settings = loadSettings();
-  if (settings.allowMultiInstance) return true;
+  if (settings.allowMultiInstance === false) return false;
   
-  return false;
+  return true; // Default: ALLOW multiple instances
 }
 
 function getScreenArgument(): string | null {
