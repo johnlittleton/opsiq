@@ -289,7 +289,11 @@ const ActiveDrivers: React.FC = () => {
                     <td style={{ padding: '12px', color: 'var(--text)' }}>{checkin.commodity}</td>
                     <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{checkin.plateNumber || '—'}</td>
                     <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{checkin.phoneNumber || '—'}</td>
-                    <td style={{ padding: '12px', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>{format(new Date(checkin.createdAt), 'MMM dd, HH:mm')}</td>
+                    <td style={{ padding: '12px', color: 'var(--text)', fontFamily: 'var(--font-mono)' }}>
+                      {checkin.createdAt && !isNaN(new Date(checkin.createdAt).getTime()) 
+                        ? format(new Date(checkin.createdAt), 'MMM dd, HH:mm')
+                        : '—'}
+                    </td>
                     <td style={{ padding: '12px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{getElapsedTime(checkin.statusStartTime)}</td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       <button

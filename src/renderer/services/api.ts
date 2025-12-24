@@ -70,7 +70,10 @@ class ApiClient {
   }
 
   onSyncResponse(callback: (data: { doors: DockDoorWithCheckin[] }) => void) {
-    this.socket?.on('sync:response', callback);
+    this.socket?.on('sync:response', (data) => {
+      console.log('📥 Received sync:response with', data.doors?.length || 0, 'doors');
+      callback(data);
+    });
   }
 
   onProductionUpdated(callback: (entry: ProductionEntry) => void) {
@@ -78,14 +81,23 @@ class ApiClient {
   }
 
   requestSync() {
+    console.log('📤 Requesting sync...');
     this.socket?.emit('sync:request');
+  }
+
+  // Helper to ensure array responses
+  private ensureArray<T>(data: T | T[]): T[] {
+    if (Array.isArray(data)) return data;
+    if (data === null || data === undefined) return [];
+    return [data];
   }
 
   // REST API calls
   async getAllDoors(): Promise<DockDoorWithCheckin[]> {
     const response = await fetch(`${API_BASE}/api/doors`);
     if (!response.ok) throw new Error('Failed to fetch doors');
-    return response.json();
+    const data = await response.json();
+    return this.ensureArray(data);
   }
 
   async createCheckin(data: CreateCheckinRequest): Promise<DockDoorWithCheckin> {
@@ -148,13 +160,15 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}/api/events?${params}`);
     if (!response.ok) throw new Error('Failed to fetch events');
-    return response.json();
+    const data = await response.json();
+    return this.ensureArray(data);
   }
 
   async getActiveCheckins(): Promise<any[]> {
     const response = await fetch(`${API_BASE}/api/checkins/active`);
     if (!response.ok) throw new Error('Failed to fetch active checkins');
-    return response.json();
+    const data = await response.json();
+    return this.ensureArray(data);
   }
 
   async getAllCheckins(filters?: {
@@ -179,7 +193,8 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}/api/checkins?${params}`);
     if (!response.ok) throw new Error('Failed to fetch checkins');
-    return response.json();
+    const data = await response.json();
+    return this.ensureArray(data);
   }
 
   async createProductionEntry(data: CreateProductionEntryRequest): Promise<ProductionEntry> {
@@ -209,7 +224,8 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}/api/production?${params}`);
     if (!response.ok) throw new Error('Failed to fetch production entries');
-    return response.json();
+    const data = await response.json();
+    return this.ensureArray(data);
   }
 
   async getShippingReceivingKPI(date?: string): Promise<ShippingReceivingKPI> {
@@ -247,7 +263,8 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}/api/appointments?${params}`);
     if (!response.ok) throw new Error('Failed to fetch appointments');
-    return response.json();
+    const data = await response.json();
+    return this.ensureArray(data);
   }
 
   async createAppointment(data: {

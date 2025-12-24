@@ -66,9 +66,9 @@ const AppointmentHistory: React.FC = () => {
     if (!searchText) return true;
     const search = searchText.toLowerCase();
     return (
-      apt.company.toLowerCase().includes(search) ||
-      apt.contactName.toLowerCase().includes(search) ||
-      apt.contactPhone.toLowerCase().includes(search) ||
+      (apt.company && apt.company.toLowerCase().includes(search)) ||
+      (apt.contactName && apt.contactName.toLowerCase().includes(search)) ||
+      (apt.contactPhone && apt.contactPhone.toLowerCase().includes(search)) ||
       (apt.commodity && apt.commodity.toLowerCase().includes(search)) ||
       (apt.notes && apt.notes.toLowerCase().includes(search))
     );
@@ -170,11 +170,15 @@ const AppointmentHistory: React.FC = () => {
                 <tbody>
                   {filteredAppointments.map(apt => (
                     <tr key={apt.id}>
-                      <td>{format(new Date(apt.appointmentDate), 'MMM dd, yyyy')}</td>
-                      <td>{apt.appointmentTime}</td>
                       <td>
-                        <span className={`appointment-history__badge appointment-history__badge--${apt.type.toLowerCase()}`}>
-                          {apt.type}
+                        {apt.appointmentDate && !isNaN(new Date(apt.appointmentDate).getTime())
+                          ? format(new Date(apt.appointmentDate), 'MMM dd, yyyy')
+                          : '—'}
+                      </td>
+                      <td>{apt.appointmentTime || '—'}</td>
+                      <td>
+                        <span className={`appointment-history__badge appointment-history__badge--${(apt.type || 'inbound').toLowerCase()}`}>
+                          {apt.type || 'N/A'}
                         </span>
                       </td>
                       <td>{apt.company}</td>
@@ -184,12 +188,16 @@ const AppointmentHistory: React.FC = () => {
                       <td>{apt.pallets || '—'}</td>
                       <td>{apt.commodity || '—'}</td>
                       <td>
-                        <span className={`appointment-history__badge appointment-history__badge--status-${apt.status.toLowerCase().replace(' ', '-')}`}>
-                          {apt.status}
+                        <span className={`appointment-history__badge appointment-history__badge--status-${(apt.status || 'pending').toLowerCase().replace(' ', '-')}`}>
+                          {apt.status || 'Pending'}
                         </span>
                       </td>
                       <td className="appointment-history__notes">{apt.notes || '—'}</td>
-                      <td>{format(new Date(apt.createdAt), 'MMM dd, HH:mm')}</td>
+                      <td>
+                        {apt.createdAt && !isNaN(new Date(apt.createdAt).getTime())
+                          ? format(new Date(apt.createdAt), 'MMM dd, HH:mm')
+                          : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

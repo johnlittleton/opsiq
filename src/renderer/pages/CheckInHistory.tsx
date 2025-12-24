@@ -185,8 +185,8 @@ const CheckInHistory: React.FC = () => {
                     <tr key={checkin.id} className={!checkin.closedAt ? 'checkin-history__row--active' : ''}>
                       <td><strong>D{checkin.doorId}</strong></td>
                       <td>
-                        <span className={`checkin-history__badge checkin-history__badge--${checkin.inboundOutbound.toLowerCase()}`}>
-                          {checkin.inboundOutbound}
+                        <span className={`checkin-history__badge checkin-history__badge--${(checkin.inboundOutbound || 'inbound').toLowerCase()}`}>
+                          {checkin.inboundOutbound || 'N/A'}
                         </span>
                       </td>
                       <td>{checkin.company}</td>
@@ -198,13 +198,21 @@ const CheckInHistory: React.FC = () => {
                       <td>{checkin.forkliftDriver}</td>
                       <td>{checkin.checker}</td>
                       <td>
-                        <span className={`checkin-history__badge checkin-history__badge--${checkin.status.toLowerCase()}`}>
-                          {checkin.status}
+                        <span className={`checkin-history__badge checkin-history__badge--${(checkin.status || 'pending').toLowerCase()}`}>
+                          {checkin.status || 'Pending'}
                         </span>
                       </td>
-                      <td>{format(new Date(checkin.createdAt), 'MMM dd, yyyy HH:mm')}</td>
                       <td>
-                        {checkin.closedAt ? format(new Date(checkin.closedAt), 'MMM dd, yyyy HH:mm') : (
+                        {checkin.createdAt && !isNaN(new Date(checkin.createdAt).getTime())
+                          ? format(new Date(checkin.createdAt), 'MMM dd, yyyy HH:mm')
+                          : '—'}
+                      </td>
+                      <td>
+                        {checkin.closedAt ? (
+                          !isNaN(new Date(checkin.closedAt).getTime())
+                            ? format(new Date(checkin.closedAt), 'MMM dd, yyyy HH:mm')
+                            : '—'
+                        ) : (
                           <span className="checkin-history__active">Active</span>
                         )}
                       </td>

@@ -102,7 +102,8 @@ const DockHistory: React.FC = () => {
     return `${minutes}m ${secs}s`;
   };
 
-  const filteredEvents = events.filter(event => {
+  const eventsArray = Array.isArray(events) ? events : [];
+  const filteredEvents = eventsArray.filter(event => {
     if (!searchText) return true;
     const search = searchText.toLowerCase();
     return (
@@ -307,11 +308,14 @@ const DockHistory: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredEvents.map(event => (
-                  <tr key={event.id}>
-                    <td>{format(new Date(event.eventTime), 'MMM dd, yyyy HH:mm:ss')}</td>
-                    <td><strong>Door {event.doorId}</strong></td>
-                    <td>
+                {filteredEvents.map(event => {
+                  const eventDate = new Date(event.eventTime);
+                  const isValidDate = !isNaN(eventDate.getTime());
+                  return (
+                    <tr key={event.id}>
+                      <td>{isValidDate ? format(eventDate, 'MMM dd, yyyy HH:mm:ss') : 'Invalid Date'}</td>
+                      <td><strong>Door {event.doorId}</strong></td>
+                      <td>
                       {event.oldStatus ? (
                         <span className={`door-status ${event.oldStatus ? `status-${event.oldStatus}` : ''}`}>
                           {event.oldStatus}
@@ -329,7 +333,8 @@ const DockHistory: React.FC = () => {
                     <td>{event.updatedBy}</td>
                     <td style={{ color: '#888' }}>{event.note || '—'}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

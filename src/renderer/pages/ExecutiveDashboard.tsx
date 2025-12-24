@@ -120,13 +120,13 @@ const ExecutiveDashboard: React.FC = () => {
           <StatPanel
             title="Trucks Loaded"
             value={metrics.totalTrucksLoaded}
-            subtitle={`${metrics.totalPalletsLoaded.toLocaleString()} pallets`}
+            subtitle={`${(metrics.totalPalletsLoaded || 0).toLocaleString()} pallets`}
             icon="truck"
           />
           <StatPanel
             title="Trucks Offloaded"
             value={metrics.totalTrucksOffloaded}
-            subtitle={`${metrics.totalPalletsOffloaded.toLocaleString()} pallets`}
+            subtitle={`${(metrics.totalPalletsOffloaded || 0).toLocaleString()} pallets`}
             icon="package"
           />
           <StatPanel
@@ -203,7 +203,7 @@ const ExecutiveDashboard: React.FC = () => {
         <GlassPanel className="operators-panel">
           <h2>Top Performing Forklift Operators</h2>
           
-          {metrics.topOperators.length === 0 ? (
+          {(metrics.topOperators?.length || 0) === 0 ? (
             <div className="empty-state">
               <p>No operator data available for selected period</p>
             </div>

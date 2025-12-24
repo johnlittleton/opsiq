@@ -8,7 +8,13 @@ import './DockBoardPage.css';
 export const DockBoardPage: React.FC = () => {
   const navigate = useNavigate();
   const doors = useAppStore(state => state.doors);
+  const initializeSync = useAppStore(state => state.initializeSync);
   const [, setTick] = useState(0);
+  
+  // Initialize data sync on mount
+  useEffect(() => {
+    initializeSync();
+  }, [initializeSync]);
   
   // Force re-render every second to update elapsed times
   useEffect(() => {
@@ -43,9 +49,10 @@ export const DockBoardPage: React.FC = () => {
   };
 
   // Create 39 doors, merging with real data
+  const doorsArray = Array.isArray(doors) ? doors : [];
   const allDoors = Array.from({ length: 39 }, (_, i) => {
     const doorNum = i + 1;
-    const doorData = doors.find(d => d.doorId === doorNum);
+    const doorData = doorsArray.find((d: any) => d.doorId === doorNum);
     const mappedStatus = doorData ? mapDoorStatus(doorData.status) : 'open';
     
     return {
@@ -58,7 +65,8 @@ export const DockBoardPage: React.FC = () => {
   });
 
   const handleDoorClick = (doorNumber: number) => {
-    const doorData = doors.find(d => d.doorId === doorNumber);
+    const doorsArray = Array.isArray(doors) ? doors : [];
+    const doorData = doorsArray.find(d => d.doorId === doorNumber);
     if (doorData?.checkin) {
       // If door has active check-in, navigate to check-out
       navigate('/history', { state: { checkoutDoor: doorNumber, checkin: doorData.checkin } });

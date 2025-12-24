@@ -247,27 +247,30 @@ const Scheduler: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  appointments.map(apt => (
-                    <tr key={apt.id} className="scheduler__table-row">
-                      <td>{format(new Date(apt.appointmentDate), 'MMM d, yyyy')}</td>
-                      <td>{apt.appointmentTime}</td>
-                      <td>
-                        <span className={`scheduler__type-badge scheduler__type-badge--${apt.type.toLowerCase()}`}>
-                          {apt.type}
-                        </span>
-                      </td>
-                      <td>{apt.company}</td>
-                      <td>{apt.contactName}</td>
-                      <td>{apt.contactPhone}</td>
-                      <td>{apt.doorId ? `D${apt.doorId}` : '-'}</td>
-                      <td>{apt.pallets || '-'}</td>
-                      <td>
-                        <span className="scheduler__status-badge">{apt.status}</span>
-                      </td>
-                      <td>
-                        <div className="scheduler__actions">
-                          <button
-                            onClick={() => openModal(new Date(apt.appointmentDate), apt)}
+                  appointments.map(apt => {
+                    const date = new Date(apt.appointmentDate);
+                    const isValidDate = !isNaN(date.getTime());
+                    return (
+                      <tr key={apt.id} className="scheduler__table-row">
+                        <td>{isValidDate ? format(date, 'MMM d, yyyy') : 'Invalid Date'}</td>
+                        <td>{apt.appointmentTime || '-'}</td>
+                        <td>
+                          <span className={`scheduler__type-badge scheduler__type-badge--${(apt.type || 'inbound').toLowerCase()}`}>
+                            {apt.type || 'N/A'}
+                          </span>
+                        </td>
+                        <td>{apt.company || '-'}</td>
+                        <td>{apt.contactName || '-'}</td>
+                        <td>{apt.contactPhone || '-'}</td>
+                        <td>{apt.doorId ? `D${apt.doorId}` : '-'}</td>
+                        <td>{apt.pallets || '-'}</td>
+                        <td>
+                          <span className="scheduler__status-badge">{apt.status || 'Pending'}</span>
+                        </td>
+                        <td>
+                          <div className="scheduler__actions">
+                            <button
+                              onClick={() => openModal(isValidDate ? date : new Date(), apt)}
                             className="scheduler__action-btn scheduler__action-btn--edit"
                           >
                             ✏️
@@ -281,7 +284,8 @@ const Scheduler: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -318,14 +322,14 @@ const Scheduler: React.FC = () => {
                     {dayAppointments.map(apt => (
                       <div
                         key={apt.id}
-                        className={`scheduler__appointment scheduler__appointment--${apt.type.toLowerCase()}`}
+                        className={`scheduler__appointment scheduler__appointment--${(apt.type || 'inbound').toLowerCase()}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           openModal(day, apt);
                         }}
                       >
-                        <div className="scheduler__appointment-time">{apt.appointmentTime}</div>
-                        <div className="scheduler__appointment-company">{apt.company}</div>
+                        <div className="scheduler__appointment-time">{apt.appointmentTime || '-'}</div>
+                        <div className="scheduler__appointment-company">{apt.company || 'N/A'}</div>
                       </div>
                     ))}
                   </div>

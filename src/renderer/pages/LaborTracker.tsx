@@ -137,19 +137,19 @@ export default function LaborTracker() {
           />
           <StatPanel
             title="Production Headcount"
-            value={summary.currentProductionHeadcount}
-            subtitle={`$${(summary.currentProductionHeadcount * PROD_HOURLY_WAGE).toFixed(2)}/hour`}
+            value={summary.currentProductionHeadcount || 0}
+            subtitle={`$${((summary.currentProductionHeadcount || 0) * PROD_HOURLY_WAGE).toFixed(2)}/hour`}
             icon="factory"
           />
           <StatPanel
             title="Total Headcount"
-            value={summary.currentTotalHeadcount}
-            subtitle={`$${summary.currentHourlyLaborCost.toFixed(2)}/hour`}
+            value={summary.currentTotalHeadcount || 0}
+            subtitle={`$${(summary.currentHourlyLaborCost || 0).toFixed(2)}/hour`}
             icon="users"
           />
           <StatPanel
             title="Today's Total Labor Cost"
-            value={`$${summary.dailyLaborCost.toFixed(2)}`}
+            value={`$${(summary.dailyLaborCost || 0).toFixed(2)}`}
             icon="dollar-sign"
           />
         </div>

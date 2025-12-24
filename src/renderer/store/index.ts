@@ -25,14 +25,15 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => {
   // Initialize socket listeners
   apiClient.onSyncResponse((data) => {
-    set({ doors: data.doors, loading: false });
+    set({ doors: Array.isArray(data.doors) ? data.doors : [], loading: false });
   });
 
   apiClient.onDockUpdated((door) => {
     const { doors } = get();
-    const index = doors.findIndex(d => d.doorId === door.doorId);
+    const doorsArray = Array.isArray(doors) ? doors : [];
+    const index = doorsArray.findIndex(d => d.doorId === door.doorId);
     if (index !== -1) {
-      const newDoors = [...doors];
+      const newDoors = [...doorsArray];
       newDoors[index] = door;
       set({ doors: newDoors });
     }
