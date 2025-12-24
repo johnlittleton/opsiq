@@ -68,11 +68,31 @@ const DoorTile: React.FC<{ door: DockDoorWithCheckin }> = ({ door }) => {
     if (updating) return;
     if (!confirm(`Clear Door ${door.doorId}?`)) return;
     
+    // Prompt for actual pallets if there's a checkin
+    let actualPallets: number | undefined;
+    if (door.currentCheckin) {
+      const input = prompt(
+        `How many pallets were ${door.currentCheckin.inboundOutbound === 'Inbound' ? 'offloaded' : 'loaded'}?\n\n(Expected: ${door.currentCheckin.pallets})`,
+        door.currentCheckin.pallets.toString()
+      );
+      
+      if (input === null) return; // User cancelled
+      
+      const parsed = parseInt(input, 10);
+      if (!isNaN(parsed) && parsed >= 0) {
+        actualPallets = parsed;
+      } else {
+        alert('Invalid number. Using expected pallets.');
+        actualPallets = door.currentCheckin.pallets;
+      }
+    }
+    
     setUpdating(true);
     try {
       await apiClient.clearDoor({
         doorId: door.doorId,
         updatedBy: 'User',
+        actualPallets,
       });
       setShowActions(false);
     } catch (error: any) {

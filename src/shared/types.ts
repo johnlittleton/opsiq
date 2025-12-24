@@ -91,6 +91,7 @@ export interface UpdateDoorStatusRequest {
 export interface ClearDoorRequest {
   doorId: number;
   updatedBy: string;
+  actualPallets?: number;
 }
 
 export interface CreateProductionEntryRequest {
@@ -213,4 +214,10 @@ export interface ExecutiveMetrics {
   dockUtilization: number;
   completedToday: number;
   activeNow: number;
+  
+  // Labor metrics
+  shippingReceivingLaborCostPerHour: number;
+  productionLaborCostPerHour: number;
+  totalShiftLaborCost: number;
+  currentHeadcount: number;
 }

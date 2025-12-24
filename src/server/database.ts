@@ -290,6 +290,18 @@ export class DatabaseService {
           SET status = ?, statusStartTime = ?, updatedAt = ?
           WHERE id = ?
         `).run(data.newStatus, now, now, door.currentCheckinId);
+        
+        // Mark load start time if status is Loading or Offload
+        if (data.newStatus === 'Loading' || data.newStatus === 'Offload') {
+          const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
+          if (!checkin.loadStartTime) {
+            this.db.prepare(`
+              UPDATE dock_checkins
+              SET loadStartTime = ?
+              WHERE id = ?
+            `).run(now, door.currentCheckinId);
+          }
+        }
       }
 
       // Log event
@@ -315,13 +327,31 @@ export class DatabaseService {
     const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
 
     const transaction = this.db.transaction(() => {
-      // Close checkin if exists
+      // Close checkin if exists and record performance metrics
       if (door.currentCheckinId) {
-        this.db.prepare(`
-          UPDATE dock_checkins
-          SET closedAt = ?, updatedAt = ?
-          WHERE id = ?
-        `).run(now, now, door.currentCheckinId);
+        const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
+        
+        // Calculate total time if loadStartTime exists
+        let totalMinutes = null;
+        if (checkin.loadStartTime) {
+          const loadEndTime = now;
+          const startMs = new Date(checkin.loadStartTime).getTime();
+          const endMs = new Date(loadEndTime).getTime();
+          totalMinutes = Math.round((endMs - startMs) / 60000); // Convert to minutes
+          
+          this.db.prepare(`
+            UPDATE dock_checkins
+            SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
+            WHERE id = ?
+          `).run(now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
+        } else {
+          // No load start time, just close it
+          this.db.prepare(`
+            UPDATE dock_checkins
+            SET closedAt = ?, updatedAt = ?, actualPallets = ?
+            WHERE id = ?
+          `).run(now, now, data.actualPallets || checkin.pallets, door.currentCheckinId);
+        }
       }
 
       // Update door to Open
@@ -857,6 +887,18 @@ export class DatabaseService {
 
     const totalDockHours = completedCheckins.reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
 
+    // Get latest labor snapshot
+    const latestLabor = this.db.prepare(
+      'SELECT * FROM labor_snapshots ORDER BY timestamp DESC LIMIT 1'
+    ).get() as any;
+
+    // Get all labor snapshots for the period to calculate shift total
+    const laborSnapshots = this.db.prepare(
+      'SELECT * FROM labor_snapshots WHERE timestamp >= ? AND timestamp <= ?'
+    ).all(start, end) as any[];
+
+    const totalShiftLaborCost = laborSnapshots.reduce((sum, s) => sum + s.totalLaborCost, 0);
+
     return {
       totalTrucksLoaded: outbound.length,
       totalTrucksOffloaded: inbound.length,
@@ -870,6 +912,10 @@ export class DatabaseService {
       dockUtilization: 0, // Calculate based on active doors
       completedToday: completedCheckins.length,
       activeNow: activeNow.count,
+      shippingReceivingLaborCostPerHour: latestLabor ? latestLabor.shippingReceivingLaborCost : 0,
+      productionLaborCostPerHour: latestLabor ? latestLabor.productionLaborCost : 0,
+      totalShiftLaborCost: Math.round(totalShiftLaborCost * 100) / 100,
+      currentHeadcount: latestLabor ? latestLabor.totalHeadcount : 0,
     };
   }
 
