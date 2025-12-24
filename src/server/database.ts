@@ -356,6 +356,13 @@ export class DatabaseService {
       if (door.currentCheckinId) {
         const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
         
+        console.log('Clearing door - Checkin data:', {
+          id: checkin.id,
+          loadStartTime: checkin.loadStartTime,
+          actualPallets: data.actualPallets,
+          expectedPallets: checkin.pallets
+        });
+        
         // Calculate total time if loadStartTime exists
         let totalMinutes = null;
         if (checkin.loadStartTime) {
@@ -364,12 +371,20 @@ export class DatabaseService {
           const endMs = new Date(loadEndTime).getTime();
           totalMinutes = Math.round((endMs - startMs) / 60000); // Convert to minutes
           
+          console.log('Calculated performance:', {
+            startTime: checkin.loadStartTime,
+            endTime: loadEndTime,
+            totalMinutes,
+            actualPallets: data.actualPallets || checkin.pallets
+          });
+          
           this.db.prepare(`
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
             WHERE id = ?
           `).run(now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
         } else {
+          console.log('⚠️ No loadStartTime found - performance tracking skipped');
           // No load start time, just close it
           this.db.prepare(`
             UPDATE dock_checkins
