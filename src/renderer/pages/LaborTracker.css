@@ -135,9 +135,65 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
-.labor-tracker__preview-item {
+.labor-tracker__preview-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.labor-tracker__preview-section.sr-section {
+  background: rgba(34, 197, 94, 0.1);
+  border-left: 3px solid #22c55e;
+}
+
+.labor-tracker__preview-section.prod-section {
+  background: rgba(59, 130, 246, 0.1);
+  border-left: 3px solid #3b82f6;
+}
+
+.labor-tracker__preview-section .section-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.labor-tracker__preview-section .preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.labor-tracker__preview-section .preview-item .label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.labor-tracker__preview-section .preview-item .value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.labor-tracker__preview-total {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.labor-tracker__preview-total .total-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -146,24 +202,24 @@
   border-radius: 6px;
 }
 
-.labor-tracker__preview-item.highlight {
+.labor-tracker__preview-total .total-item.highlight {
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.3);
-  grid-column: 1 / -1;
 }
 
-.labor-tracker__preview-item .label {
+.labor-tracker__preview-total .total-item .label {
   font-size: 12px;
   color: var(--text-muted);
+  font-weight: 600;
 }
 
-.labor-tracker__preview-item .value {
+.labor-tracker__preview-total .total-item .value {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
 }
 
-.labor-tracker__preview-item.highlight .value {
+.labor-tracker__preview-total .total-item.highlight .value {
   color: var(--primary);
   font-size: 16px;
 }

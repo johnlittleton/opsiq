@@ -237,19 +237,37 @@ export default function LaborTracker() {
             <div className="labor-tracker__preview">
               <h3>Cost Preview</h3>
               <div className="labor-tracker__preview-grid">
-                <div className="labor-tracker__preview-item">
+                <div className="labor-tracker__preview-section sr-section">
+                  <div className="section-header">Shipping & Receiving</div>
+                  <div className="preview-item">
+                    <span className="label">Headcount:</span>
+                    <span className="value">{parseInt(shippingHeadcount) || 0}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="label">Hourly Cost:</span>
+                    <span className="value">${preview.srCost.toFixed(2)}/hr</span>
+                  </div>
+                </div>
+                
+                <div className="labor-tracker__preview-section prod-section">
+                  <div className="section-header">Production</div>
+                  <div className="preview-item">
+                    <span className="label">Headcount:</span>
+                    <span className="value">{parseInt(productionHeadcount) || 0}</span>
+                  </div>
+                  <div className="preview-item">
+                    <span className="label">Hourly Cost:</span>
+                    <span className="value">${preview.prodCost.toFixed(2)}/hr</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="labor-tracker__preview-total">
+                <div className="total-item">
                   <span className="label">Total Headcount:</span>
                   <span className="value">{preview.totalHeadcount}</span>
                 </div>
-                <div className="labor-tracker__preview-item">
-                  <span className="label">S&R Cost:</span>
-                  <span className="value">${preview.srCost.toFixed(2)}/hr</span>
-                </div>
-                <div className="labor-tracker__preview-item">
-                  <span className="label">Production Cost:</span>
-                  <span className="value">${preview.prodCost.toFixed(2)}/hr</span>
-                </div>
-                <div className="labor-tracker__preview-item highlight">
+                <div className="total-item highlight">
                   <span className="label">Total Hourly Cost:</span>
                   <span className="value">${preview.hourlyLaborCost.toFixed(2)}/hr</span>
                 </div>
