@@ -29,9 +29,9 @@ app.use(express.json());
 // ==================== REST API ====================
 
 // Get all doors with checkins
-app.get('/api/doors', (req, res) => {
+app.get('/api/doors', async (req, res) => {
   try {
-    const doors = db.getAllDoorsWithCheckins();
+    const doors = await db.getAllDoorsWithCheckins();
     res.json(doors);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -39,10 +39,10 @@ app.get('/api/doors', (req, res) => {
 });
 
 // Create checkin
-app.post('/api/checkins', (req, res) => {
+app.post('/api/checkins', async (req, res) => {
   try {
     const data: CreateCheckinRequest = req.body;
-    const result = db.createCheckin(data);
+    const result = await db.createCheckin(data);
     
     // Broadcast update to all clients
     io.emit('dock:updated', result);
@@ -54,13 +54,13 @@ app.post('/api/checkins', (req, res) => {
 });
 
 // Update door status
-app.post('/api/doors/:doorId/status', (req, res) => {
+app.post('/api/doors/:doorId/status', async (req, res) => {
   try {
     const data: UpdateDoorStatusRequest = {
       doorId: parseInt(req.params.doorId),
       ...req.body,
     };
-    const result = db.updateDoorStatus(data);
+    const result = await db.updateDoorStatus(data);
     
     // Broadcast update to all clients
     io.emit('dock:updated', result);
@@ -72,14 +72,14 @@ app.post('/api/doors/:doorId/status', (req, res) => {
 });
 
 // Clear door
-app.post('/api/doors/:doorId/clear', (req, res) => {
+app.post('/api/doors/:doorId/clear', async (req, res) => {
   try {
     const data: ClearDoorRequest = {
       doorId: parseInt(req.params.doorId),
       updatedBy: req.body.updatedBy || 'System',
       actualPallets: req.body.actualPallets, // CRITICAL: Pass actualPallets from request body
     };
-    const result = db.clearDoor(data);
+    const result = await db.clearDoor(data);
     
     // Broadcast update to all clients
     io.emit('dock:updated', result);
@@ -91,7 +91,7 @@ app.post('/api/doors/:doorId/clear', (req, res) => {
 });
 
 // Get dock events (history)
-app.get('/api/events', (req, res) => {
+app.get('/api/events', async (req, res) => {
   try {
     const filters = {
       startDate: req.query.startDate as string | undefined,
@@ -107,7 +107,7 @@ app.get('/api/events', (req, res) => {
 });
 
 // Get active checkins
-app.get('/api/checkins/active', (req, res) => {
+app.get('/api/checkins/active', async (req, res) => {
   try {
     const checkins = db.getActiveCheckins();
     res.json(checkins);
@@ -117,7 +117,7 @@ app.get('/api/checkins/active', (req, res) => {
 });
 
 // Get all checkins with filters
-app.get('/api/checkins', (req, res) => {
+app.get('/api/checkins', async (req, res) => {
   try {
     const filters = {
       startDate: req.query.startDate as string | undefined,
@@ -137,7 +137,7 @@ app.get('/api/checkins', (req, res) => {
 });
 
 // Create production entry
-app.post('/api/production', (req, res) => {
+app.post('/api/production', async (req, res) => {
   try {
     const data: CreateProductionEntryRequest = req.body;
     const result = db.createProductionEntry(data);
@@ -152,7 +152,7 @@ app.post('/api/production', (req, res) => {
 });
 
 // Get production entries
-app.get('/api/production', (req, res) => {
+app.get('/api/production', async (req, res) => {
   try {
     const filters = {
       startDate: req.query.startDate as string | undefined,
@@ -329,7 +329,7 @@ async function calculateProductionKPI(startDate: string, endDate: string, shift?
 // ==================== APPOINTMENTS API ====================
 
 // Get appointments
-app.get('/api/appointments', (req, res) => {
+app.get('/api/appointments', async (req, res) => {
   try {
     const filters = {
       startDate: req.query.startDate as string | undefined,
@@ -345,7 +345,7 @@ app.get('/api/appointments', (req, res) => {
 });
 
 // Create appointment
-app.post('/api/appointments', (req, res) => {
+app.post('/api/appointments', async (req, res) => {
   try {
     const appointment = db.createAppointment(req.body);
     
@@ -359,7 +359,7 @@ app.post('/api/appointments', (req, res) => {
 });
 
 // Update appointment
-app.put('/api/appointments/:id', (req, res) => {
+app.put('/api/appointments/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const appointment = db.updateAppointment(id, req.body);
@@ -374,7 +374,7 @@ app.put('/api/appointments/:id', (req, res) => {
 });
 
 // Delete appointment
-app.delete('/api/appointments/:id', (req, res) => {
+app.delete('/api/appointments/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     db.deleteAppointment(id);
@@ -394,8 +394,8 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Send initial sync
-  socket.on('sync:request', () => {
-    const doors = db.getAllDoorsWithCheckins();
+  socket.on('sync:request', async () => {
+    const doors = await db.getAllDoorsWithCheckins();
     socket.emit('sync:response', { doors });
   });
 
@@ -407,7 +407,7 @@ io.on('connection', (socket) => {
 // ==================== LABOR TRACKING API ====================
 
 // Create labor snapshot
-app.post('/api/labor/snapshot', (req, res) => {
+app.post('/api/labor/snapshot', async (req, res) => {
   try {
     const data = req.body;
     const result = db.createLaborSnapshot(data);
@@ -422,7 +422,7 @@ app.post('/api/labor/snapshot', (req, res) => {
 });
 
 // Get latest labor snapshot
-app.get('/api/labor/latest', (req, res) => {
+app.get('/api/labor/latest', async (req, res) => {
   try {
     const latest = db.getLatestLaborSnapshot();
     res.json(latest || null);
@@ -432,7 +432,7 @@ app.get('/api/labor/latest', (req, res) => {
 });
 
 // Get labor snapshots with filters
-app.get('/api/labor/snapshots', (req, res) => {
+app.get('/api/labor/snapshots', async (req, res) => {
   try {
     const options = {
       startDate: req.query.startDate as string,
@@ -448,7 +448,7 @@ app.get('/api/labor/snapshots', (req, res) => {
 });
 
 // Get labor summary
-app.get('/api/labor/summary', (req, res) => {
+app.get('/api/labor/summary', async (req, res) => {
   try {
     const summary = db.getLaborSummary();
     res.json(summary);
@@ -460,7 +460,7 @@ app.get('/api/labor/summary', (req, res) => {
 // ==================== PERFORMANCE TRACKING API ====================
 
 // Mark load start for a checkin
-app.post('/api/checkins/:checkinId/start-load', (req, res) => {
+app.post('/api/checkins/:checkinId/start-load', async (req, res) => {
   try {
     const checkinId = parseInt(req.params.checkinId);
     db.markLoadStart(checkinId);
@@ -471,7 +471,7 @@ app.post('/api/checkins/:checkinId/start-load', (req, res) => {
 });
 
 // Update checkin completion with actual pallets
-app.post('/api/checkins/:checkinId/complete', (req, res) => {
+app.post('/api/checkins/:checkinId/complete', async (req, res) => {
   try {
     const checkinId = parseInt(req.params.checkinId);
     const { actualPallets } = req.body;
@@ -483,7 +483,7 @@ app.post('/api/checkins/:checkinId/complete', (req, res) => {
 });
 
 // Get executive dashboard metrics
-app.get('/api/executive/metrics', (req, res) => {
+app.get('/api/executive/metrics', async (req, res) => {
   try {
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
