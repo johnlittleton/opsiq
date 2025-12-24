@@ -32,10 +32,16 @@ export class DatabaseService {
 
     this.db = new Database(finalPath);
     this.db.pragma('journal_mode = WAL');
-    this.initialize();
+    this.initializeSync();
   }
 
-  private initialize() {
+  // Public async initialize for compatibility with Postgres DatabaseService
+  async initialize(): Promise<void> {
+    // SQLite initializes synchronously in constructor, nothing to do here
+    return Promise.resolve();
+  }
+
+  private initializeSync() {
     // Create tables
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS dock_doors (

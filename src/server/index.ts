@@ -498,10 +498,25 @@ app.get('/api/executive/metrics', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-httpServer.listen(PORT, () => {
-  console.log(`✓ OpsIQ Server running on http://localhost:${PORT}`);
-  console.log(`✓ Socket.IO ready for real-time updates`);
-  console.log(`✓ Database initialized`);
+// Start server after database initialization
+async function startServer() {
+  // Wait for database initialization if using Postgres
+  if (process.env.DATABASE_URL) {
+    console.log('⏳ Waiting for PostgreSQL initialization...');
+    await db.initialize();
+    console.log('✓ PostgreSQL initialized and seeded');
+  }
+
+  httpServer.listen(PORT, () => {
+    console.log(`✓ OpsIQ Server running on http://localhost:${PORT}`);
+    console.log(`✓ Socket.IO ready for real-time updates`);
+    console.log(`✓ Database ready`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('❌ Failed to start server:', error);
+  process.exit(1);
 });
 
 // Graceful shutdown
