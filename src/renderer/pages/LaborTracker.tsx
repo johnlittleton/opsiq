@@ -137,26 +137,27 @@ export default function LaborTracker() {
       {summary && (
         <div className="labor-tracker__summary">
           <StatPanel
-            title="Current Total Headcount"
+            title="Shipping & Receiving Headcount"
+            value={summary.currentShippingReceivingHeadcount}
+            subtitle={`$${(summary.currentShippingReceivingHeadcount * SR_HOURLY_WAGE).toFixed(2)}/hour`}
+            icon="package"
+          />
+          <StatPanel
+            title="Production Headcount"
+            value={summary.currentProductionHeadcount}
+            subtitle={`$${(summary.currentProductionHeadcount * PROD_HOURLY_WAGE).toFixed(2)}/hour`}
+            icon="factory"
+          />
+          <StatPanel
+            title="Total Headcount"
             value={summary.currentTotalHeadcount}
-            trend={0}
+            subtitle={`$${summary.currentHourlyLaborCost.toFixed(2)}/hour`}
             icon="users"
           />
           <StatPanel
-            title="Current Hourly Labor Cost"
-            value={`$${summary.currentHourlyLaborCost.toFixed(2)}`}
-            subtitle="/hour"
-            icon="dollar-sign"
-          />
-          <StatPanel
-            title="Today's Labor Cost"
+            title="Today's Total Labor Cost"
             value={`$${summary.dailyLaborCost.toFixed(2)}`}
-            icon="calendar"
-          />
-          <StatPanel
-            title="Weekly Labor Cost"
-            value={`$${summary.weeklyLaborCost.toFixed(2)}`}
-            icon="trending-up"
+            icon="dollar-sign"
           />
         </div>
       )}
@@ -281,20 +282,31 @@ export default function LaborTracker() {
                   </div>
                   
                   <div className="labor-tracker__snapshot-data">
-                    <div className="data-item">
-                      <span className="label">S&R:</span>
-                      <span className="value">{snapshot.shippingReceivingHeadcount} people</span>
+                    <div className="data-item sr-dept">
+                      <span className="label">S&R Headcount:</span>
+                      <span className="value">{snapshot.shippingReceivingHeadcount}</span>
                     </div>
-                    <div className="data-item">
-                      <span className="label">Production:</span>
-                      <span className="value">{snapshot.productionHeadcount} people</span>
+                    <div className="data-item sr-dept">
+                      <span className="label">S&R Cost:</span>
+                      <span className="value">${snapshot.shippingReceivingLaborCost.toFixed(2)}/hr</span>
                     </div>
-                    <div className="data-item">
-                      <span className="label">Total:</span>
-                      <span className="value">{snapshot.totalHeadcount} people</span>
+                    <div className="data-item prod-dept">
+                      <span className="label">Prod Headcount:</span>
+                      <span className="value">{snapshot.productionHeadcount}</span>
                     </div>
-                    <div className="data-item highlight">
-                      <span className="label">Hourly Cost:</span>
+                    <div className="data-item prod-dept">
+                      <span className="label">Prod Cost:</span>
+                      <span className="value">${snapshot.productionLaborCost.toFixed(2)}/hr</span>
+                    </div>
+                  </div>
+                  
+                  <div className="labor-tracker__snapshot-totals">
+                    <div className="total-item">
+                      <span className="label">Total Headcount:</span>
+                      <span className="value">{snapshot.totalHeadcount}</span>
+                    </div>
+                    <div className="total-item highlight">
+                      <span className="label">Total Hourly Cost:</span>
                       <span className="value">${snapshot.totalLaborCost.toFixed(2)}</span>
                     </div>
                   </div>
