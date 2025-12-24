@@ -240,33 +240,66 @@ export class DatabaseService {
     }
 
     const transaction = this.db.transaction(() => {
-      // Insert checkin
-      const result = this.db.prepare(`
-        INSERT INTO dock_checkins (
-          inboundOutbound, company, driverName, pickupNumber, pallets,
-          commodity, forkliftDriver, checker, plateNumber, phoneNumber,
-          doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        data.inboundOutbound,
-        data.company,
-        data.driverName,
-        data.pickupNumber,
-        data.pallets,
-        data.commodity,
-        data.forkliftDriver,
-        data.checker,
-        data.plateNumber,
-        data.phoneNumber,
-        data.doorId,
-        data.status,
-        now,
-        now,
-        now,
-        data.clientRequestId
-      );
-
-      const checkinId = result.lastInsertRowid as number;
+      // Determine if we should set loadStartTime based on initial status
+      const shouldSetLoadStartTime = data.status === 'Loading' || data.status === 'Offload';
+      
+      // Insert checkin with loadStartTime if status is Loading/Offload
+      if (shouldSetLoadStartTime) {
+        console.log('✅ Setting initial loadStartTime for new checkin with status:', data.status);
+        const result = this.db.prepare(`
+          INSERT INTO dock_checkins (
+            inboundOutbound, company, driverName, pickupNumber, pallets,
+            commodity, forkliftDriver, checker, plateNumber, phoneNumber,
+            doorId, status, statusStartTime, loadStartTime, createdAt, updatedAt, clientRequestId
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          data.inboundOutbound,
+          data.company,
+          data.driverName,
+          data.pickupNumber,
+          data.pallets,
+          data.commodity,
+          data.forkliftDriver,
+          data.checker,
+          data.plateNumber,
+          data.phoneNumber,
+          data.doorId,
+          data.status,
+          now,
+          now, // loadStartTime = now
+          now,
+          now,
+          data.clientRequestId
+        );
+        var checkinId = result.lastInsertRowid as number;
+      } else {
+        // Insert checkin without loadStartTime
+        const result = this.db.prepare(`
+          INSERT INTO dock_checkins (
+            inboundOutbound, company, driverName, pickupNumber, pallets,
+            commodity, forkliftDriver, checker, plateNumber, phoneNumber,
+            doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          data.inboundOutbound,
+          data.company,
+          data.driverName,
+          data.pickupNumber,
+          data.pallets,
+          data.commodity,
+          data.forkliftDriver,
+          data.checker,
+          data.plateNumber,
+          data.phoneNumber,
+          data.doorId,
+          data.status,
+          now,
+          now,
+          now,
+          data.clientRequestId
+        );
+        var checkinId = result.lastInsertRowid as number;
+      }
 
       // Calculate elapsed time from previous status
       const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
@@ -300,6 +333,13 @@ export class DatabaseService {
 
     const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
 
+    console.log('🔄 Updating door status:', {
+      doorId: data.doorId,
+      oldStatus: door.status,
+      newStatus: data.newStatus,
+      checkinId: door.currentCheckinId
+    });
+
     const transaction = this.db.transaction(() => {
       // Update door
       this.db.prepare(`
@@ -320,11 +360,14 @@ export class DatabaseService {
         if (data.newStatus === 'Loading' || data.newStatus === 'Offload') {
           const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
           if (!checkin.loadStartTime) {
+            console.log('✅ Setting loadStartTime for checkin', door.currentCheckinId, 'at', now);
             this.db.prepare(`
               UPDATE dock_checkins
               SET loadStartTime = ?
               WHERE id = ?
             `).run(now, door.currentCheckinId);
+          } else {
+            console.log('ℹ️ loadStartTime already set for checkin', door.currentCheckinId);
           }
         }
       }
@@ -371,18 +414,28 @@ export class DatabaseService {
           const endMs = new Date(loadEndTime).getTime();
           totalMinutes = Math.round((endMs - startMs) / 60000); // Convert to minutes
           
-          console.log('Calculated performance:', {
+          console.log('🔍 Calculated performance:', {
             startTime: checkin.loadStartTime,
             endTime: loadEndTime,
+            startMs,
+            endMs,
+            diffMs: endMs - startMs,
             totalMinutes,
-            actualPallets: data.actualPallets || checkin.pallets
+            actualPallets: data.actualPallets || checkin.pallets,
+            checkinId: door.currentCheckinId
           });
           
-          this.db.prepare(`
+          const updateResult = this.db.prepare(`
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
             WHERE id = ?
           `).run(now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
+          
+          console.log('✅ UPDATE result:', updateResult);
+          
+          // Verify the update
+          const verify = this.db.prepare('SELECT totalMinutes, actualPallets, loadEndTime FROM dock_checkins WHERE id = ?').get(door.currentCheckinId);
+          console.log('✅ Verified data after update:', verify);
         } else {
           console.log('⚠️ No loadStartTime found - performance tracking skipped');
           // No load start time, just close it
@@ -867,7 +920,10 @@ export class DatabaseService {
   getExecutiveMetrics(startDate?: string, endDate?: string): any {
     const today = new Date().toISOString().split('T')[0];
     const start = startDate || today;
-    const end = endDate || today + 'T23:59:59';
+    // Always append time to end date to include full day
+    const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
+
+    console.log('📊 getExecutiveMetrics query:', { start, end });
 
     // Get completed checkins for the period
     const completedCheckins = this.db.prepare(`
@@ -876,6 +932,8 @@ export class DatabaseService {
         AND closedAt >= ? AND closedAt <= ?
         AND totalMinutes IS NOT NULL
     `).all(start, end) as any[];
+
+    console.log('📊 Found completed checkins:', completedCheckins.length);
 
     // Calculate metrics
     const inbound = completedCheckins.filter(c => c.inboundOutbound === 'Inbound');

@@ -14,6 +14,8 @@ const DockHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [checkingOut, setCheckingOut] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [actualPalletsInput, setActualPalletsInput] = useState('');
   const [filters, setFilters] = useState({
     startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
@@ -23,9 +25,13 @@ const DockHistory: React.FC = () => {
 
   // Handle checkout modal on mount if checkoutDoor is provided
   useEffect(() => {
+    console.log('DockHistory mounted with:', { checkoutDoor, checkin });
     if (checkoutDoor && checkin) {
-      handleCheckOut();
+      console.log('Setting showCheckoutModal to true');
+      setShowCheckoutModal(true);
+      setActualPalletsInput(checkin.pallets.toString());
     } else {
+      console.log('Loading events instead');
       loadEvents();
     }
   }, [checkoutDoor, checkin]);
@@ -36,33 +42,34 @@ const DockHistory: React.FC = () => {
     }
   }, [filters]);
 
-  const handleCheckOut = async () => {
+  const handleConfirmCheckout = async () => {
     if (!checkoutDoor || !checkin) return;
-
-    const confirmed = window.confirm(
-      `Check out ${checkin.driverName} from Door ${checkoutDoor}?\n\nDriver: ${checkin.driverName}\nCompany: ${checkin.company}\nPickup #: ${checkin.pickupNumber}`
-    );
-
-    if (!confirmed) {
-      navigate('/active-drivers');
-      return;
-    }
+    
+    const parsed = parseInt(actualPalletsInput, 10);
+    const actualPallets = !isNaN(parsed) && parsed >= 0 ? parsed : checkin.pallets;
 
     setCheckingOut(true);
+    setShowCheckoutModal(false);
+    
     try {
       await apiClient.clearDoor({
         doorId: checkoutDoor,
         updatedBy: 'System',
+        actualPallets,
       });
       
-      alert(`Driver ${checkin.driverName} checked out successfully from Door ${checkoutDoor}`);
       navigate('/dockboard');
     } catch (err: any) {
-      alert(`Failed to check out driver: ${err.message || 'Unknown error'}`);
+      console.error('Checkout failed:', err);
       navigate('/active-drivers');
     } finally {
       setCheckingOut(false);
     }
+  };
+
+  const handleCancelCheckout = () => {
+    setShowCheckoutModal(false);
+    navigate('/dockboard');
   };
 
   const loadEvents = async () => {
@@ -109,6 +116,94 @@ const DockHistory: React.FC = () => {
 
   return (
     <div className="dock-history-container">
+      {showCheckoutModal && checkin && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: '#1e293b',
+            padding: '32px',
+            borderRadius: '12px',
+            maxWidth: '500px',
+            width: '90%',
+            border: '1px solid rgba(255,255,255,0.1)'
+          }}>
+            <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '24px' }}>Check Out Driver</h2>
+            <div style={{ color: '#94a3b8', marginBottom: '24px', lineHeight: '1.6' }}>
+              <p><strong>Driver:</strong> {checkin.driverName}</p>
+              <p><strong>Company:</strong> {checkin.company}</p>
+              <p><strong>Pickup #:</strong> {checkin.pickupNumber}</p>
+              <p><strong>Door:</strong> {checkoutDoor}</p>
+            </div>
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ color: 'white', display: 'block', marginBottom: '8px', fontWeight: 600 }}>
+                Actual Pallets {checkin.inboundOutbound === 'Inbound' ? 'Offloaded' : 'Loaded'}:
+              </label>
+              <input
+                type="number"
+                value={actualPalletsInput}
+                onChange={(e) => setActualPalletsInput(e.target.value)}
+                placeholder={`Expected: ${checkin.pallets}`}
+                min="0"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  backgroundColor: '#0f172a',
+                  color: 'white'
+                }}
+                autoFocus
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={handleConfirmCheckout}
+                style={{
+                  flex: 1,
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  backgroundColor: '#22c55e',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                ✓ Confirm Checkout
+              </button>
+              <button
+                onClick={handleCancelCheckout}
+                style={{
+                  flex: 1,
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  backgroundColor: '#64748b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {checkingOut ? (
         <div className="checkout-modal">
           <div className="checkout-spinner"></div>
@@ -129,7 +224,6 @@ const DockHistory: React.FC = () => {
               <div className="form-group">
                 <label>Search</label>
                 <input
-                  type="text"
                   value={searchText}
                   onChange={(e) => setSearchText(e.target.value)}
                   className="form-input"

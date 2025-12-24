@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
-import { db } from './database';
+// Use factory to switch between SQLite (local) and Postgres (Railway)
+import { db } from './db-factory';
 import {
   CreateCheckinRequest,
   UpdateDoorStatusRequest,
@@ -76,6 +77,7 @@ app.post('/api/doors/:doorId/clear', (req, res) => {
     const data: ClearDoorRequest = {
       doorId: parseInt(req.params.doorId),
       updatedBy: req.body.updatedBy || 'System',
+      actualPallets: req.body.actualPallets, // CRITICAL: Pass actualPallets from request body
     };
     const result = db.clearDoor(data);
     
@@ -166,10 +168,10 @@ app.get('/api/production', (req, res) => {
 });
 
 // Get shipping/receiving KPIs
-app.get('/api/kpi/shipping-receiving', (req, res) => {
+app.get('/api/kpi/shipping-receiving', async (req, res) => {
   try {
-    const date = req.query.date as string || new Date().toISOString().split('T')[0];
-    const kpi = calculateShippingReceivingKPI(date);
+    const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const kpi = await calculateShippingReceivingKPI(date);
     res.json(kpi);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -177,13 +179,13 @@ app.get('/api/kpi/shipping-receiving', (req, res) => {
 });
 
 // Get production KPIs
-app.get('/api/kpi/production', (req, res) => {
+app.get('/api/kpi/production', async (req, res) => {
   try {
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
     const shift = req.query.shift as string | undefined;
     
-    const kpi = calculateProductionKPI(startDate, endDate, shift);
+    const kpi = await calculateProductionKPI(startDate, endDate, shift);
     res.json(kpi);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -192,11 +194,11 @@ app.get('/api/kpi/production', (req, res) => {
 
 // ==================== KPI CALCULATIONS ====================
 
-function calculateShippingReceivingKPI(date: string): ShippingReceivingKPI {
+async function calculateShippingReceivingKPI(date: string): Promise<ShippingReceivingKPI> {
   const startOfDay = `${date}T00:00:00`;
   const endOfDay = `${date}T23:59:59`;
   
-  const events = db.getDockEvents({
+  const events = await db.getDockEvents({
     startDate: startOfDay,
     endDate: endOfDay,
   });
@@ -217,7 +219,7 @@ function calculateShippingReceivingKPI(date: string): ShippingReceivingKPI {
     Parked: 0,
   };
 
-  const doors = db.getAllDoorsWithCheckins();
+  const doors = await db.getAllDoorsWithCheckins();
   doors.forEach(door => {
     statusCounts[door.status]++;
     
@@ -258,8 +260,8 @@ function calculateShippingReceivingKPI(date: string): ShippingReceivingKPI {
   };
 }
 
-function calculateProductionKPI(startDate: string, endDate: string, shift?: string): ProductionKPI {
-  const entries = db.getProductionEntries({ startDate, endDate, shift });
+async function calculateProductionKPI(startDate: string, endDate: string, shift?: string): Promise<ProductionKPI> {
+  const entries = await db.getProductionEntries({ startDate, endDate, shift });
 
   let totalLaborHours = 0;
   let totalLaborCost = 0;

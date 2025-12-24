@@ -40,6 +40,23 @@ const ActiveDrivers: React.FC = () => {
       return;
     }
 
+    // Prompt for actual pallets
+    let actualPallets: number | undefined;
+    const input = window.prompt(
+      `How many pallets were ${checkin.inboundOutbound === 'Inbound' ? 'offloaded' : 'loaded'}?\n\n(Expected: ${checkin.pallets})`,
+      checkin.pallets.toString()
+    );
+    
+    if (input === null) return; // User cancelled
+    
+    const parsed = parseInt(input, 10);
+    if (!isNaN(parsed) && parsed >= 0) {
+      actualPallets = parsed;
+    } else {
+      alert('Invalid number. Using expected pallets.');
+      actualPallets = checkin.pallets;
+    }
+
     setCheckingOut(checkin.id);
     setError(null);
 
@@ -47,6 +64,7 @@ const ActiveDrivers: React.FC = () => {
       await apiClient.clearDoor({
         doorId: checkin.doorId,
         updatedBy: 'System',
+        actualPallets,
       });
       
       await loadActiveCheckins();
