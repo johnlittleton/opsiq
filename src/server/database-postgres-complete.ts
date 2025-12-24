@@ -1052,5 +1052,3 @@ export class DatabaseService {
     await this.pool.end();
   }
 }
-
-export const db = new DatabaseService();
