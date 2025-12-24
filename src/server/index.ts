@@ -220,7 +220,7 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
   };
 
   const doors = await db.getAllDoorsWithCheckins();
-  doors.forEach(door => {
+  doors.forEach((door: any) => {
     statusCounts[door.status]++;
     
     if (door.checkin && !door.checkin.closedAt) {
@@ -233,8 +233,8 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
   });
 
   // Calculate average times from closed checkins
-  const completedCheckins = events.filter(e => e.newStatus === 'Open' && e.checkinId);
-  completedCheckins.forEach(event => {
+  const completedCheckins = events.filter((e: any) => e.newStatus === 'Open' && e.checkinId);
+  completedCheckins.forEach((event: any) => {
     if (event.checkinId) {
       // This would need checkin data to determine type
       // For now, simplified calculation
@@ -279,7 +279,7 @@ async function calculateProductionKPI(startDate: string, endDate: string, shift?
     scrapRate: number;
   }> = {};
 
-  entries.forEach(entry => {
+  entries.forEach((entry: any) => {
     const laborCost = entry.laborHours * entry.laborRate;
     
     totalLaborHours += entry.laborHours;
