@@ -32,10 +32,10 @@ export class DatabaseService implements IDatabaseService {
       ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
     });
 
-    this.initialize();
+    // Don't call initialize in constructor - let server call it explicitly
   }
 
-  private async initialize() {
+  async initialize() {
     const client = await this.pool.connect();
     
     try {
