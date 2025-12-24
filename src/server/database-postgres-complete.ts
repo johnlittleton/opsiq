@@ -14,8 +14,9 @@ import {
   CreateLaborSnapshotRequest,
   LaborSummary,
 } from '../shared/types';
+import { IDatabaseService } from './database-interface';
 
-export class DatabaseService {
+export class DatabaseService implements IDatabaseService {
   private pool: Pool;
 
   constructor() {

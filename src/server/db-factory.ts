@@ -2,9 +2,10 @@
 
 import { DatabaseService as PostgresDatabase } from './database-postgres-complete';
 import { DatabaseService as SqliteDatabase } from './database';
+import { IDatabaseService } from './database-interface';
 
 // Automatic database selection based on environment
-export const db = process.env.DATABASE_URL 
+export const db: IDatabaseService = process.env.DATABASE_URL 
   ? new PostgresDatabase() 
   : new SqliteDatabase();
 
