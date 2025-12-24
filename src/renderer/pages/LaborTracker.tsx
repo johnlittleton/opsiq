@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GlassPanel, StatPanel } from '../components';
+import { TitleBar } from '../../components/layout/TitleBar';
 import './LaborTracker.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -32,19 +34,19 @@ interface LaborSummary {
 }
 
 export default function LaborTracker() {
+  const navigate = useNavigate();
   const [shippingHeadcount, setShippingHeadcount] = useState('');
   const [productionHeadcount, setProductionHeadcount] = useState('');
   const [recordedBy, setRecordedBy] = useState('');
   const [shift, setShift] = useState<'A' | 'B'>('A');
   const [notes, setNotes] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [summary, setSummary] = useState<LaborSummary | null>(null);
-  const [recentSnapshots, setRecentSnapshots] = useState<LaborSnapshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSummary();
-    fetchRecentSnapshots();
   }, []);
 
   const fetchSummary = async () => {
@@ -55,17 +57,6 @@ export default function LaborTracker() {
       setSummary(data);
     } catch (err: any) {
       console.error('Error fetching summary:', err);
-    }
-  };
-
-  const fetchRecentSnapshots = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/labor/snapshots?limit=10`);
-      if (!response.ok) throw new Error('Failed to fetch snapshots');
-      const data = await response.json();
-      setRecentSnapshots(data);
-    } catch (err: any) {
-      console.error('Error fetching snapshots:', err);
     }
   };
 
@@ -105,7 +96,6 @@ export default function LaborTracker() {
 
       // Refresh data
       await fetchSummary();
-      await fetchRecentSnapshots();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -128,10 +118,13 @@ export default function LaborTracker() {
 
   return (
     <div className="labor-tracker">
-      <div className="labor-tracker__header">
-        <h1>Labor Tracker</h1>
-        <p className="labor-tracker__subtitle">Manager Dashboard - Track Department Headcount & Labor Costs</p>
-      </div>
+      <TitleBar showLegend={false} />
+      
+      <div className="labor-tracker__container">
+        <div className="labor-tracker__header">
+          <h1>Labor Tracker</h1>
+          <p className="labor-tracker__subtitle">Manager Dashboard - Track Department Headcount & Labor Costs</p>
+        </div>
 
       {/* Summary Stats */}
       {summary && (
@@ -165,13 +158,32 @@ export default function LaborTracker() {
       <div className="labor-tracker__content">
         {/* Input Form */}
         <GlassPanel className="labor-tracker__form-panel">
-          <h2>Record Current Headcount</h2>
+          <div className="labor-tracker__form-header">
+            <h2>Record Current Headcount</h2>
+            <button 
+              type="button"
+              className="labor-tracker__history-btn"
+              onClick={() => navigate('/labor-history')}
+            >
+              📊 View History
+            </button>
+          </div>
           
           {error && (
             <div className="labor-tracker__error">
               ⚠️ {error}
             </div>
           )}
+          
+          <div className="labor-tracker__date-selector">
+            <label>Recording Date</label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
+            />
+          </div>
 
           <form onSubmit={handleSubmit} className="labor-tracker__form">
             <div className="labor-tracker__form-row">
@@ -279,66 +291,8 @@ export default function LaborTracker() {
             </button>
           </form>
         </GlassPanel>
-
-        {/* Recent Snapshots */}
-        <GlassPanel className="labor-tracker__history-panel">
-          <h2>Recent Snapshots</h2>
-          
-          {recentSnapshots.length === 0 ? (
-            <div className="labor-tracker__empty">
-              <p>No snapshots recorded yet. Record your first snapshot above.</p>
-            </div>
-          ) : (
-            <div className="labor-tracker__history">
-              {recentSnapshots.map((snapshot) => (
-                <div key={snapshot.id} className="labor-tracker__snapshot">
-                  <div className="labor-tracker__snapshot-header">
-                    <span className="time">
-                      {new Date(snapshot.timestamp).toLocaleString()}
-                    </span>
-                    <span className={`shift shift-${snapshot.shift}`}>Shift {snapshot.shift}</span>
-                  </div>
-                  
-                  <div className="labor-tracker__snapshot-data">
-                    <div className="data-item sr-dept">
-                      <span className="label">S&R Headcount:</span>
-                      <span className="value">{snapshot.shippingReceivingHeadcount}</span>
-                    </div>
-                    <div className="data-item sr-dept">
-                      <span className="label">S&R Cost:</span>
-                      <span className="value">${snapshot.shippingReceivingLaborCost.toFixed(2)}/hr</span>
-                    </div>
-                    <div className="data-item prod-dept">
-                      <span className="label">Prod Headcount:</span>
-                      <span className="value">{snapshot.productionHeadcount}</span>
-                    </div>
-                    <div className="data-item prod-dept">
-                      <span className="label">Prod Cost:</span>
-                      <span className="value">${snapshot.productionLaborCost.toFixed(2)}/hr</span>
-                    </div>
-                  </div>
-                  
-                  <div className="labor-tracker__snapshot-totals">
-                    <div className="total-item">
-                      <span className="label">Total Headcount:</span>
-                      <span className="value">{snapshot.totalHeadcount}</span>
-                    </div>
-                    <div className="total-item highlight">
-                      <span className="label">Total Hourly Cost:</span>
-                      <span className="value">${snapshot.totalLaborCost.toFixed(2)}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="labor-tracker__snapshot-footer">
-                    <span className="recorded-by">Recorded by: {snapshot.recordedBy}</span>
-                    {snapshot.notes && <span className="notes">{snapshot.notes}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </GlassPanel>
       </div>
+    </div>
     </div>
   );
 }

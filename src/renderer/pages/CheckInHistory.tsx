@@ -74,7 +74,7 @@ const CheckInHistory: React.FC = () => {
 
   return (
     <div className="checkin-history">
-      <TitleBar />
+      <TitleBar showLegend={false} />
       
       <div className="checkin-history__content">
         <div className="checkin-history__header">

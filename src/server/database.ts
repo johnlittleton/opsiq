@@ -54,6 +54,7 @@ export class DatabaseService {
         driverName TEXT NOT NULL,
         pickupNumber TEXT NOT NULL,
         pallets INTEGER NOT NULL,
+        actualPallets INTEGER,
         commodity TEXT NOT NULL,
         forkliftDriver TEXT NOT NULL,
         checker TEXT NOT NULL,
@@ -62,6 +63,9 @@ export class DatabaseService {
         doorId INTEGER NOT NULL,
         status TEXT NOT NULL,
         statusStartTime TEXT NOT NULL,
+        loadStartTime TEXT,
+        loadEndTime TEXT,
+        totalMinutes INTEGER,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
         closedAt TEXT,
@@ -759,6 +763,113 @@ export class DatabaseService {
       weeklyLaborCost,
       averageShippingReceivingHeadcount: Math.round(avgSR * 10) / 10,
       averageProductionHeadcount: Math.round(avgProd * 10) / 10,
+    };
+  }
+
+  // ==================== PERFORMANCE TRACKING ====================
+
+  updateCheckinCompletion(checkinId: number, actualPallets: number): void {
+    const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(checkinId) as any;
+    if (!checkin) {
+      throw new Error(`Checkin ${checkinId} not found`);
+    }
+
+    const now = new Date().toISOString();
+    const loadStartTime = checkin.loadStartTime || checkin.statusStartTime;
+    const totalMinutes = Math.round((new Date(now).getTime() - new Date(loadStartTime).getTime()) / 1000 / 60);
+
+    this.db.prepare(`
+      UPDATE dock_checkins
+      SET actualPallets = ?, loadEndTime = ?, totalMinutes = ?, updatedAt = ?
+      WHERE id = ?
+    `).run(actualPallets, now, totalMinutes, now, checkinId);
+  }
+
+  markLoadStart(checkinId: number): void {
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      UPDATE dock_checkins
+      SET loadStartTime = ?, updatedAt = ?
+      WHERE id = ? AND loadStartTime IS NULL
+    `).run(now, now, checkinId);
+  }
+
+  getExecutiveMetrics(startDate?: string, endDate?: string): any {
+    const today = new Date().toISOString().split('T')[0];
+    const start = startDate || today;
+    const end = endDate || today + 'T23:59:59';
+
+    // Get completed checkins for the period
+    const completedCheckins = this.db.prepare(`
+      SELECT * FROM dock_checkins
+      WHERE closedAt IS NOT NULL
+        AND closedAt >= ? AND closedAt <= ?
+        AND totalMinutes IS NOT NULL
+    `).all(start, end) as any[];
+
+    // Calculate metrics
+    const inbound = completedCheckins.filter(c => c.inboundOutbound === 'Inbound');
+    const outbound = completedCheckins.filter(c => c.inboundOutbound === 'Outbound');
+
+    const totalPalletsLoaded = outbound.reduce((sum, c) => sum + (c.actualPallets || c.pallets), 0);
+    const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + (c.actualPallets || c.pallets), 0);
+
+    const avgLoadTime = outbound.length > 0
+      ? outbound.reduce((sum, c) => sum + c.totalMinutes, 0) / outbound.length
+      : 0;
+
+    const avgOffloadTime = inbound.length > 0
+      ? inbound.reduce((sum, c) => sum + c.totalMinutes, 0) / inbound.length
+      : 0;
+
+    const avgPallets = completedCheckins.length > 0
+      ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
+      : 0;
+
+    // Top operators
+    const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
+    
+    completedCheckins.forEach(c => {
+      if (!operatorStats[c.forkliftDriver]) {
+        operatorStats[c.forkliftDriver] = { loads: 0, pallets: 0, totalMinutes: 0 };
+      }
+      operatorStats[c.forkliftDriver].loads++;
+      operatorStats[c.forkliftDriver].pallets += (c.actualPallets || c.pallets);
+      operatorStats[c.forkliftDriver].totalMinutes += c.totalMinutes;
+    });
+
+    const topOperators = Object.entries(operatorStats)
+      .filter(([name]) => name !== 'TBD' && name.trim() !== '')
+      .map(([name, stats]) => ({
+        operatorName: name,
+        totalLoads: stats.loads,
+        totalPallets: stats.pallets,
+        avgTimeMinutes: Math.round(stats.totalMinutes / stats.loads),
+        avgPalletsPerLoad: Math.round((stats.pallets / stats.loads) * 10) / 10,
+      }))
+      .sort((a, b) => b.totalLoads - a.totalLoads)
+      .slice(0, 10);
+
+    // Current active count
+    const activeNow = this.db.prepare(
+      'SELECT COUNT(*) as count FROM dock_checkins WHERE closedAt IS NULL'
+    ).get() as any;
+
+    const totalDockHours = completedCheckins.reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
+
+    return {
+      totalTrucksLoaded: outbound.length,
+      totalTrucksOffloaded: inbound.length,
+      totalPalletsLoaded,
+      totalPalletsOffloaded,
+      avgLoadTimeMinutes: Math.round(avgLoadTime),
+      avgOffloadTimeMinutes: Math.round(avgOffloadTime),
+      avgPalletsPerTruck: Math.round(avgPallets * 10) / 10,
+      topOperators,
+      totalDockTimeHours: Math.round(totalDockHours * 10) / 10,
+      dockUtilization: 0, // Calculate based on active doors
+      completedToday: completedCheckins.length,
+      activeNow: activeNow.count,
     };
   }
 

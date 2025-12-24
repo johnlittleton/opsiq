@@ -21,6 +21,7 @@ export interface DockCheckin {
   driverName: string;
   pickupNumber: string;
   pallets: number;
+  actualPallets: number | null;
   commodity: string;
   forkliftDriver: string;
   checker: string;
@@ -29,6 +30,9 @@ export interface DockCheckin {
   doorId: number;
   status: DoorStatus;
   statusStartTime: string;
+  loadStartTime: string | null;
+  loadEndTime: string | null;
+  totalMinutes: number | null;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -178,4 +182,35 @@ export interface LaborSummary {
   weeklyLaborCost: number;
   averageShippingReceivingHeadcount: number;
   averageProductionHeadcount: number;
+}
+
+// Executive Dashboard Performance Metrics
+export interface OperatorPerformance {
+  operatorName: string;
+  totalLoads: number;
+  totalPallets: number;
+  avgTimeMinutes: number;
+  avgPalletsPerLoad: number;
+}
+
+export interface ExecutiveMetrics {
+  // Time period summary
+  totalTrucksLoaded: number;
+  totalTrucksOffloaded: number;
+  totalPalletsLoaded: number;
+  totalPalletsOffloaded: number;
+  
+  // Performance metrics
+  avgLoadTimeMinutes: number;
+  avgOffloadTimeMinutes: number;
+  avgPalletsPerTruck: number;
+  
+  // Top performers
+  topOperators: OperatorPerformance[];
+  
+  // Additional insights
+  totalDockTimeHours: number;
+  dockUtilization: number;
+  completedToday: number;
+  activeNow: number;
 }

@@ -184,7 +184,7 @@ const Scheduler: React.FC = () => {
 
   return (
     <div className="scheduler">
-      <TitleBar />
+      <TitleBar showLegend={false} />
       
       <div className="scheduler__content">
         <div className="scheduler__header">

@@ -1,194 +1,204 @@
 import React, { useState, useEffect } from 'react';
-import { apiClient } from '../services/api';
-import { ProductionKPI, ShippingReceivingKPI } from '../../shared/types';
-import { useAppStore } from '../store';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TitleBar } from '../../components/layout/TitleBar';
+import { GlassPanel, StatPanel } from '../components';
+import { ExecutiveMetrics } from '../../shared/types';
+import './ExecutiveDashboard.css';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const ExecutiveDashboard: React.FC = () => {
-  const { selectedDate } = useAppStore();
-  const [productionKPI, setProductionKPI] = useState<ProductionKPI | null>(null);
-  const [shippingKPI, setShippingKPI] = useState<ShippingReceivingKPI | null>(null);
+  const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dateRange, setDateRange] = useState({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+  });
 
   useEffect(() => {
-    loadData();
-  }, [selectedDate]);
+    loadMetrics();
+  }, [dateRange]);
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadMetrics = async () => {
     try {
-      const [prodData, shipData] = await Promise.all([
-        apiClient.getProductionKPI(selectedDate, selectedDate),
-        apiClient.getShippingReceivingKPI(selectedDate),
-      ]);
-      setProductionKPI(prodData);
-      setShippingKPI(shipData);
+      setLoading(true);
+      const response = await fetch(
+        `${API_BASE}/api/executive/metrics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+      );
+      if (!response.ok) throw new Error('Failed to load metrics');
+      const data = await response.json();
+      setMetrics(data);
     } catch (error) {
-      console.error('Failed to load executive data:', error);
+      console.error('Failed to load executive metrics:', error);
     } finally {
       setLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="loading">Loading executive dashboard...</div>;
+    return (
+      <div className="executive-dashboard">
+        <TitleBar showLegend={false} />
+        <div className="executive-dashboard__container">
+          <div className="loading">Loading executive dashboard...</div>
+        </div>
+      </div>
+    );
   }
 
-  const lineChartData = productionKPI?.lineBreakdown.map(line => ({
-    name: `Line ${line.lineNumber}`,
-    pallets: line.pallets,
-    cases: line.cases,
-    laborCost: line.laborCost,
-  })) || [];
-
-  const statusChartData = shippingKPI ? Object.entries(shippingKPI.statusCounts).map(([status, count]) => ({
-    status,
-    count,
-  })) : [];
+  if (!metrics) {
+    return (
+      <div className="executive-dashboard">
+        <TitleBar showLegend={false} />
+        <div className="executive-dashboard__container">
+          <div className="error">Failed to load metrics</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <h1 className="page-title">Executive Dashboard</h1>
-      <p style={{ color: '#b0b0b0', marginBottom: '24px' }}>
-        Comprehensive operational overview for {selectedDate}
-      </p>
-
-      {/* Top-Level Metrics */}
-      <div className="kpi-grid">
-        <div className="kpi-card" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-          <div className="kpi-label">Total Pallets</div>
-          <div className="kpi-value">{productionKPI?.totalPallets.toLocaleString() || 0}</div>
-        </div>
-        <div className="kpi-card" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-          <div className="kpi-label">Total Cases</div>
-          <div className="kpi-value">{productionKPI?.totalCases.toLocaleString() || 0}</div>
-        </div>
-        <div className="kpi-card" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
-          <div className="kpi-label">Labor Cost</div>
-          <div className="kpi-value">${productionKPI?.totalLaborCost.toLocaleString() || 0}</div>
-        </div>
-        <div className="kpi-card" style={{ background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }}>
-          <div className="kpi-label">Dock Utilization</div>
-          <div className="kpi-value">{shippingKPI?.dockUtilizationPercent.toFixed(1) || 0}%</div>
-        </div>
-      </div>
-
-      {/* Production Overview */}
-      <div className="card" style={{ marginTop: '24px' }}>
-        <h3 className="card-title">Production Overview</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+    <div className="executive-dashboard">
+      <TitleBar showLegend={false} />
+      
+      <div className="executive-dashboard__container">
+        <div className="executive-dashboard__header">
           <div>
-            <h4 style={{ color: '#b0b0b0', fontSize: '14px', marginBottom: '16px', textTransform: 'uppercase' }}>
-              Key Metrics
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Total Labor Hours</span>
-                <strong>{productionKPI?.totalLaborHours.toFixed(1) || 0} hrs</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Scrap Rate</span>
-                <strong style={{ color: (productionKPI?.scrapRate || 0) > 5 ? '#e74c3c' : '#27ae60' }}>
-                  {productionKPI?.scrapRate.toFixed(2) || 0}%
-                </strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Active Lines</span>
-                <strong>{productionKPI?.lineBreakdown.length || 0}</strong>
-              </div>
-            </div>
+            <h1>Executive Dashboard</h1>
+            <p className="subtitle">Site Performance Overview</p>
           </div>
-          <div>
-            <h4 style={{ color: '#b0b0b0', fontSize: '14px', marginBottom: '16px', textTransform: 'uppercase' }}>
-              Output by Line
-            </h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={lineChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="name" stroke="#b0b0b0" />
-                <YAxis stroke="#b0b0b0" />
-                <Tooltip contentStyle={{ background: '#252525', border: '1px solid #444' }} />
-                <Bar dataKey="pallets" fill="#4a9eff" />
-              </BarChart>
-            </ResponsiveContainer>
+          
+          <div className="date-selector">
+            <div className="date-field">
+              <label>Start Date</label>
+              <input
+                type="date"
+                value={dateRange.startDate}
+                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+              />
+            </div>
+            <div className="date-field">
+              <label>End Date</label>
+              <input
+                type="date"
+                value={dateRange.endDate}
+                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Shipping & Receiving Overview */}
-      <div className="card" style={{ marginTop: '24px' }}>
-        <h3 className="card-title">Shipping & Receiving Overview</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-          <div>
-            <h4 style={{ color: '#b0b0b0', fontSize: '14px', marginBottom: '16px', textTransform: 'uppercase' }}>
-              Movement Summary
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Total Inbound</span>
-                <strong style={{ color: '#3498db' }}>{shippingKPI?.totalInbound || 0}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Total Outbound</span>
-                <strong style={{ color: '#f39c12' }}>{shippingKPI?.totalOutbound || 0}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Avg Turnaround</span>
-                <strong>{((shippingKPI?.avgInboundTimeMinutes || 0) + (shippingKPI?.avgOutboundTimeMinutes || 0)) / 2 | 0} min</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: '#2a2a2a', borderRadius: '4px' }}>
-                <span>Waiting Queue</span>
-                <strong style={{ color: shippingKPI && shippingKPI.statusCounts.Waiting > 5 ? '#e74c3c' : '#27ae60' }}>
-                  {shippingKPI?.statusCounts.Waiting || 0}
-                </strong>
-              </div>
-            </div>
-          </div>
-          <div>
-            <h4 style={{ color: '#b0b0b0', fontSize: '14px', marginBottom: '16px', textTransform: 'uppercase' }}>
-              Door Status Distribution
-            </h4>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={statusChartData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis type="number" stroke="#b0b0b0" />
-                <YAxis dataKey="status" type="category" stroke="#b0b0b0" />
-                <Tooltip contentStyle={{ background: '#252525', border: '1px solid #444' }} />
-                <Bar dataKey="count" fill="#4a9eff" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Top-Level KPIs */}
+        <div className="kpi-grid">
+          <StatPanel
+            title="Trucks Loaded"
+            value={metrics.totalTrucksLoaded}
+            subtitle={`${metrics.totalPalletsLoaded.toLocaleString()} pallets`}
+            icon="truck"
+          />
+          <StatPanel
+            title="Trucks Offloaded"
+            value={metrics.totalTrucksOffloaded}
+            subtitle={`${metrics.totalPalletsOffloaded.toLocaleString()} pallets`}
+            icon="package"
+          />
+          <StatPanel
+            title="Avg Load Time"
+            value={`${metrics.avgLoadTimeMinutes} min`}
+            subtitle="Per truck"
+            icon="clock"
+          />
+          <StatPanel
+            title="Avg Offload Time"
+            value={`${metrics.avgOffloadTimeMinutes} min`}
+            subtitle="Per truck"
+            icon="clock"
+          />
         </div>
-      </div>
 
-      {/* Health Score (calculated) */}
-      <div className="card" style={{ marginTop: '24px' }}>
-        <h3 className="card-title">Overall Operational Health</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#27ae60', marginBottom: '8px' }}>
-              {(100 - (shippingKPI?.dockUtilizationPercent || 0)).toFixed(0)}
+        {/* Performance Summary */}
+        <GlassPanel className="performance-summary">
+          <h2>Performance Summary</h2>
+          <div className="summary-grid">
+            <div className="summary-item">
+              <span className="label">Total Dock Time</span>
+              <span className="value">{metrics.totalDockTimeHours} hours</span>
             </div>
-            <div style={{ color: '#b0b0b0', fontSize: '14px' }}>Capacity Available %</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', fontWeight: 'bold', color: productionKPI && productionKPI.scrapRate < 3 ? '#27ae60' : '#e74c3c', marginBottom: '8px' }}>
-              {productionKPI ? (100 - productionKPI.scrapRate).toFixed(0) : 100}
+            <div className="summary-item">
+              <span className="label">Avg Pallets/Truck</span>
+              <span className="value">{metrics.avgPalletsPerTruck}</span>
             </div>
-            <div style={{ color: '#b0b0b0', fontSize: '14px' }}>Quality Score</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#4a9eff', marginBottom: '8px' }}>
-              {shippingKPI ? (shippingKPI.totalInbound + shippingKPI.totalOutbound) : 0}
+            <div className="summary-item">
+              <span className="label">Completed</span>
+              <span className="value">{metrics.completedToday}</span>
             </div>
-            <div style={{ color: '#b0b0b0', fontSize: '14px' }}>Total Movements</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#f39c12', marginBottom: '8px' }}>
-              {productionKPI?.totalPallets || 0}
+            <div className="summary-item">
+              <span className="label">Active Now</span>
+              <span className="value highlight">{metrics.activeNow}</span>
             </div>
-            <div style={{ color: '#b0b0b0', fontSize: '14px' }}>Pallets Produced</div>
           </div>
+        </GlassPanel>
+
+        {/* Top Performing Operators */}
+        <GlassPanel className="operators-panel">
+          <h2>Top Performing Forklift Operators</h2>
+          
+          {metrics.topOperators.length === 0 ? (
+            <div className="empty-state">
+              <p>No operator data available for selected period</p>
+            </div>
+          ) : (
+            <div className="operators-table">
+              <div className="table-header">
+                <div className="col-rank">#</div>
+                <div className="col-name">Operator</div>
+                <div className="col-loads">Total Loads</div>
+                <div className="col-pallets">Total Pallets</div>
+                <div className="col-avg-time">Avg Time</div>
+                <div className="col-avg-pallets">Avg Pallets</div>
+              </div>
+              
+              {metrics.topOperators.map((operator, index) => (
+                <div key={operator.operatorName} className={`table-row ${index < 3 ? 'top-three' : ''}`}>
+                  <div className="col-rank">
+                    {index === 0 && '🥇'}
+                    {index === 1 && '🥈'}
+                    {index === 2 && '🥉'}
+                    {index > 2 && index + 1}
+                  </div>
+                  <div className="col-name">{operator.operatorName}</div>
+                  <div className="col-loads">{operator.totalLoads}</div>
+                  <div className="col-pallets">{operator.totalPallets.toLocaleString()}</div>
+                  <div className="col-avg-time">{operator.avgTimeMinutes} min</div>
+                  <div className="col-avg-pallets">{operator.avgPalletsPerLoad}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </GlassPanel>
+
+        {/* Pallets Overview */}
+        <div className="pallets-grid">
+          <GlassPanel className="pallets-card loaded">
+            <div className="card-header">
+              <h3>Pallets Loaded</h3>
+              <div className="icon">📦</div>
+            </div>
+            <div className="card-value">{metrics.totalPalletsLoaded.toLocaleString()}</div>
+            <div className="card-subtitle">
+              {metrics.totalTrucksLoaded} trucks • Avg {(metrics.totalPalletsLoaded / (metrics.totalTrucksLoaded || 1)).toFixed(1)} per truck
+            </div>
+          </GlassPanel>
+
+          <GlassPanel className="pallets-card offloaded">
+            <div className="card-header">
+              <h3>Pallets Offloaded</h3>
+              <div className="icon">📥</div>
+            </div>
+            <div className="card-value">{metrics.totalPalletsOffloaded.toLocaleString()}</div>
+            <div className="card-subtitle">
+              {metrics.totalTrucksOffloaded} trucks • Avg {(metrics.totalPalletsOffloaded / (metrics.totalTrucksOffloaded || 1)).toFixed(1)} per truck
+            </div>
+          </GlassPanel>
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@ import ShippingReceivingKPI from './pages/ShippingReceivingKPI';
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
 import Settings from './pages/Settings';
 import LaborTracker from './pages/LaborTracker';
+import LaborHistory from './pages/LaborHistory';
 
 const App: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
@@ -40,6 +41,7 @@ const App: React.FC = () => {
         <Route path="/shipping" element={<ShippingReceivingKPI />} />
         <Route path="/executive" element={<ExecutiveDashboard />} />
         <Route path="/labor-tracker" element={<LaborTracker />} />
+        <Route path="/labor-history" element={<LaborHistory />} />
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>

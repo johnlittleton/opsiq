@@ -78,7 +78,7 @@ export const DockBoardPage: React.FC = () => {
 
   return (
     <div className="dock-board-page">
-      <TitleBar />
+      <TitleBar showLegend={true} />
       
       <div className="dock-board-page__content">
         <div className="dock-board-page__grid">

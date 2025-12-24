@@ -124,7 +124,7 @@ const DriverCheckIn: React.FC = () => {
 
   return (
     <div className="driver-checkin">
-      <TitleBar />
+      <TitleBar showLegend={false} />
       
       <div className="driver-checkin__container">
         <div className="driver-checkin__header">

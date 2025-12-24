@@ -76,7 +76,7 @@ const AppointmentHistory: React.FC = () => {
 
   return (
     <div className="appointment-history">
-      <TitleBar />
+      <TitleBar showLegend={false} />
       
       <div className="appointment-history__content">
         <div className="appointment-history__header">

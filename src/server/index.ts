@@ -455,6 +455,43 @@ app.get('/api/labor/summary', (req, res) => {
   }
 });
 
+// ==================== PERFORMANCE TRACKING API ====================
+
+// Mark load start for a checkin
+app.post('/api/checkins/:checkinId/start-load', (req, res) => {
+  try {
+    const checkinId = parseInt(req.params.checkinId);
+    db.markLoadStart(checkinId);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update checkin completion with actual pallets
+app.post('/api/checkins/:checkinId/complete', (req, res) => {
+  try {
+    const checkinId = parseInt(req.params.checkinId);
+    const { actualPallets } = req.body;
+    db.updateCheckinCompletion(checkinId, actualPallets);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get executive dashboard metrics
+app.get('/api/executive/metrics', (req, res) => {
+  try {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const metrics = db.getExecutiveMetrics(startDate, endDate);
+    res.json(metrics);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== SERVER START ====================
 
 const PORT = process.env.PORT || 3000;

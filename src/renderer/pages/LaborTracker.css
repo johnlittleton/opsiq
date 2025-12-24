@@ -1,4 +1,11 @@
 .labor-tracker {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.labor-tracker__container {
   padding: 24px;
   height: 100%;
   overflow-y: auto;
@@ -28,22 +35,81 @@
 }
 
 .labor-tracker__content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  display: block;
 }
 
-.labor-tracker__form-panel,
-.labor-tracker__history-panel {
+.labor-tracker__form-panel {
   padding: 24px;
 }
 
-.labor-tracker__form-panel h2,
-.labor-tracker__history-panel h2 {
+.labor-tracker__form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.labor-tracker__form-header h2 {
   font-size: 20px;
   font-weight: 600;
   color: var(--text);
+  margin: 0;
+}
+
+.labor-tracker__history-btn {
+  padding: 10px 20px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.labor-tracker__history-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+.labor-tracker__date-selector {
   margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.labor-tracker__date-selector label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.labor-tracker__date-selector input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.labor-tracker__date-selector input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .labor-tracker__error {

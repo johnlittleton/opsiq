@@ -3,7 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Legend } from '../common/Legend';
 import './TitleBar.css';
 
-export const TitleBar: React.FC = () => {
+interface TitleBarProps {
+  showLegend?: boolean;
+}
+
+export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false }) => {
   const navigate = useNavigate();
   const [showViewMenu, setShowViewMenu] = useState(false);
 
@@ -66,7 +70,7 @@ export const TitleBar: React.FC = () => {
           )}
         </div>
 
-        <Legend />
+        {showLegend && <Legend />}
       </div>
       <button className="title-bar__home-btn" onClick={() => navigate('/')}>← Home</button>
       <div className="title-bar__controls">
