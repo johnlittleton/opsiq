@@ -221,7 +221,7 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
 
   const doors = await db.getAllDoorsWithCheckins();
   doors.forEach((door: any) => {
-    statusCounts[door.status]++;
+    statusCounts[door.status as DoorStatus]++;
     
     if (door.checkin && !door.checkin.closedAt) {
       if (door.checkin.inboundOutbound === 'Inbound') {
