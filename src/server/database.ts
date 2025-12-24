@@ -148,6 +148,31 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
     `);
 
+    // Migration: Add performance tracking columns if they don't exist
+    try {
+      const columns = this.db.pragma('table_info(dock_checkins)') as any[];
+      const columnNames = columns.map(c => c.name);
+      
+      if (!columnNames.includes('actualPallets')) {
+        console.log('Adding actualPallets column...');
+        this.db.exec('ALTER TABLE dock_checkins ADD COLUMN actualPallets INTEGER');
+      }
+      if (!columnNames.includes('loadStartTime')) {
+        console.log('Adding loadStartTime column...');
+        this.db.exec('ALTER TABLE dock_checkins ADD COLUMN loadStartTime TEXT');
+      }
+      if (!columnNames.includes('loadEndTime')) {
+        console.log('Adding loadEndTime column...');
+        this.db.exec('ALTER TABLE dock_checkins ADD COLUMN loadEndTime TEXT');
+      }
+      if (!columnNames.includes('totalMinutes')) {
+        console.log('Adding totalMinutes column...');
+        this.db.exec('ALTER TABLE dock_checkins ADD COLUMN totalMinutes INTEGER');
+      }
+    } catch (err) {
+      console.error('Migration error:', err);
+    }
+
     // Seed dock doors if empty
     const doorCount = this.db.prepare('SELECT COUNT(*) as count FROM dock_doors').get() as { count: number };
     if (doorCount.count === 0) {
