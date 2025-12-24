@@ -145,3 +145,37 @@ export interface ProductionKPI {
     scrapRate: number;
   }>;
 }
+
+// Labor Tracking Types
+export interface LaborSnapshot {
+  id: number;
+  timestamp: string; // ISO timestamp
+  shippingReceivingHeadcount: number;
+  productionHeadcount: number;
+  shippingReceivingLaborCost: number;
+  productionLaborCost: number;
+  totalHeadcount: number;
+  totalLaborCost: number;
+  recordedBy: string;
+  shift: Shift;
+  notes: string | null;
+}
+
+export interface CreateLaborSnapshotRequest {
+  shippingReceivingHeadcount: number;
+  productionHeadcount: number;
+  recordedBy: string;
+  shift: Shift;
+  notes?: string;
+}
+
+export interface LaborSummary {
+  currentShippingReceivingHeadcount: number;
+  currentProductionHeadcount: number;
+  currentTotalHeadcount: number;
+  currentHourlyLaborCost: number;
+  dailyLaborCost: number;
+  weeklyLaborCost: number;
+  averageShippingReceivingHeadcount: number;
+  averageProductionHeadcount: number;
+}

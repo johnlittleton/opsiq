@@ -37,7 +37,14 @@ export const HomePage: React.FC = () => {
       onClick: () => navigate('/scheduler'),
     },
     {
-      icon: '📋',
+      icon: '�',
+      title: 'Labor Tracker',
+      description: 'Track department headcount and labor costs',
+      tags: ['Manager', 'Labor', 'Cost'],
+      onClick: () => navigate('/labor-tracker'),
+    },
+    {
+      icon: '�📋',
       title: 'Dock History',
       description: 'View dock status changes and events',
       tags: ['History', 'Search', 'Reports'],

@@ -12,6 +12,9 @@ import {
   ClearDoorRequest,
   CreateProductionEntryRequest,
   DoorStatus,
+  LaborSnapshot,
+  CreateLaborSnapshotRequest,
+  LaborSummary,
 } from '../shared/types';
 
 export class DatabaseService {
@@ -122,6 +125,23 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointmentDate);
       CREATE INDEX IF NOT EXISTS idx_appointments_type ON appointments(type);
       CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+
+      CREATE TABLE IF NOT EXISTS labor_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        shippingReceivingHeadcount INTEGER NOT NULL,
+        productionHeadcount INTEGER NOT NULL,
+        shippingReceivingLaborCost REAL NOT NULL,
+        productionLaborCost REAL NOT NULL,
+        totalHeadcount INTEGER NOT NULL,
+        totalLaborCost REAL NOT NULL,
+        recordedBy TEXT NOT NULL,
+        shift TEXT NOT NULL,
+        notes TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_labor_timestamp ON labor_snapshots(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
     `);
 
     // Seed dock doors if empty
@@ -625,6 +645,121 @@ export class DatabaseService {
 
   deleteAppointment(id: number) {
     return this.db.prepare('DELETE FROM appointments WHERE id = ?').run(id);
+  }
+
+  // ==================== LABOR TRACKING ====================
+
+  createLaborSnapshot(data: { shippingReceivingHeadcount: number; productionHeadcount: number; recordedBy: string; shift: string; notes?: string }) {
+    const now = new Date().toISOString();
+    const SR_HOURLY_WAGE = 21; // Shipping & Receiving
+    const PROD_HOURLY_WAGE = 19; // Production
+
+    const shippingReceivingLaborCost = data.shippingReceivingHeadcount * SR_HOURLY_WAGE;
+    const productionLaborCost = data.productionHeadcount * PROD_HOURLY_WAGE;
+    const totalHeadcount = data.shippingReceivingHeadcount + data.productionHeadcount;
+    const totalLaborCost = shippingReceivingLaborCost + productionLaborCost;
+
+    const result = this.db.prepare(`
+      INSERT INTO labor_snapshots (
+        timestamp, shippingReceivingHeadcount, productionHeadcount,
+        shippingReceivingLaborCost, productionLaborCost,
+        totalHeadcount, totalLaborCost, recordedBy, shift, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      now,
+      data.shippingReceivingHeadcount,
+      data.productionHeadcount,
+      shippingReceivingLaborCost,
+      productionLaborCost,
+      totalHeadcount,
+      totalLaborCost,
+      data.recordedBy,
+      data.shift,
+      data.notes || null
+    );
+
+    return this.db.prepare('SELECT * FROM labor_snapshots WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  getLatestLaborSnapshot() {
+    return this.db.prepare('SELECT * FROM labor_snapshots ORDER BY timestamp DESC LIMIT 1').get();
+  }
+
+  getLaborSnapshots(options?: { startDate?: string; endDate?: string; shift?: string; limit?: number }) {
+    let query = 'SELECT * FROM labor_snapshots WHERE 1=1';
+    const params: any[] = [];
+
+    if (options?.startDate) {
+      query += ' AND timestamp >= ?';
+      params.push(options.startDate);
+    }
+    if (options?.endDate) {
+      query += ' AND timestamp <= ?';
+      params.push(options.endDate);
+    }
+    if (options?.shift) {
+      query += ' AND shift = ?';
+      params.push(options.shift);
+    }
+
+    query += ' ORDER BY timestamp DESC';
+
+    if (options?.limit) {
+      query += ' LIMIT ?';
+      params.push(options.limit);
+    }
+
+    return this.db.prepare(query).all(...params);
+  }
+
+  getLaborSummary() {
+    const latest = this.getLatestLaborSnapshot() as any;
+    
+    if (!latest) {
+      return {
+        currentShippingReceivingHeadcount: 0,
+        currentProductionHeadcount: 0,
+        currentTotalHeadcount: 0,
+        currentHourlyLaborCost: 0,
+        dailyLaborCost: 0,
+        weeklyLaborCost: 0,
+        averageShippingReceivingHeadcount: 0,
+        averageProductionHeadcount: 0,
+      };
+    }
+
+    // Get today's data
+    const today = new Date().toISOString().split('T')[0];
+    const todaySnapshots = this.db.prepare(
+      'SELECT * FROM labor_snapshots WHERE date(timestamp) = ? ORDER BY timestamp'
+    ).all(today) as any[];
+
+    // Get week's data
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const weekSnapshots = this.db.prepare(
+      'SELECT * FROM labor_snapshots WHERE timestamp >= ?'
+    ).all(weekAgo) as any[];
+
+    const dailyLaborCost = todaySnapshots.reduce((sum, s) => sum + s.totalLaborCost, 0);
+    const weeklyLaborCost = weekSnapshots.reduce((sum, s) => sum + s.totalLaborCost, 0);
+
+    const avgSR = weekSnapshots.length > 0
+      ? weekSnapshots.reduce((sum, s) => sum + s.shippingReceivingHeadcount, 0) / weekSnapshots.length
+      : 0;
+    const avgProd = weekSnapshots.length > 0
+      ? weekSnapshots.reduce((sum, s) => sum + s.productionHeadcount, 0) / weekSnapshots.length
+      : 0;
+
+    return {
+      currentShippingReceivingHeadcount: latest.shippingReceivingHeadcount,
+      currentProductionHeadcount: latest.productionHeadcount,
+      currentTotalHeadcount: latest.totalHeadcount,
+      currentHourlyLaborCost: latest.totalLaborCost,
+      dailyLaborCost,
+      weeklyLaborCost,
+      averageShippingReceivingHeadcount: Math.round(avgSR * 10) / 10,
+      averageProductionHeadcount: Math.round(avgProd * 10) / 10,
+    };
   }
 
   close() {

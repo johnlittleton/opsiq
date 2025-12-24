@@ -402,6 +402,59 @@ io.on('connection', (socket) => {
   });
 });
 
+// ==================== LABOR TRACKING API ====================
+
+// Create labor snapshot
+app.post('/api/labor/snapshot', (req, res) => {
+  try {
+    const data = req.body;
+    const result = db.createLaborSnapshot(data);
+    
+    // Broadcast update to all clients
+    io.emit('labor:updated', result);
+    
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get latest labor snapshot
+app.get('/api/labor/latest', (req, res) => {
+  try {
+    const latest = db.getLatestLaborSnapshot();
+    res.json(latest || null);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get labor snapshots with filters
+app.get('/api/labor/snapshots', (req, res) => {
+  try {
+    const options = {
+      startDate: req.query.startDate as string,
+      endDate: req.query.endDate as string,
+      shift: req.query.shift as string,
+      limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
+    };
+    const snapshots = db.getLaborSnapshots(options);
+    res.json(snapshots);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get labor summary
+app.get('/api/labor/summary', (req, res) => {
+  try {
+    const summary = db.getLaborSummary();
+    res.json(summary);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== SERVER START ====================
 
 const PORT = process.env.PORT || 3000;

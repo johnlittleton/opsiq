@@ -1,0 +1,328 @@
+.labor-tracker {
+  padding: 24px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.labor-tracker__header {
+  margin-bottom: 24px;
+}
+
+.labor-tracker__header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.labor-tracker__subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.labor-tracker__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.labor-tracker__content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.labor-tracker__form-panel,
+.labor-tracker__history-panel {
+  padding: 24px;
+}
+
+.labor-tracker__form-panel h2,
+.labor-tracker__history-panel h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 20px;
+}
+
+.labor-tracker__error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.labor-tracker__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.labor-tracker__form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.labor-tracker__form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.labor-tracker__form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.labor-tracker__form-group input,
+.labor-tracker__form-group select,
+.labor-tracker__form-group textarea {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.labor-tracker__form-group input:focus,
+.labor-tracker__form-group select:focus,
+.labor-tracker__form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.labor-tracker__form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+
+.labor-tracker__wage-info {
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 600;
+}
+
+.labor-tracker__preview {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.labor-tracker__preview h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.labor-tracker__preview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.labor-tracker__preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.labor-tracker__preview-item.highlight {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  grid-column: 1 / -1;
+}
+
+.labor-tracker__preview-item .label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.labor-tracker__preview-item .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.labor-tracker__preview-item.highlight .value {
+  color: var(--primary);
+  font-size: 16px;
+}
+
+.labor-tracker__submit {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.labor-tracker__submit:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.labor-tracker__submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.labor-tracker__history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.labor-tracker__snapshot {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.labor-tracker__snapshot:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--primary);
+}
+
+.labor-tracker__snapshot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.labor-tracker__snapshot-header .time {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.labor-tracker__snapshot-header .shift {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.labor-tracker__snapshot-header .shift-A {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.labor-tracker__snapshot-header .shift-B {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.labor-tracker__snapshot-data {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.labor-tracker__snapshot-data .data-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.labor-tracker__snapshot-data .data-item.highlight {
+  padding: 8px;
+  background: rgba(59, 130, 246, 0.1);
+  border-radius: 6px;
+}
+
+.labor-tracker__snapshot-data .label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.labor-tracker__snapshot-data .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.labor-tracker__snapshot-data .data-item.highlight .value {
+  color: var(--primary);
+  font-size: 15px;
+}
+
+.labor-tracker__snapshot-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.labor-tracker__snapshot-footer .recorded-by {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.labor-tracker__snapshot-footer .notes {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.labor-tracker__empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.labor-tracker__empty p {
+  font-size: 14px;
+}
+
+@media (max-width: 1200px) {
+  .labor-tracker__content {
+    grid-template-columns: 1fr;
+  }
+
+  .labor-tracker__snapshot-data {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
