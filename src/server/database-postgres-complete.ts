@@ -408,12 +408,16 @@ export class DatabaseService implements IDatabaseService {
       const door = this.toCamelCase(doorResult.rows[0]);
       const elapsedSeconds = Math.floor((new Date(now).getTime() - new Date(door.statusStartTime).getTime()) / 1000);
 
+      // Save the checkin ID before we clear it
+      const savedCheckinId = door.currentCheckinId;
+      const savedStatus = door.status;
+
       // Close checkin if exists and record performance metrics
-      if (door.currentCheckinId) {
-        const checkinResult = await client.query('SELECT * FROM dock_checkins WHERE id = $1', [door.currentCheckinId]);
+      if (savedCheckinId) {
+        const checkinResult = await client.query('SELECT * FROM dock_checkins WHERE id = $1', [savedCheckinId]);
         const checkin = this.toCamelCase(checkinResult.rows[0]);
         
-        console.log('Clearing door - Checkin data:', {
+        console.log('🚪 Clearing door - Checkin data:', {
           id: checkin.id,
           loadStartTime: checkin.loadStartTime,
           actualPallets: data.actualPallets,
@@ -438,16 +442,30 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closed_at = $1, updated_at = $2, actual_pallets = $3, load_end_time = $4, total_minutes = $5
             WHERE id = $6
-          `, [now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId]);
+          `, [now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, savedCheckinId]);
         } else {
           console.log('⚠️ No loadStartTime found - performance tracking skipped');
           await client.query(`
             UPDATE dock_checkins
             SET closed_at = $1, updated_at = $2, actual_pallets = $3
             WHERE id = $4
-          `, [now, now, data.actualPallets || checkin.pallets, door.currentCheckinId]);
+          `, [now, now, data.actualPallets || checkin.pallets, savedCheckinId]);
         }
       }
+
+      // Log event BEFORE clearing the door (while we still have checkin_id)
+      console.log('📝 Logging dock event:', {
+        doorId: data.doorId,
+        checkinId: savedCheckinId,
+        oldStatus: savedStatus,
+        newStatus: 'Open',
+        eventTime: now
+      });
+
+      await client.query(`
+        INSERT INTO dock_events (door_id, checkin_id, old_status, new_status, event_time, elapsed_seconds, updated_by, note)
+        VALUES ($1, $2, $3, 'Open', $4, $5, $6, 'Door cleared')
+      `, [data.doorId, savedCheckinId, savedStatus, now, elapsedSeconds, data.updatedBy]);
 
       // Update door to Open
       await client.query(`
@@ -456,13 +474,8 @@ export class DatabaseService implements IDatabaseService {
         WHERE door_id = $3
       `, [now, now, data.doorId]);
 
-      // Log event
-      await client.query(`
-        INSERT INTO dock_events (door_id, checkin_id, old_status, new_status, event_time, elapsed_seconds, updated_by, note)
-        VALUES ($1, $2, $3, 'Open', $4, $5, $6, 'Door cleared')
-      `, [data.doorId, door.currentCheckinId, door.status, now, elapsedSeconds, data.updatedBy]);
-
       await client.query('COMMIT');
+      console.log('✅ Door cleared and event logged successfully');
 
       return await this.getDoorWithCheckin(data.doorId) as DockDoorWithCheckin;
     } catch (error) {
