@@ -512,8 +512,7 @@ export class DatabaseService implements IDatabaseService {
         c.actual_pallets,
         c.type,
         c.load_start_time,
-        c.load_end_time,
-        c.total_minutes
+        c.load_end_time
       FROM dock_events e
       LEFT JOIN dock_checkins c ON e.checkin_id = c.id
       WHERE 1=1
