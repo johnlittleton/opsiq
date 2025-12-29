@@ -70,15 +70,25 @@ const Scheduler: React.FC = () => {
     };
   }, []);
 
-  // Load appointments when month or filter changes
+  // Load appointments when month, filter, or view changes
   useEffect(() => {
     loadAppointments();
-  }, [currentMonth, typeFilter]);
+  }, [currentMonth, typeFilter, view]);
 
   const loadAppointments = async () => {
     try {
-      const start = startOfMonth(currentMonth);
-      const end = endOfMonth(currentMonth);
+      let start: Date;
+      let end: Date;
+      
+      if (view === 'list') {
+        // In list view, load appointments for 3 months (past, current, and future)
+        start = startOfMonth(subMonths(new Date(), 1));
+        end = endOfMonth(addMonths(new Date(), 2));
+      } else {
+        // In calendar view, load appointments for the current month only
+        start = startOfMonth(currentMonth);
+        end = endOfMonth(currentMonth);
+      }
       
       const filters: any = {
         startDate: format(start, 'yyyy-MM-dd'),
@@ -88,6 +98,7 @@ const Scheduler: React.FC = () => {
       if (typeFilter) filters.type = typeFilter;
       
       const data = await apiClient.getAppointments(filters);
+      console.log('Loaded appointments:', data);
       setAppointments(data);
     } catch (error) {
       console.error('Failed to load appointments:', error);
@@ -141,6 +152,8 @@ const Scheduler: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Form submitted!', formData);
+    
     try {
       const data = {
         ...formData,
@@ -148,14 +161,22 @@ const Scheduler: React.FC = () => {
         pallets: formData.pallets ? parseInt(formData.pallets) : undefined,
       };
 
+      console.log('Prepared data:', data);
+
       if (editingAppointment) {
+        console.log('Updating appointment:', editingAppointment.id);
         await apiClient.updateAppointment(editingAppointment.id, data);
       } else {
-        await apiClient.createAppointment(data);
+        console.log('Creating new appointment');
+        const result = await apiClient.createAppointment(data);
+        console.log('Created successfully:', result);
       }
       
       closeModal();
+      // Reload appointments to ensure the list is current
+      await loadAppointments();
     } catch (error: any) {
+      console.error('Error submitting appointment:', error);
       alert(error.message);
     }
   };
@@ -247,8 +268,7 @@ const Scheduler: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  appointments.map(apt => {
-                    const date = new Date(apt.appointmentDate);
+                  appointments.map(apt => {                    console.log('Rendering appointment:', JSON.stringify(apt, null, 2));                    const date = new Date(apt.appointmentDate);
                     const isValidDate = !isNaN(date.getTime());
                     return (
                       <tr key={apt.id} className="scheduler__table-row">

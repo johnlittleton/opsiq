@@ -280,16 +280,21 @@ class ApiClient {
     notes?: string;
     status?: string;
   }): Promise<any> {
+    console.log('API: Creating appointment with data:', data);
     const response = await fetch(`${API_BASE}/api/appointments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    console.log('API: Response status:', response.status);
     if (!response.ok) {
       const error = await response.json();
+      console.error('API: Error response:', error);
       throw new Error(error.error || 'Failed to create appointment');
     }
-    return response.json();
+    const result = await response.json();
+    console.log('API: Created appointment:', result);
+    return result;
   }
 
   async updateAppointment(id: number, data: any): Promise<any> {

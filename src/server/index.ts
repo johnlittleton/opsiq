@@ -337,9 +337,13 @@ app.get('/api/appointments', async (req, res) => {
       type: req.query.type as string | undefined,
       status: req.query.status as string | undefined,
     };
+    console.log('📅 Fetching appointments with filters:', filters);
     const appointments = db.getAppointments(filters);
+    console.log('📅 Found appointments:', appointments.length);
+    console.log('📅 First appointment:', appointments[0]);
     res.json(appointments);
   } catch (error: any) {
+    console.error('❌ Error fetching appointments:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -347,13 +351,16 @@ app.get('/api/appointments', async (req, res) => {
 // Create appointment
 app.post('/api/appointments', async (req, res) => {
   try {
+    console.log('📅 Creating appointment with data:', req.body);
     const appointment = db.createAppointment(req.body);
+    console.log('✅ Appointment created:', appointment);
     
     // Broadcast update to all clients
     io.emit('appointment:created', appointment);
     
     res.json(appointment);
   } catch (error: any) {
+    console.error('❌ Error creating appointment:', error.message);
     res.status(400).json({ error: error.message });
   }
 });

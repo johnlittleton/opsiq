@@ -170,11 +170,14 @@ export class DatabaseService implements IDatabaseService {
     if (Array.isArray(obj)) {
       return obj.map(item => this.toCamelCase(item));
     } else if (obj !== null && typeof obj === 'object') {
-      return Object.keys(obj).reduce((acc, key) => {
-        const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-        acc[camelKey] = this.toCamelCase(obj[key]);
-        return acc;
-      }, {} as any);
+      const result: any = {};
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
+          result[camelKey] = this.toCamelCase(obj[key]);
+        }
+      }
+      return result;
     }
     return obj;
   }
@@ -697,7 +700,10 @@ export class DatabaseService implements IDatabaseService {
     query += ' ORDER BY appointment_date, appointment_time';
 
     const result = await this.pool.query(query, params);
-    return this.toCamelCase(result.rows);
+    console.log('PostgreSQL raw result rows:', result.rows);
+    const converted = this.toCamelCase(result.rows);
+    console.log('After toCamelCase:', converted);
+    return converted;
   }
 
   async updateAppointment(id: number, data: {
