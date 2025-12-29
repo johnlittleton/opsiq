@@ -481,31 +481,46 @@ export class DatabaseService implements IDatabaseService {
     doorId?: number;
     status?: DoorStatus;
   }): Promise<DockEvent[]> {
-    let query = 'SELECT * FROM dock_events WHERE 1=1';
+    let query = `
+      SELECT 
+        e.*,
+        c.company,
+        c.driver_name,
+        c.pickup_number,
+        c.pallets,
+        c.actual_pallets,
+        c.type,
+        c.load_start_time,
+        c.load_end_time,
+        c.total_minutes
+      FROM dock_events e
+      LEFT JOIN dock_checkins c ON e.checkin_id = c.id
+      WHERE 1=1
+    `;
     const params: any[] = [];
     let paramIndex = 1;
 
     if (filters?.startDate) {
-      query += ` AND event_time >= $${paramIndex++}`;
+      query += ` AND e.event_time >= $${paramIndex++}`;
       params.push(filters.startDate);
     }
 
     if (filters?.endDate) {
-      query += ` AND event_time <= $${paramIndex++}`;
+      query += ` AND e.event_time <= $${paramIndex++}`;
       params.push(filters.endDate);
     }
 
     if (filters?.doorId) {
-      query += ` AND door_id = $${paramIndex++}`;
+      query += ` AND e.door_id = $${paramIndex++}`;
       params.push(filters.doorId);
     }
 
     if (filters?.status) {
-      query += ` AND new_status = $${paramIndex++}`;
+      query += ` AND e.new_status = $${paramIndex++}`;
       params.push(filters.status);
     }
 
-    query += ' ORDER BY event_time DESC LIMIT 1000';
+    query += ' ORDER BY e.event_time DESC LIMIT 1000';
 
     const result = await this.pool.query(query, params);
     return this.toCamelCase(result.rows);
