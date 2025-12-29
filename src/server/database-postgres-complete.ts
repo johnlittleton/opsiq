@@ -167,18 +167,27 @@ export class DatabaseService implements IDatabaseService {
 
   // Helper to convert snake_case to camelCase
   private toCamelCase(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+    
     if (Array.isArray(obj)) {
       return obj.map(item => this.toCamelCase(item));
-    } else if (obj !== null && typeof obj === 'object') {
-      const result: any = {};
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          const camelKey = key.replace(/_([a-z])/g, (g) => g[1].toUpperCase());
-          result[camelKey] = this.toCamelCase(obj[key]);
-        }
-      }
-      return result;
     }
+    
+    if (obj instanceof Date) {
+      return obj;
+    }
+    
+    if (typeof obj === 'object') {
+      const newObj: any = {};
+      Object.keys(obj).forEach(key => {
+        const camelKey = key.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+        newObj[camelKey] = this.toCamelCase(obj[key]);
+      });
+      return newObj;
+    }
+    
     return obj;
   }
 
