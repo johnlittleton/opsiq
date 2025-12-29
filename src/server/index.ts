@@ -338,7 +338,7 @@ app.get('/api/appointments', async (req, res) => {
       status: req.query.status as string | undefined,
     };
     console.log('📅 Fetching appointments with filters:', filters);
-    const appointments = db.getAppointments(filters);
+    const appointments = await db.getAppointments(filters);
     console.log('📅 Found appointments:', appointments.length);
     console.log('📅 First appointment:', appointments[0]);
     res.json(appointments);
