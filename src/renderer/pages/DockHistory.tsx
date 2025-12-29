@@ -300,6 +300,11 @@ const DockHistory: React.FC = () => {
                 <tr>
                   <th>Event Time</th>
                   <th>Door</th>
+                  <th>Company</th>
+                  <th>Driver</th>
+                  <th>Pickup #</th>
+                  <th>Type</th>
+                  <th>Pallets</th>
                   <th>Old Status</th>
                   <th>New Status</th>
                   <th>Elapsed Time</th>
@@ -315,6 +320,15 @@ const DockHistory: React.FC = () => {
                     <tr key={event.id}>
                       <td>{isValidDate ? format(eventDate, 'MMM dd, yyyy HH:mm:ss') : 'Invalid Date'}</td>
                       <td><strong>Door {event.doorId}</strong></td>
+                      <td>{(event as any).company || '—'}</td>
+                      <td>{(event as any).driverName || '—'}</td>
+                      <td>{(event as any).pickupNumber || '—'}</td>
+                      <td>{(event as any).type || '—'}</td>
+                      <td>
+                        {(event as any).actualPallets 
+                          ? `${(event as any).actualPallets} (${(event as any).pallets || '0'} expected)` 
+                          : (event as any).pallets || '—'}
+                      </td>
                       <td>
                       {event.oldStatus ? (
                         <span className={`door-status ${event.oldStatus ? `status-${event.oldStatus}` : ''}`}>
