@@ -166,6 +166,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Helper to convert snake_case to camelCase
+  // Convert PostgreSQL snake_case to JavaScript camelCase
   private toCamelCase(obj: any): any {
     if (obj === null || obj === undefined) {
       return obj;
