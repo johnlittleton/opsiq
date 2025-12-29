@@ -99,7 +99,7 @@ app.get('/api/events', async (req, res) => {
       doorId: req.query.doorId ? parseInt(req.query.doorId as string) : undefined,
       status: req.query.status as DoorStatus | undefined,
     };
-    const events = db.getDockEvents(filters);
+    const events = await db.getDockEvents(filters);
     res.json(events);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -109,7 +109,7 @@ app.get('/api/events', async (req, res) => {
 // Get active checkins
 app.get('/api/checkins/active', async (req, res) => {
   try {
-    const checkins = db.getActiveCheckins();
+    const checkins = await db.getActiveCheckins();
     res.json(checkins);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -129,7 +129,7 @@ app.get('/api/checkins', async (req, res) => {
       type: req.query.type as string | undefined,
       includeActive: req.query.includeActive === 'false' ? false : undefined,
     };
-    const checkins = db.getAllCheckins(filters);
+    const checkins = await db.getAllCheckins(filters);
     res.json(checkins);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -470,7 +470,7 @@ app.get('/api/labor/summary', async (req, res) => {
 app.post('/api/checkins/:checkinId/start-load', async (req, res) => {
   try {
     const checkinId = parseInt(req.params.checkinId);
-    db.markLoadStart(checkinId);
+    await db.markLoadStart(checkinId);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -482,7 +482,7 @@ app.post('/api/checkins/:checkinId/complete', async (req, res) => {
   try {
     const checkinId = parseInt(req.params.checkinId);
     const { actualPallets } = req.body;
-    db.updateCheckinCompletion(checkinId, actualPallets);
+    await db.updateCheckinCompletion(checkinId, actualPallets);
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -494,7 +494,7 @@ app.get('/api/executive/metrics', async (req, res) => {
   try {
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
-    const metrics = db.getExecutiveMetrics(startDate, endDate);
+    const metrics = await db.getExecutiveMetrics(startDate, endDate);
     res.json(metrics);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
