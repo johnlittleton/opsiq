@@ -1,7 +1,9 @@
 .dock-tile {
   position: relative;
   width: 100%;
-  aspect-ratio: 1;
+  height: 100%;
+  max-width: 160px;
+  max-height: 160px;
   background: var(--tile-bg);
   border-radius: var(--tile-radius);
   border: var(--tile-border) solid transparent;
@@ -15,6 +17,7 @@
   cursor: pointer;
   user-select: none;
   overflow: hidden;
+  margin: 0 auto;
 }
 
 .dock-tile::before {
