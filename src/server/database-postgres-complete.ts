@@ -496,7 +496,15 @@ export class DatabaseService implements IDatabaseService {
   }): Promise<DockEvent[]> {
     let query = `
       SELECT 
-        e.*,
+        e.id,
+        e.door_id,
+        e.checkin_id,
+        e.old_status,
+        e.new_status,
+        e.event_time,
+        e.elapsed_seconds,
+        e.updated_by,
+        e.note,
         c.company,
         c.driver_name,
         c.pickup_number,
