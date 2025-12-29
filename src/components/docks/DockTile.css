@@ -2,8 +2,6 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  max-width: var(--tile-size);
-  max-height: var(--tile-size);
   background: var(--tile-bg);
   border-radius: var(--tile-radius);
   border: var(--tile-border) solid transparent;
@@ -213,5 +211,126 @@
   50% {
     box-shadow: var(--current-glow-shadow), 0 0 30px var(--current-glow);
     filter: brightness(1.2);
+  }
+}
+
+/* Responsive typography for different screen sizes */
+
+/* Extra Large Screens - Bigger text for readability */
+@media (min-width: 2560px) {
+  .dock-tile__label {
+    font-size: 28px;
+  }
+  .dock-tile__time {
+    font-size: 20px;
+  }
+  .dock-tile__status {
+    font-size: 14px;
+  }
+  .dock-tile__company {
+    font-size: 12px;
+  }
+  .dock-tile__pickup, .dock-tile__pallets {
+    font-size: 11px;
+  }
+  .dock-tile {
+    padding: 12px;
+  }
+}
+
+@media (min-width: 1920px) and (max-width: 2559px) {
+  .dock-tile__label {
+    font-size: 24px;
+  }
+  .dock-tile__time {
+    font-size: 18px;
+  }
+  .dock-tile__status {
+    font-size: 12px;
+  }
+  .dock-tile__company {
+    font-size: 10px;
+  }
+  .dock-tile__pickup, .dock-tile__pallets {
+    font-size: 9px;
+  }
+  .dock-tile {
+    padding: 10px;
+  }
+}
+
+/* Standard Screens */
+@media (max-width: 1400px) {
+  .dock-tile__label {
+    font-size: 20px;
+  }
+  .dock-tile__time {
+    font-size: 14px;
+  }
+  .dock-tile__status {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .dock-tile__label {
+    font-size: 18px;
+  }
+  .dock-tile__time {
+    font-size: 13px;
+  }
+  .dock-tile__company {
+    font-size: 8px;
+  }
+  .dock-tile__pickup, .dock-tile__pallets {
+    font-size: 7px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dock-tile__label {
+    font-size: 16px;
+  }
+  .dock-tile__time {
+    font-size: 12px;
+  }
+  .dock-tile__status {
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dock-tile {
+    padding: 6px;
+  }
+  .dock-tile__label {
+    font-size: 14px;
+  }
+  .dock-tile__time {
+    font-size: 11px;
+  }
+  .dock-tile__status {
+    font-size: 8px;
+  }
+  .dock-tile__company {
+    font-size: 7px;
+  }
+  .dock-tile__pickup, .dock-tile__pallets {
+    font-size: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dock-tile {
+    padding: 4px;
+  }
+  .dock-tile__label {
+    font-size: 12px;
+  }
+  .dock-tile__time {
+    font-size: 10px;
+  }
+  .dock-tile__timer {
+    font-size: 9px;
   }
 }
