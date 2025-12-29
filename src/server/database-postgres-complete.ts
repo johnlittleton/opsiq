@@ -510,7 +510,7 @@ export class DatabaseService implements IDatabaseService {
         c.pickup_number,
         c.pallets,
         c.actual_pallets,
-        c.type,
+        c.inbound_outbound,
         c.load_start_time,
         c.load_end_time
       FROM dock_events e
