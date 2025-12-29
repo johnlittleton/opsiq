@@ -180,12 +180,13 @@ export class DatabaseService implements IDatabaseService {
       return obj;
     }
     
-    if (typeof obj === 'object' && obj.constructor === Object) {
+    // Handle plain objects (including PostgreSQL result rows)
+    if (typeof obj === 'object' && !(obj instanceof Date) && !Array.isArray(obj)) {
       const newObj: any = {};
       for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
-          // Convert snake_case to camelCase
-          const camelKey = key.replace(/_[a-z]/g, (match) => match[1].toUpperCase());
+          // Convert snake_case to camelCase: appointment_date -> appointmentDate
+          const camelKey = key.replace(/_([a-z])/g, (match) => match[1].toUpperCase());
           newObj[camelKey] = this.toCamelCase(obj[key]);
         }
       }
