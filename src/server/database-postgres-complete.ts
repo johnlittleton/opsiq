@@ -180,12 +180,15 @@ export class DatabaseService implements IDatabaseService {
       return obj;
     }
     
-    if (typeof obj === 'object') {
+    if (typeof obj === 'object' && obj.constructor === Object) {
       const newObj: any = {};
-      Object.keys(obj).forEach(key => {
-        const camelKey = key.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
-        newObj[camelKey] = this.toCamelCase(obj[key]);
-      });
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          // Convert snake_case to camelCase
+          const camelKey = key.replace(/_[a-z]/g, (match) => match[1].toUpperCase());
+          newObj[camelKey] = this.toCamelCase(obj[key]);
+        }
+      }
       return newObj;
     }
     
