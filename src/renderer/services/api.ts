@@ -146,6 +146,19 @@ class ApiClient {
     return response.json();
   }
 
+  async updateCheckin(checkinId: number, updates: any, updatedBy: string): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/checkins/${checkinId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates, updatedBy }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update checkin');
+    }
+    return response.json();
+  }
+
   async getDockEvents(filters?: {
     startDate?: string;
     endDate?: string;

@@ -84,6 +84,27 @@
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
+.dock-tile__edit-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.dock-tile__edit-btn:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
 .dock-tile__footer {
   width: 100%;
   display: flex;

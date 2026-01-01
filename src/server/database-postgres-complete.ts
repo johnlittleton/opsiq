@@ -134,6 +134,17 @@ export class DatabaseService implements IDatabaseService {
           notes TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS checkin_audit_log (
+          id SERIAL PRIMARY KEY,
+          checkin_id INTEGER NOT NULL,
+          field_name TEXT NOT NULL,
+          old_value TEXT,
+          new_value TEXT,
+          changed_by TEXT NOT NULL,
+          changed_at TIMESTAMP NOT NULL,
+          FOREIGN KEY (checkin_id) REFERENCES dock_checkins(id)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_checkins_door ON dock_checkins(door_id);
         CREATE INDEX IF NOT EXISTS idx_checkins_status ON dock_checkins(status);
         CREATE INDEX IF NOT EXISTS idx_checkins_created ON dock_checkins(created_at);
@@ -146,6 +157,8 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
         CREATE INDEX IF NOT EXISTS idx_labor_timestamp ON labor_snapshots(timestamp);
         CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
+        CREATE INDEX IF NOT EXISTS idx_audit_checkin ON checkin_audit_log(checkin_id);
+        CREATE INDEX IF NOT EXISTS idx_audit_time ON checkin_audit_log(changed_at);
       `);
 
       // Seed dock doors if empty
@@ -612,6 +625,91 @@ export class DatabaseService implements IDatabaseService {
 
     const result = await this.pool.query(query, params);
     return this.toCamelCase(result.rows);
+  }
+
+  async updateCheckin(checkinId: number, updates: Partial<DockCheckin>, updatedBy: string): Promise<DockCheckin> {
+    const client = await this.pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+
+      // Get current check-in data
+      const currentResult = await client.query('SELECT * FROM dock_checkins WHERE id = $1', [checkinId]);
+      if (currentResult.rows.length === 0) {
+        throw new Error(`Check-in ${checkinId} not found`);
+      }
+      
+      const current = currentResult.rows[0];
+      const now = new Date().toISOString();
+      
+      // Map camelCase to snake_case
+      const fieldMap: Record<string, string> = {
+        inboundOutbound: 'inbound_outbound',
+        company: 'company',
+        driverName: 'driver_name',
+        pickupNumber: 'pickup_number',
+        pallets: 'pallets',
+        actualPallets: 'actual_pallets',
+        commodity: 'commodity',
+        forkliftDriver: 'forklift_driver',
+        checker: 'checker',
+        plateNumber: 'plate_number',
+        phoneNumber: 'phone_number'
+      };
+
+      // Build update query and log changes
+      const updateFields: string[] = [];
+      const updateValues: any[] = [];
+      let paramIndex = 1;
+
+      for (const [camelKey, value] of Object.entries(updates)) {
+        if (value === undefined || !fieldMap[camelKey]) continue;
+        
+        const snakeKey = fieldMap[camelKey];
+        const oldValue = current[snakeKey];
+        
+        // Only update and log if value actually changed
+        if (oldValue !== value) {
+          updateFields.push(`${snakeKey} = $${paramIndex++}`);
+          updateValues.push(value);
+          
+          // Log the change
+          await client.query(`
+            INSERT INTO checkin_audit_log (checkin_id, field_name, old_value, new_value, changed_by, changed_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+          `, [checkinId, camelKey, String(oldValue || ''), String(value || ''), updatedBy, now]);
+        }
+      }
+
+      if (updateFields.length === 0) {
+        await client.query('COMMIT');
+        return this.toCamelCase(current);
+      }
+
+      // Add updated_at
+      updateFields.push(`updated_at = $${paramIndex++}`);
+      updateValues.push(now);
+      updateValues.push(checkinId);
+
+      // Execute update
+      const updateQuery = `
+        UPDATE dock_checkins 
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex}
+        RETURNING *
+      `;
+      
+      const result = await client.query(updateQuery, updateValues);
+      
+      await client.query('COMMIT');
+      return this.toCamelCase(result.rows[0]);
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   // ==================== PRODUCTION ====================

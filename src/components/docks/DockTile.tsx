@@ -12,6 +12,7 @@ interface DockTileProps {
   pulsing?: boolean;
   checkin?: DockCheckin | null;
   onClick?: () => void;
+  onEdit?: () => void;
 }
 
 export const DockTile: React.FC<DockTileProps> = ({
@@ -22,6 +23,7 @@ export const DockTile: React.FC<DockTileProps> = ({
   pulsing = false,
   checkin,
   onClick,
+  onEdit,
 }) => {
   const statusLabels: Record<DockStatus, string> = {
     open: 'OPEN',
@@ -31,6 +33,13 @@ export const DockTile: React.FC<DockTileProps> = ({
     offline: 'OFFLINE',
   };
 
+  const handleEditClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) {
+      onEdit();
+    }
+  };
+
   return (
     <div
       className={`dock-tile ${compact ? 'compact' : ''} ${pulsing ? 'pulsing' : ''}`}
@@ -38,6 +47,11 @@ export const DockTile: React.FC<DockTileProps> = ({
       onClick={onClick}
     >
       <div className="dock-tile__label">D{doorNumber}</div>
+      {checkin && onEdit && (
+        <button className="dock-tile__edit-btn" onClick={handleEditClick} title="Edit check-in">
+          ✏️
+        </button>
+      )}
       <div className="dock-tile__footer">
         {checkin ? (
           <>

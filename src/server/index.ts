@@ -136,6 +136,24 @@ app.get('/api/checkins', async (req, res) => {
   }
 });
 
+// Update checkin
+app.put('/api/checkins/:id', async (req, res) => {
+  try {
+    const checkinId = parseInt(req.params.id);
+    const updates = req.body.updates;
+    const updatedBy = req.body.updatedBy || 'System';
+    
+    const updatedCheckin = await db.updateCheckin(checkinId, updates, updatedBy);
+    
+    // Broadcast update to all clients
+    io.emit('checkin:updated', updatedCheckin);
+    
+    res.json(updatedCheckin);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Create production entry
 app.post('/api/production', async (req, res) => {
   try {

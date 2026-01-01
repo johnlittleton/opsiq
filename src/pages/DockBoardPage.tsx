@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DockTile, DockStatus } from '../components/docks/DockTile';
 import { TitleBar } from '../components/layout/TitleBar';
+import { EditCheckinModal } from '../components/docks/EditCheckinModal';
 import { useAppStore } from '../renderer/store';
+import { api } from '../renderer/services/api';
+import { DockCheckin } from '../shared/types';
 import './DockBoardPage.css';
 
 export const DockBoardPage: React.FC = () => {
@@ -10,6 +13,7 @@ export const DockBoardPage: React.FC = () => {
   const doors = useAppStore(state => state.doors);
   const initializeSync = useAppStore(state => state.initializeSync);
   const [, setTick] = useState(0);
+  const [editingCheckin, setEditingCheckin] = useState<DockCheckin | null>(null);
   
   // Initialize data sync on mount
   useEffect(() => {
@@ -84,6 +88,21 @@ export const DockBoardPage: React.FC = () => {
     navigate('/active-drivers');
   };
 
+  const handleEditCheckin = (checkin: DockCheckin) => {
+    setEditingCheckin(checkin);
+  };
+
+  const handleSaveEdit = async (updates: Partial<DockCheckin>, updatedBy: string) => {
+    if (!editingCheckin) return;
+    
+    try {
+      await api.updateCheckin(editingCheckin.id, updates, updatedBy);
+      // The socket.io update will refresh the UI automatically
+    } catch (error: any) {
+      throw new Error(error.message || 'Failed to update check-in');
+    }
+  };
+
   return (
     <div className="dock-board-page">
       <TitleBar showLegend={true} />
@@ -99,10 +118,19 @@ export const DockBoardPage: React.FC = () => {
               pulsing={door.pulsing}
               checkin={door.checkin}
               onClick={() => handleDoorClick(door.doorNumber)}
+              onEdit={door.checkin ? () => handleEditCheckin(door.checkin) : undefined}
             />
           ))}
         </div>
       </div>
+
+      {editingCheckin && (
+        <EditCheckinModal
+          checkin={editingCheckin}
+          onClose={() => setEditingCheckin(null)}
+          onSave={handleSaveEdit}
+        />
+      )}
     </div>
   );
 };
