@@ -4,7 +4,7 @@ import { DockTile, DockStatus } from '../components/docks/DockTile';
 import { TitleBar } from '../components/layout/TitleBar';
 import { EditCheckinModal } from '../components/docks/EditCheckinModal';
 import { useAppStore } from '../renderer/store';
-import { api } from '../renderer/services/api';
+import { apiClient } from '../renderer/services/api';
 import { DockCheckin } from '../shared/types';
 import './DockBoardPage.css';
 
@@ -96,7 +96,7 @@ export const DockBoardPage: React.FC = () => {
     if (!editingCheckin) return;
     
     try {
-      await api.updateCheckin(editingCheckin.id, updates, updatedBy);
+      await apiClient.updateCheckin(editingCheckin.id, updates, updatedBy);
       // The socket.io update will refresh the UI automatically
     } catch (error: any) {
       throw new Error(error.message || 'Failed to update check-in');

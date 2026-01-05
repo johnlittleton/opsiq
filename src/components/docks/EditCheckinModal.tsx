@@ -10,6 +10,7 @@ interface EditCheckinModalProps {
 
 export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalProps) {
   const [formData, setFormData] = useState({
+    status: checkin.status || '',
     inboundOutbound: checkin.inboundOutbound || '',
     company: checkin.company || '',
     driverName: checkin.driverName || '',
@@ -38,6 +39,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
     // Build updates object with only changed fields
     const updates: Partial<DockCheckin> = {};
     
+    if (formData.status !== checkin.status) updates.status = formData.status;
     if (formData.inboundOutbound !== checkin.inboundOutbound) updates.inboundOutbound = formData.inboundOutbound;
     if (formData.company !== checkin.company) updates.company = formData.company;
     if (formData.driverName !== checkin.driverName) updates.driverName = formData.driverName;
@@ -90,13 +92,22 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
               <span className="label">Check-In ID:</span>
               <span className="value">#{checkin.id}</span>
             </div>
-            <div className="info-item">
-              <span className="label">Status:</span>
-              <span className="value">{checkin.status}</span>
-            </div>
           </div>
 
           <div className="edit-checkin-modal__row">
+            <div className="edit-checkin-modal__field">
+              <label>Status *</label>
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                required
+              >
+                <option value="Waiting">Waiting</option>
+                <option value="Loading">Loading</option>
+                <option value="Offload">Offload</option>
+              </select>
+            </div>
+
             <div className="edit-checkin-modal__field">
               <label>Type *</label>
               <select

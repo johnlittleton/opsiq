@@ -145,8 +145,12 @@ app.put('/api/checkins/:id', async (req, res) => {
     
     const updatedCheckin = await db.updateCheckin(checkinId, updates, updatedBy);
     
-    // Broadcast update to all clients
-    io.emit('checkin:updated', updatedCheckin);
+    // Get the full door data to broadcast
+    const doorId = updatedCheckin.doorId;
+    const doorData = await db.getDoorWithCheckin(doorId);
+    
+    // Broadcast door update to all clients
+    io.emit('dock:updated', doorData);
     
     res.json(updatedCheckin);
   } catch (error: any) {

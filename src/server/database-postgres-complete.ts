@@ -644,6 +644,7 @@ export class DatabaseService implements IDatabaseService {
       
       // Map camelCase to snake_case
       const fieldMap: Record<string, string> = {
+        status: 'status',
         inboundOutbound: 'inbound_outbound',
         company: 'company',
         driverName: 'driver_name',
@@ -700,6 +701,15 @@ export class DatabaseService implements IDatabaseService {
       `;
       
       const result = await client.query(updateQuery, updateValues);
+      
+      // If status was changed, also update the door's status
+      if (updates.status && current.status !== updates.status) {
+        await client.query(`
+          UPDATE dock_doors
+          SET status = $1, status_start_time = $2, updated_at = $3
+          WHERE current_checkin_id = $4
+        `, [updates.status, now, now, checkinId]);
+      }
       
       await client.query('COMMIT');
       return this.toCamelCase(result.rows[0]);
