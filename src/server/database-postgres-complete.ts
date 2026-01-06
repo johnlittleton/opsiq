@@ -797,6 +797,7 @@ export class DatabaseService implements IDatabaseService {
     company: string;
     contactName: string;
     contactPhone: string;
+    pickupNumber?: string;
     type: 'Inbound' | 'Outbound';
     doorId?: number;
     pallets?: number;
@@ -876,6 +877,7 @@ export class DatabaseService implements IDatabaseService {
     company?: string;
     contactName?: string;
     contactPhone?: string;
+    pickupNumber?: string;
     type?: 'Inbound' | 'Outbound';
     doorId?: number;
     pallets?: number;
