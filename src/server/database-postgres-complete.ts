@@ -109,6 +109,7 @@ export class DatabaseService implements IDatabaseService {
           company TEXT NOT NULL,
           contact_name TEXT NOT NULL,
           contact_phone TEXT NOT NULL,
+          pickup_number TEXT,
           type TEXT NOT NULL,
           door_id INTEGER,
           pallets INTEGER,
@@ -159,6 +160,11 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
         CREATE INDEX IF NOT EXISTS idx_audit_checkin ON checkin_audit_log(checkin_id);
         CREATE INDEX IF NOT EXISTS idx_audit_time ON checkin_audit_log(changed_at);
+      `);
+
+      // Add pickup_number column if it doesn't exist (migration)
+      await client.query(`
+        ALTER TABLE appointments ADD COLUMN IF NOT EXISTS pickup_number TEXT;
       `);
 
       // Seed dock doors if empty
@@ -802,8 +808,8 @@ export class DatabaseService implements IDatabaseService {
     const result = await this.pool.query(`
       INSERT INTO appointments (
         appointment_date, appointment_time, company, contact_name, contact_phone,
-        type, door_id, pallets, commodity, notes, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        pickup_number, type, door_id, pallets, commodity, notes, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING *
     `, [
       data.appointmentDate,
@@ -811,6 +817,7 @@ export class DatabaseService implements IDatabaseService {
       data.company,
       data.contactName,
       data.contactPhone,
+      data.pickupNumber || null,
       data.type,
       data.doorId || null,
       data.pallets || null,
@@ -900,6 +907,10 @@ export class DatabaseService implements IDatabaseService {
     if (data.contactPhone !== undefined) {
       fields.push(`contact_phone = $${paramIndex++}`);
       params.push(data.contactPhone);
+    }
+    if (data.pickupNumber !== undefined) {
+      fields.push(`pickup_number = $${paramIndex++}`);
+      params.push(data.pickupNumber);
     }
     if (data.type !== undefined) {
       fields.push(`type = $${paramIndex++}`);

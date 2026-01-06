@@ -17,7 +17,7 @@ const DockHistory: React.FC = () => {
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [actualPalletsInput, setActualPalletsInput] = useState('');
   const [filters, setFilters] = useState({
-    startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    startDate: '2020-01-01',
     endDate: new Date().toISOString().split('T')[0],
     doorId: '',
     status: '' as DoorStatus | '',

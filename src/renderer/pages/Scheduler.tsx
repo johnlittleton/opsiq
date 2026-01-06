@@ -11,6 +11,7 @@ interface Appointment {
   company: string;
   contactName: string;
   contactPhone: string;
+  pickupNumber?: string;
   type: 'Inbound' | 'Outbound';
   doorId?: number;
   pallets?: number;
@@ -34,6 +35,7 @@ const Scheduler: React.FC = () => {
     company: '',
     contactName: '',
     contactPhone: '',
+    pickupNumber: '',
     type: 'Inbound' as 'Inbound' | 'Outbound',
     doorId: '',
     pallets: '',
@@ -118,6 +120,7 @@ const Scheduler: React.FC = () => {
         company: appointment.company,
         contactName: appointment.contactName,
         contactPhone: appointment.contactPhone,
+        pickupNumber: appointment.pickupNumber || '',
         type: appointment.type,
         doorId: appointment.doorId?.toString() || '',
         pallets: appointment.pallets?.toString() || '',
@@ -132,6 +135,7 @@ const Scheduler: React.FC = () => {
         company: '',
         contactName: '',
         contactPhone: '',
+        pickupNumber: '',
         type: 'Inbound',
         doorId: '',
         pallets: '',
@@ -252,6 +256,7 @@ const Scheduler: React.FC = () => {
                   <th>Time</th>
                   <th>Type</th>
                   <th>Company</th>
+                  <th>Pickup #</th>
                   <th>Contact</th>
                   <th>Phone</th>
                   <th>Door</th>
@@ -263,7 +268,7 @@ const Scheduler: React.FC = () => {
               <tbody>
                 {appointments.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="scheduler__table-empty">
+                    <td colSpan={11} className="scheduler__table-empty">
                       No appointments scheduled
                     </td>
                   </tr>
@@ -280,6 +285,7 @@ const Scheduler: React.FC = () => {
                           </span>
                         </td>
                         <td>{apt.company || '-'}</td>
+                        <td>{apt.pickupNumber || '-'}</td>
                         <td>{apt.contactName || '-'}</td>
                         <td>{apt.contactPhone || '-'}</td>
                         <td>{apt.doorId ? `D${apt.doorId}` : '-'}</td>
@@ -411,6 +417,18 @@ const Scheduler: React.FC = () => {
                       required
                     />
                   </div>
+                  <div className="scheduler__form-field">
+                    <label>Pickup Number</label>
+                    <input
+                      type="text"
+                      value={formData.pickupNumber}
+                      onChange={(e) => setFormData({ ...formData, pickupNumber: e.target.value })}
+                      placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div className="scheduler__form-row">
                   <div className="scheduler__form-field">
                     <label>Contact Name *</label>
                     <input
