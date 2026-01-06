@@ -708,8 +708,16 @@ export class DatabaseService implements IDatabaseService {
       
       const result = await client.query(updateQuery, updateValues);
       
-      // If status was changed, also update the door's status
+      // If status was changed, also update the door's status and check-in's status_start_time
       if (updates.status && current.status !== updates.status) {
+        // Update check-in status_start_time
+        await client.query(`
+          UPDATE dock_checkins
+          SET status_start_time = $1
+          WHERE id = $2
+        `, [now, checkinId]);
+        
+        // Update door status
         await client.query(`
           UPDATE dock_doors
           SET status = $1, status_start_time = $2, updated_at = $3

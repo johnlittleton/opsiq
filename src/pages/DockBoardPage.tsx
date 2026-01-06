@@ -62,7 +62,7 @@ export const DockBoardPage: React.FC = () => {
     return {
       doorNumber: doorNum,
       status: mappedStatus,
-      timer: doorData?.checkin?.createdAt ? getElapsedTime(doorData.checkin.createdAt) : undefined,
+      timer: doorData?.checkin?.statusStartTime ? getElapsedTime(doorData.checkin.statusStartTime) : undefined,
       pulsing: mappedStatus !== 'open',
       checkin: doorData?.checkin || null,
     };
