@@ -196,6 +196,7 @@ const DriverCheckIn: React.FC = () => {
                   <option value="Waiting">Waiting</option>
                   <option value="Offload">Offload</option>
                   <option value="Loading">Loading</option>
+                  <option value="Parked">Parked</option>
                 </select>
               </div>
 

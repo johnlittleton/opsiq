@@ -105,6 +105,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
                 <option value="Waiting">Waiting</option>
                 <option value="Loading">Loading</option>
                 <option value="Offload">Offload</option>
+                <option value="Parked">Parked</option>
               </select>
             </div>
 

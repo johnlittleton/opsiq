@@ -63,6 +63,13 @@
   box-shadow: var(--glow-offload-shadow);
 }
 
+.dock-tile[data-status="parked"] {
+  --current-glow: var(--glow-parked);
+  --current-glow-bright: var(--glow-parked-bright);
+  --current-glow-shadow: var(--glow-parked-shadow);
+  box-shadow: var(--glow-parked-shadow);
+}
+
 .dock-tile[data-status="offline"] {
   --current-glow: var(--glow-offline);
   --current-glow-bright: var(--glow-offline-bright);

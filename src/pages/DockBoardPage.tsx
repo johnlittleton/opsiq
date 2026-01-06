@@ -36,8 +36,8 @@ export const DockBoardPage: React.FC = () => {
       'Waiting': 'waiting',
       'Loading': 'loading',
       'Offload': 'offload',
-      'Blocked': 'offline',
-      'Parked': 'offline'
+      'Parked': 'parked',
+      'Blocked': 'offline'
     };
     return statusMap[status] || 'open';
   };

@@ -52,6 +52,11 @@
   color: var(--glow-waiting);
 }
 
+.legend__dot--parked {
+  background: var(--glow-parked);
+  color: var(--glow-parked);
+}
+
 .legend__dot--offline {
   background: var(--glow-offline);
   color: var(--glow-offline);

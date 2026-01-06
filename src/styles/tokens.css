@@ -49,6 +49,10 @@
   --glow-offload-bright: #f87171;
   --glow-offload-shadow: 0 0 20px rgba(239, 68, 68, 0.6), 0 0 40px rgba(239, 68, 68, 0.3), inset 0 0 10px rgba(239, 68, 68, 0.2);
   
+  --glow-parked: #a855f7;
+  --glow-parked-bright: #c084fc;
+  --glow-parked-shadow: 0 0 20px rgba(168, 85, 247, 0.6), 0 0 40px rgba(168, 85, 247, 0.3), inset 0 0 10px rgba(168, 85, 247, 0.2);
+  
   --glow-offline: #6b7280;
   --glow-offline-bright: #9ca3af;
   --glow-offline-shadow: 0 0 20px rgba(107, 114, 128, 0.4), 0 0 40px rgba(107, 114, 128, 0.2), inset 0 0 10px rgba(107, 114, 128, 0.1);

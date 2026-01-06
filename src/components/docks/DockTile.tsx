@@ -2,7 +2,7 @@ import React from 'react';
 import { DockCheckin } from '../../shared/types';
 import './DockTile.css';
 
-export type DockStatus = 'open' | 'waiting' | 'loading' | 'offload' | 'offline';
+export type DockStatus = 'open' | 'waiting' | 'loading' | 'offload' | 'parked' | 'offline';
 
 interface DockTileProps {
   doorNumber: number;
@@ -30,6 +30,7 @@ export const DockTile: React.FC<DockTileProps> = ({
     waiting: 'WAITING',
     loading: 'LOADING',
     offload: 'OFFLOAD',
+    parked: 'PARKED',
     offline: 'OFFLINE',
   };
 

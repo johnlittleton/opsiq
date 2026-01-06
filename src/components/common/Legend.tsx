@@ -7,6 +7,7 @@ export const Legend: React.FC = () => {
     { key: 'loading', label: 'Loading' },
     { key: 'offload', label: 'Offloading' },
     { key: 'waiting', label: 'Waiting' },
+    { key: 'parked', label: 'Parked' },
     { key: 'offline', label: 'Offline' },
   ];
 
