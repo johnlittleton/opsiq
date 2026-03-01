@@ -2055,7 +2055,7 @@ export class DatabaseService implements IDatabaseService {
 
   async endDowntime(id: number): Promise<any> {
     console.log('endDowntime called for ID:', id);
-    const downtime = this.db.prepare('SELECT * FROM production_downtime WHERE id = ?').get(id);
+    const downtime = this.db.prepare('SELECT * FROM production_downtime WHERE id = ?').get(id) as any;
     if (!downtime) {
       console.error('Downtime record not found:', id);
       throw new Error('Downtime record not found');
@@ -2074,7 +2074,7 @@ export class DatabaseService implements IDatabaseService {
       WHERE id = ?
     `).run(now, durationMinutes, now, id);
 
-    const updated = this.db.prepare('SELECT * FROM production_downtime WHERE id = ?').get(id);
+    const updated = this.db.prepare('SELECT * FROM production_downtime WHERE id = ?').get(id) as any;
     console.log('Updated downtime:', updated);
     return updated;
   }
