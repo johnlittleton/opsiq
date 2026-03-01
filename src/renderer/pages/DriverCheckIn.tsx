@@ -6,6 +6,8 @@ import { InboundOutbound, DoorStatus } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import './DriverCheckIn.css';
 
+const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
+
 const DriverCheckIn: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -26,6 +28,7 @@ const DriverCheckIn: React.FC = () => {
     phoneNumber: '',
     doorId: (location.state as any)?.selectedDoor?.toString() || '',
     status: 'Waiting' as DoorStatus,
+    hasAppointment: false,
   });
 
   // Touch keyboard support
@@ -68,13 +71,22 @@ const DriverCheckIn: React.FC = () => {
     setError(null);
   };
 
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, checked } = e.target;
+    setFormData(prev => ({ ...prev, [name]: checked }));
+    setError(null);
+  };
+
   const validateForm = (): string | null => {
     if (!formData.company.trim()) return 'Company is required';
     if (!formData.driverName.trim()) return 'Driver name is required';
-    if (!formData.pickupNumber.trim()) return 'Pickup number is required';
+    if (!formData.pickupNumber.trim()) return formData.inboundOutbound === 'Inbound' ? 'P/U # is required' : 'S/O # is required';
     if (!formData.pallets || parseInt(formData.pallets) < 1) return 'Valid pallet count is required';
-    if (!formData.doorId || parseInt(formData.doorId) < 1 || parseInt(formData.doorId) > 39) {
-      return 'Valid door number (1-39) is required';
+    // Door is optional for Parked status
+    if (formData.status !== 'Parked') {
+      if (!formData.doorId || parseInt(formData.doorId) < 1 || parseInt(formData.doorId) > 39) {
+        return 'Valid door number (1-39) is required';
+      }
     }
     return null;
   };
@@ -104,9 +116,10 @@ const DriverCheckIn: React.FC = () => {
         checker: formData.checker || 'TBD',
         plateNumber: formData.plateNumber,
         phoneNumber: formData.phoneNumber,
-        doorId: parseInt(formData.doorId) || 1,
+        doorId: formData.doorId && formData.doorId.trim() ? parseInt(formData.doorId) : null,
         status: formData.status,
         clientRequestId: uuidv4(),
+        hasAppointment: formData.hasAppointment,
       });
 
       setSuccess(true);
@@ -170,14 +183,16 @@ const DriverCheckIn: React.FC = () => {
               </div>
 
               <div className="driver-checkin__field">
-                <label className="driver-checkin__label">Door # *</label>
+                <label className="driver-checkin__label">
+                  Door # {formData.status === 'Parked' ? '(Optional - leave empty if parking)' : '*'}
+                </label>
                 <input
                   type="number"
                   name="doorId"
                   value={formData.doorId}
                   onChange={handleChange}
                   className="driver-checkin__input"
-                  placeholder="1-39"
+                  placeholder={formData.status === 'Parked' ? 'Leave empty to park' : '1-39'}
                   min="1"
                   max="39"
                   disabled={submitting}
@@ -197,20 +212,38 @@ const DriverCheckIn: React.FC = () => {
                   <option value="Offload">Offload</option>
                   <option value="Loading">Loading</option>
                   <option value="Parked">Parked</option>
+                  <option value="Offline">Offline</option>
                 </select>
               </div>
 
               <div className="driver-checkin__field">
-                <label className="driver-checkin__label">Pickup # *</label>
+                <label className="driver-checkin__label">
+                  {formData.inboundOutbound === 'Inbound' ? 'P/U #' : 'S/O #'} *
+                </label>
                 <input
                   type="text"
                   name="pickupNumber"
                   value={formData.pickupNumber}
                   onChange={handleChange}
                   className="driver-checkin__input"
-                  placeholder="Enter pickup number"
+                  placeholder={formData.inboundOutbound === 'Inbound' ? 'Enter pickup number' : 'Enter S/O number'}
                   disabled={submitting}
                 />
+              </div>
+
+              <div className="driver-checkin__field">
+                <label className="driver-checkin__label">Appointment Status</label>
+                <div className="driver-checkin__checkbox-wrapper">
+                  <input
+                    type="checkbox"
+                    name="hasAppointment"
+                    checked={formData.hasAppointment}
+                    onChange={handleCheckboxChange}
+                    className="driver-checkin__checkbox"
+                    disabled={submitting}
+                  />
+                  <span className="driver-checkin__checkbox-label">Driver had an appointment</span>
+                </div>
               </div>
             </div>
           </div>
@@ -291,15 +324,18 @@ const DriverCheckIn: React.FC = () => {
 
               <div className="driver-checkin__field">
                 <label className="driver-checkin__label">Commodity</label>
-                <input
-                  type="text"
+                <select
                   name="commodity"
                   value={formData.commodity}
                   onChange={handleChange}
-                  className="driver-checkin__input"
-                  placeholder="Product type"
+                  className="driver-checkin__select"
                   disabled={submitting}
-                />
+                >
+                  <option value="">Select commodity...</option>
+                  {COMMODITIES.map(commodity => (
+                    <option key={commodity} value={commodity}>{commodity}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="driver-checkin__field">

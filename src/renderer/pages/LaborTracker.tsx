@@ -5,8 +5,8 @@ import { TitleBar } from '../../components/layout/TitleBar';
 import './LaborTracker.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const SR_HOURLY_WAGE = 21; // Shipping & Receiving
-const PROD_HOURLY_WAGE = 19; // Production
+const SR_HOURLY_WAGE = 27; // Warehouse
+const PROD_HOURLY_WAGE = 24.50; // Production
 
 interface LaborSnapshot {
   id: number;
@@ -37,16 +37,30 @@ export default function LaborTracker() {
   const navigate = useNavigate();
   const [shippingHeadcount, setShippingHeadcount] = useState('');
   const [productionHeadcount, setProductionHeadcount] = useState('');
+  const [warehouseOvertimeHours, setWarehouseOvertimeHours] = useState('');
+  const [productionOvertimeHours, setProductionOvertimeHours] = useState('');
   const [recordedBy, setRecordedBy] = useState('');
   const [shift, setShift] = useState<'A' | 'B'>('A');
   const [notes, setNotes] = useState('');
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Helper function to get local date string without timezone issues
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [summary, setSummary] = useState<LaborSummary | null>(null);
+  const [currentShift, setCurrentShift] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [endingShift, setEndingShift] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSummary();
+    fetchCurrentShift();
   }, []);
 
   const fetchSummary = async () => {
@@ -57,6 +71,43 @@ export default function LaborTracker() {
       setSummary(data);
     } catch (err: any) {
       console.error('Error fetching summary:', err);
+    }
+  };
+
+  const fetchCurrentShift = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      if (!response.ok) throw new Error('Failed to fetch current shift');
+      const data = await response.json();
+      setCurrentShift(data);
+    } catch (err: any) {
+      console.error('Error fetching current shift:', err);
+    }
+  };
+
+  const handleEndShift = async () => {
+    if (!currentShift) return;
+    
+    if (!confirm(`End ${currentShift.shiftName}? This will record the final shift cost of $${currentShift.runningLaborCost?.toFixed(2) || '0.00'}.`)) {
+      return;
+    }
+
+    setEndingShift(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/${currentShift.shiftNumber}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endedBy: recordedBy || 'Manager' }),
+      });
+
+      if (!response.ok) throw new Error('Failed to end shift');
+      
+      setCurrentShift(null);
+      alert('Shift ended successfully!');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setEndingShift(false);
     }
   };
 
@@ -78,6 +129,8 @@ export default function LaborTracker() {
         body: JSON.stringify({
           shippingReceivingHeadcount: parseInt(shippingHeadcount),
           productionHeadcount: parseInt(productionHeadcount),
+          warehouseOvertimeHours: warehouseOvertimeHours ? parseFloat(warehouseOvertimeHours) : 0,
+          productionOvertimeHours: productionOvertimeHours ? parseFloat(productionOvertimeHours) : 0,
           recordedBy,
           shift,
           notes: notes || undefined,
@@ -90,12 +143,15 @@ export default function LaborTracker() {
       }
 
       // Reset form
+      setWarehouseOvertimeHours('');
+      setProductionOvertimeHours('');
       setShippingHeadcount('');
       setProductionHeadcount('');
       setNotes('');
 
       // Refresh data
       await fetchSummary();
+      await fetchCurrentShift();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -130,29 +186,55 @@ export default function LaborTracker() {
       {summary && (
         <div className="labor-tracker__summary">
           <StatPanel
-            title="Shipping & Receiving Headcount"
+            title="Warehouse Headcount"
             value={summary.currentShippingReceivingHeadcount}
-            subtitle={`$${(summary.currentShippingReceivingHeadcount * SR_HOURLY_WAGE).toFixed(2)}/hour`}
             icon="package"
           />
           <StatPanel
             title="Production Headcount"
             value={summary.currentProductionHeadcount || 0}
-            subtitle={`$${((summary.currentProductionHeadcount || 0) * PROD_HOURLY_WAGE).toFixed(2)}/hour`}
             icon="factory"
           />
           <StatPanel
             title="Total Headcount"
             value={summary.currentTotalHeadcount || 0}
-            subtitle={`$${(summary.currentHourlyLaborCost || 0).toFixed(2)}/hour`}
             icon="users"
           />
-          <StatPanel
-            title="Today's Total Labor Cost"
-            value={`$${(summary.dailyLaborCost || 0).toFixed(2)}`}
-            icon="dollar-sign"
-          />
         </div>
+      )}
+
+      {/* Active Shift Info */}
+      {currentShift && (
+        <GlassPanel className="labor-tracker__shift-panel">
+          <div className="shift-info">
+            <div className="shift-header">
+              <span className="shift-badge active">🟢 {currentShift.shiftName} ACTIVE</span>
+              <span className="shift-time">Started: {new Date(currentShift.startTime).toLocaleTimeString()}</span>
+            </div>
+            <div className="shift-stats">
+              <div className="shift-stat">
+                <span className="label">Elapsed Time:</span>
+                <span className="value">{Math.floor(currentShift.elapsedMinutes / 60)}h {currentShift.elapsedMinutes % 60}m</span>
+              </div>
+              <div className="shift-stat">
+                <span className="label">Running Cost:</span>
+                <span className="value cost">${currentShift.runningLaborCost?.toFixed(2) || '0.00'}</span>
+              </div>
+              <div className="shift-stat">
+                <span className="label">Workers:</span>
+                <span className="value">{currentShift.currentTotalHeadcount}</span>
+              </div>
+            </div>
+            <button 
+              type="button"
+              className="end-shift-btn" 
+              onClick={handleEndShift}
+              disabled={endingShift}
+            >
+              {endingShift ? 'Ending Shift...' : '🛑 End Shift'}
+            </button>
+          </div>
+        </GlassPanel>
       )}
 
       <div className="labor-tracker__content">
@@ -181,14 +263,14 @@ export default function LaborTracker() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
+              max={getLocalDateString(new Date())}
             />
           </div>
 
           <form onSubmit={handleSubmit} className="labor-tracker__form">
             <div className="labor-tracker__form-row">
               <div className="labor-tracker__form-group">
-                <label>Shipping & Receiving Headcount *</label>
+                <label>Warehouse Headcount *</label>
                 <input
                   type="number"
                   min="0"
@@ -197,7 +279,6 @@ export default function LaborTracker() {
                   placeholder="Enter headcount"
                   required
                 />
-                <span className="labor-tracker__wage-info">${SR_HOURLY_WAGE}/hour</span>
               </div>
 
               <div className="labor-tracker__form-group">
@@ -210,7 +291,34 @@ export default function LaborTracker() {
                   placeholder="Enter headcount"
                   required
                 />
-                <span className="labor-tracker__wage-info">${PROD_HOURLY_WAGE}/hour</span>
+              </div>
+            </div>
+
+            <div className="labor-tracker__form-row">
+              <div className="labor-tracker__form-group">
+                <label>Warehouse Overtime Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={warehouseOvertimeHours}
+                  onChange={(e) => setWarehouseOvertimeHours(e.target.value)}
+                  placeholder="0.0"
+                />
+                <span className="labor-tracker__field-help">Optional - hours worked beyond regular shift</span>
+              </div>
+
+              <div className="labor-tracker__form-group">
+                <label>Production Overtime Hours</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={productionOvertimeHours}
+                  onChange={(e) => setProductionOvertimeHours(e.target.value)}
+                  placeholder="0.0"
+                />
+                <span className="labor-tracker__field-help">Optional - hours worked beyond regular shift</span>
               </div>
             </div>
 
@@ -247,18 +355,20 @@ export default function LaborTracker() {
 
             {/* Preview */}
             <div className="labor-tracker__preview">
-              <h3>Cost Preview</h3>
+              <h3>Headcount Preview</h3>
               <div className="labor-tracker__preview-grid">
                 <div className="labor-tracker__preview-section sr-section">
-                  <div className="section-header">Shipping & Receiving</div>
+                  <div className="section-header">Warehouse</div>
                   <div className="preview-item">
                     <span className="label">Headcount:</span>
                     <span className="value">{parseInt(shippingHeadcount) || 0}</span>
                   </div>
-                  <div className="preview-item">
-                    <span className="label">Hourly Cost:</span>
-                    <span className="value">${preview.srCost.toFixed(2)}/hr</span>
-                  </div>
+                  {warehouseOvertimeHours && parseFloat(warehouseOvertimeHours) > 0 && (
+                    <div className="preview-item">
+                      <span className="label">Overtime:</span>
+                      <span className="value">{parseFloat(warehouseOvertimeHours).toFixed(1)} hrs</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="labor-tracker__preview-section prod-section">
@@ -267,21 +377,19 @@ export default function LaborTracker() {
                     <span className="label">Headcount:</span>
                     <span className="value">{parseInt(productionHeadcount) || 0}</span>
                   </div>
-                  <div className="preview-item">
-                    <span className="label">Hourly Cost:</span>
-                    <span className="value">${preview.prodCost.toFixed(2)}/hr</span>
-                  </div>
+                  {productionOvertimeHours && parseFloat(productionOvertimeHours) > 0 && (
+                    <div className="preview-item">
+                      <span className="label">Overtime:</span>
+                      <span className="value">{parseFloat(productionOvertimeHours).toFixed(1)} hrs</span>
+                    </div>
+                  )}
                 </div>
               </div>
               
               <div className="labor-tracker__preview-total">
-                <div className="total-item">
+                <div className="total-item highlight">
                   <span className="label">Total Headcount:</span>
                   <span className="value">{preview.totalHeadcount}</span>
-                </div>
-                <div className="total-item highlight">
-                  <span className="label">Total Hourly Cost:</span>
-                  <span className="value">${preview.hourlyLaborCost.toFixed(2)}/hr</span>
                 </div>
               </div>
             </div>

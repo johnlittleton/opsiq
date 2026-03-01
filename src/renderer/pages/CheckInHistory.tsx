@@ -11,9 +11,21 @@ const CheckInHistory: React.FC = () => {
   const [checkins, setCheckins] = useState<DockCheckin[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
+  const [expandedCheckin, setExpandedCheckin] = useState<number | null>(null);
+  const [auditLogs, setAuditLogs] = useState<Record<number, any[]>>({});
+  const [loadingAudit, setLoadingAudit] = useState<number | null>(null);
+  
+  // Helper function to get local date string without timezone issues
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
   const [filters, setFilters] = useState({
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: getLocalDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)),
+    endDate: getLocalDateString(new Date()),
     doorId: '',
     type: '',
     includeActive: true,
@@ -58,6 +70,28 @@ const CheckInHistory: React.FC = () => {
     return `${minutes}m ${secs}s`;
   };
 
+  const handleToggleExpand = async (checkinId: number) => {
+    if (expandedCheckin === checkinId) {
+      setExpandedCheckin(null);
+      return;
+    }
+
+    setExpandedCheckin(checkinId);
+    
+    // Fetch audit log if not already loaded
+    if (!auditLogs[checkinId]) {
+      setLoadingAudit(checkinId);
+      try {
+        const logs = await apiClient.getCheckinAuditLog(checkinId);
+        setAuditLogs(prev => ({ ...prev, [checkinId]: logs }));
+      } catch (error) {
+        console.error('Failed to load audit log:', error);
+      } finally {
+        setLoadingAudit(null);
+      }
+    }
+  };
+
   const filteredCheckins = checkins.filter(checkin => {
     if (!searchText) return true;
     const search = searchText.toLowerCase();
@@ -66,6 +100,7 @@ const CheckInHistory: React.FC = () => {
       checkin.driverName.toLowerCase().includes(search) ||
       checkin.pickupNumber.toLowerCase().includes(search) ||
       checkin.commodity.toLowerCase().includes(search) ||
+      (checkin.forkliftDriver && checkin.forkliftDriver.toLowerCase().includes(search)) ||
       (checkin.plateNumber && checkin.plateNumber.toLowerCase().includes(search)) ||
       (checkin.forkliftDriver && checkin.forkliftDriver.toLowerCase().includes(search)) ||
       (checkin.checker && checkin.checker.toLowerCase().includes(search))
@@ -93,7 +128,7 @@ const CheckInHistory: React.FC = () => {
                 type="text"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Company, driver, pickup #, commodity..."
+                placeholder="Company, driver, P/U #, S/O #, commodity..."
               />
             </div>
             <div className="checkin-history__field">
@@ -164,11 +199,12 @@ const CheckInHistory: React.FC = () => {
               <table className="checkin-history__table">
                 <thead>
                   <tr>
+                    <th></th>
                     <th>Door</th>
                     <th>Type</th>
                     <th>Company</th>
                     <th>Driver</th>
-                    <th>Pickup #</th>
+                    <th>P/U # / S/O #</th>
                     <th>Pallets</th>
                     <th>Commodity</th>
                     <th>Plate</th>
@@ -182,46 +218,90 @@ const CheckInHistory: React.FC = () => {
                 </thead>
                 <tbody>
                   {filteredCheckins.map(checkin => (
-                    <tr key={checkin.id} className={!checkin.closedAt ? 'checkin-history__row--active' : ''}>
-                      <td><strong>D{checkin.doorId}</strong></td>
-                      <td>
-                        <span className={`checkin-history__badge checkin-history__badge--${(checkin.inboundOutbound || 'inbound').toLowerCase()}`}>
-                          {checkin.inboundOutbound || 'N/A'}
-                        </span>
-                      </td>
-                      <td>{checkin.company}</td>
-                      <td>{checkin.driverName}</td>
-                      <td>{checkin.pickupNumber}</td>
-                      <td>{checkin.pallets}</td>
-                      <td>{checkin.commodity}</td>
-                      <td>{checkin.plateNumber || '—'}</td>
-                      <td>{checkin.forkliftDriver}</td>
-                      <td>{checkin.checker}</td>
-                      <td>
-                        <span className={`checkin-history__badge checkin-history__badge--${(checkin.status || 'pending').toLowerCase()}`}>
-                          {checkin.status || 'Pending'}
-                        </span>
-                      </td>
-                      <td>
-                        {checkin.createdAt && !isNaN(new Date(checkin.createdAt).getTime())
-                          ? format(new Date(checkin.createdAt), 'MMM dd, yyyy HH:mm')
-                          : '—'}
-                      </td>
-                      <td>
-                        {checkin.closedAt ? (
-                          !isNaN(new Date(checkin.closedAt).getTime())
-                            ? format(new Date(checkin.closedAt), 'MMM dd, yyyy HH:mm')
-                            : '—'
-                        ) : (
-                          <span className="checkin-history__active">Active</span>
-                        )}
-                      </td>
-                      <td>
-                        {checkin.closedAt ? formatElapsed(checkin.createdAt, checkin.closedAt) : (
-                          <span className="checkin-history__active">{formatElapsed(checkin.createdAt)}</span>
-                        )}
-                      </td>
-                    </tr>
+                    <React.Fragment key={checkin.id}>
+                      <tr className={!checkin.closedAt ? 'checkin-history__row--active' : ''}>
+                        <td>
+                          <button
+                            className="checkin-history__expand-btn"
+                            onClick={() => handleToggleExpand(checkin.id)}
+                            title="View edit history"
+                          >
+                            {expandedCheckin === checkin.id ? '▼' : '▶'}
+                          </button>
+                        </td>
+                        <td><strong>{checkin.doorId ? `D${checkin.doorId}` : 'Parked'}</strong></td>
+                        <td>
+                          <span className={`checkin-history__badge checkin-history__badge--${(checkin.inboundOutbound || 'inbound').toLowerCase()}`}>
+                            {checkin.inboundOutbound || 'N/A'}
+                          </span>
+                        </td>
+                        <td>{checkin.company}</td>
+                        <td>{checkin.driverName}</td>
+                        <td>{checkin.pickupNumber}</td>
+                        <td>{checkin.pallets}</td>
+                        <td>{checkin.commodity}</td>
+                        <td>{checkin.plateNumber || '—'}</td>
+                        <td>{checkin.forkliftDriver}</td>
+                        <td>{checkin.checker}</td>
+                        <td>
+                          <span className={`checkin-history__badge checkin-history__badge--${(checkin.status || 'pending').toLowerCase()}`}>
+                            {checkin.status || 'Pending'}
+                          </span>
+                        </td>
+                        <td>
+                          {checkin.createdAt && !isNaN(new Date(checkin.createdAt).getTime())
+                            ? format(new Date(checkin.createdAt), 'MMM dd, yyyy HH:mm')
+                            : '—'}
+                        </td>
+                        <td>
+                          {checkin.closedAt ? (
+                            !isNaN(new Date(checkin.closedAt).getTime())
+                              ? format(new Date(checkin.closedAt), 'MMM dd, yyyy HH:mm')
+                              : '—'
+                          ) : (
+                            <span className="checkin-history__active">Active</span>
+                          )}
+                        </td>
+                        <td>
+                          {checkin.closedAt ? formatElapsed(checkin.createdAt, checkin.closedAt) : (
+                            <span className="checkin-history__active">{formatElapsed(checkin.createdAt)}</span>
+                          )}
+                        </td>
+                      </tr>
+                      {expandedCheckin === checkin.id && (
+                        <tr className="checkin-history__audit-row">
+                          <td colSpan={15}>
+                            <div className="checkin-history__audit-content">
+                              <h4 className="checkin-history__audit-title">Edit History</h4>
+                              {loadingAudit === checkin.id ? (
+                                <div className="checkin-history__audit-loading">Loading edit history...</div>
+                              ) : auditLogs[checkin.id]?.length > 0 ? (
+                                <div className="checkin-history__audit-list">
+                                  {auditLogs[checkin.id].map((log, idx) => (
+                                    <div key={idx} className="checkin-history__audit-item">
+                                      <div className="checkin-history__audit-meta">
+                                        <span className="checkin-history__audit-time">
+                                          {format(new Date(log.changedAt), 'MMM dd, yyyy HH:mm:ss')}
+                                        </span>
+                                        <span className="checkin-history__audit-user">{log.changedBy}</span>
+                                      </div>
+                                      <div className="checkin-history__audit-change">
+                                        <span className="checkin-history__audit-field">{log.fieldName}:</span>
+                                        <span className="checkin-history__audit-old">{log.oldValue || '(empty)'}</span>
+                                        <span className="checkin-history__audit-arrow">→</span>
+                                        <span className="checkin-history__audit-new">{log.newValue || '(empty)'}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="checkin-history__audit-empty">No edits recorded</div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

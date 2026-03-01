@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { DockCheckin } from '../../shared/types';
+import { useState } from 'react';
+import { DockCheckin, DoorStatus, InboundOutbound } from '../../shared/types';
 import './EditCheckinModal.css';
 
 interface EditCheckinModalProps {
@@ -11,6 +11,7 @@ interface EditCheckinModalProps {
 export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalProps) {
   const [formData, setFormData] = useState({
     status: checkin.status || '',
+    doorId: checkin.doorId ? String(checkin.doorId) : '',
     inboundOutbound: checkin.inboundOutbound || '',
     company: checkin.company || '',
     driverName: checkin.driverName || '',
@@ -40,6 +41,8 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
     const updates: Partial<DockCheckin> = {};
     
     if (formData.status !== checkin.status) updates.status = formData.status;
+    const newDoorId = formData.doorId ? parseInt(formData.doorId) : null;
+    if (newDoorId !== checkin.doorId) updates.doorId = newDoorId;
     if (formData.inboundOutbound !== checkin.inboundOutbound) updates.inboundOutbound = formData.inboundOutbound;
     if (formData.company !== checkin.company) updates.company = formData.company;
     if (formData.driverName !== checkin.driverName) updates.driverName = formData.driverName;
@@ -86,7 +89,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
           <div className="edit-checkin-modal__info">
             <div className="info-item">
               <span className="label">Door:</span>
-              <span className="value">{checkin.doorId}</span>
+              <span className="value">{checkin.doorId || 'None'}</span>
             </div>
             <div className="info-item">
               <span className="label">Check-In ID:</span>
@@ -99,13 +102,14 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
               <label>Status *</label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as DoorStatus })}
                 required
               >
                 <option value="Waiting">Waiting</option>
                 <option value="Loading">Loading</option>
                 <option value="Offload">Offload</option>
                 <option value="Parked">Parked</option>
+                <option value="Offline">Offline</option>
               </select>
             </div>
 
@@ -113,7 +117,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
               <label>Type *</label>
               <select
                 value={formData.inboundOutbound}
-                onChange={(e) => setFormData({ ...formData, inboundOutbound: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, inboundOutbound: e.target.value as InboundOutbound })}
                 required
               >
                 <option value="Inbound">Inbound</option>
@@ -134,6 +138,19 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
 
           <div className="edit-checkin-modal__row">
             <div className="edit-checkin-modal__field">
+              <label>Door # {formData.status === 'Parked' || formData.status === 'Offline' ? '(Optional)' : ''}</label>
+              <select
+                value={formData.doorId}
+                onChange={(e) => setFormData({ ...formData, doorId: e.target.value })}
+              >
+                <option value="">None (Parked/Offline)</option>
+                {Array.from({ length: 39 }, (_, i) => i + 1).map(num => (
+                  <option key={num} value={num}>Door {num}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="edit-checkin-modal__field">
               <label>Driver Name *</label>
               <input
                 type="text"
@@ -144,7 +161,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
             </div>
 
             <div className="edit-checkin-modal__field">
-              <label>Pickup # *</label>
+              <label>{formData.inboundOutbound === 'Inbound' ? 'P/U #' : 'S/O #'} *</label>
               <input
                 type="text"
                 value={formData.pickupNumber}

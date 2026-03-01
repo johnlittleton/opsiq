@@ -5,8 +5,8 @@ import { TitleBar } from '../../components/layout/TitleBar';
 import './LaborHistory.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-const SR_HOURLY_WAGE = 21; // Shipping & Receiving
-const PROD_HOURLY_WAGE = 19; // Production
+const SR_HOURLY_WAGE = 27; // Warehouse
+const PROD_HOURLY_WAGE = 24.50; // Production
 
 interface LaborSnapshot {
   id: number;
@@ -28,8 +28,17 @@ export default function LaborHistory() {
   const [filteredSnapshots, setFilteredSnapshots] = useState<LaborSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  
+  // Helper function to get local date string without timezone issues
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const [startDate, setStartDate] = useState(getLocalDateString(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
+  const [endDate, setEndDate] = useState(getLocalDateString(new Date()));
   const [selectedShift, setSelectedShift] = useState<'all' | 'A' | 'B'>('all');
 
   useEffect(() => {
@@ -234,11 +243,17 @@ export default function LaborHistory() {
                   
                   <div className="snapshot-data">
                     <div className="data-section sr-section">
-                      <h4>Shipping & Receiving</h4>
+                      <h4>Warehouse</h4>
                       <div className="data-row">
                         <span className="label">Headcount:</span>
                         <span className="value">{snapshot.shippingReceivingHeadcount}</span>
                       </div>
+                      {snapshot.warehouseOvertimeHours > 0 && (
+                        <div className="data-row">
+                          <span className="label">Overtime:</span>
+                          <span className="value">{snapshot.warehouseOvertimeHours.toFixed(1)} hrs</span>
+                        </div>
+                      )}
                       <div className="data-row">
                         <span className="label">Hourly Cost:</span>
                         <span className="value">${snapshot.shippingReceivingLaborCost.toFixed(2)}/hr</span>
@@ -251,6 +266,12 @@ export default function LaborHistory() {
                         <span className="label">Headcount:</span>
                         <span className="value">{snapshot.productionHeadcount}</span>
                       </div>
+                      {snapshot.productionOvertimeHours > 0 && (
+                        <div className="data-row">
+                          <span className="label">Overtime:</span>
+                          <span className="value">{snapshot.productionOvertimeHours.toFixed(1)} hrs</span>
+                        </div>
+                      )}
                       <div className="data-row">
                         <span className="label">Hourly Cost:</span>
                         <span className="value">${snapshot.productionLaborCost.toFixed(2)}/hr</span>

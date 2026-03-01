@@ -7,67 +7,87 @@ export const HomePage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
   
-  const quickAccessCards = [
+  const dockOperationsCards = [
     {
       icon: '🚢',
       title: 'Dock Dashboard',
       description: 'Monitor all 39 docks in real-time',
-      tags: ['Real-time monitoring', 'Interactive dock grid'],
       onClick: () => navigate('/dockboard'),
     },
     {
       icon: '✅',
       title: 'Driver Check In',
       description: 'Check in drivers and assign dock doors',
-      tags: ['Driver management', 'Dock assignment'],
       onClick: () => navigate('/checkin'),
     },
     {
       icon: '👥',
       title: 'Active Drivers',
       description: 'View and manage currently checked-in drivers',
-      tags: ['Driver checkout', 'Active sessions'],
       onClick: () => navigate('/active-drivers'),
     },
     {
-      icon: '📅',
-      title: 'Appointment Scheduler',
-      description: 'Schedule inbound and outbound appointments',
-      tags: ['Calendar', 'Appointments', 'Planning'],
-      onClick: () => navigate('/scheduler'),
-    },
-    {
-      icon: '�',
-      title: 'Labor Tracker',
-      description: 'Track department headcount and labor costs',
-      tags: ['Manager', 'Labor', 'Cost'],
-      onClick: () => navigate('/labor-tracker'),
-    },
-    {      icon: '📊',
-      title: 'Executive Dashboard',
-      description: 'Site performance metrics and top operators',
-      tags: ['Executive', 'Performance', 'Analytics'],
-      onClick: () => navigate('/executive'),
-    },
-    {      icon: '�📋',
+      icon: '🗄️',
       title: 'Dock History',
       description: 'View dock status changes and events',
-      tags: ['History', 'Search', 'Reports'],
       onClick: () => navigate('/history'),
     },
     {
       icon: '🚛',
       title: 'Check-In History',
       description: 'Comprehensive driver check-in records',
-      tags: ['History', 'Search', 'Reports'],
       onClick: () => navigate('/checkin-history'),
+    },
+  ];
+
+  const appointmentCards = [
+    {
+      icon: '📅',
+      title: 'Appointment Scheduler',
+      description: 'Schedule inbound and outbound appointments',
+      onClick: () => navigate('/scheduler'),
     },
     {
       icon: '📆',
       title: 'Appointment History',
       description: 'View all past and upcoming appointments',
-      tags: ['History', 'Search', 'Reports'],
       onClick: () => navigate('/appointment-history'),
+    },
+  ];
+
+  const productionCards = [
+    {
+      icon: '📋',
+      title: 'Production Scheduler',
+      description: 'Schedule work orders for 5 Giro lines',
+      onClick: () => navigate('/production-scheduler'),
+    },
+    {
+      icon: '📈',
+      title: 'Production Dashboard',
+      description: 'Monitor all lines in real-time',
+      onClick: () => navigate('/production-dashboard'),
+    },
+    {
+      icon: '📑',
+      title: 'Work Order History',
+      description: 'View completed work orders',
+      onClick: () => navigate('/work-order-history'),
+    },
+  ];
+
+  const managementCards = [
+    {
+      icon: '📊',
+      title: 'Executive Dashboard',
+      description: 'Site performance metrics and top operators',
+      onClick: () => navigate('/executive'),
+    },
+    {
+      icon: '💼',
+      title: 'Labor Tracker',
+      description: 'Track department headcount and labor costs',
+      onClick: () => navigate('/labor-tracker'),
     },
   ];
 
@@ -148,26 +168,75 @@ export const HomePage: React.FC = () => {
       </div>
 
       <div className="home-page__section">
-        <h2 className="home-page__section-title">Quick Access</h2>
+        <h2 className="home-page__section-title">Dock Operations</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {quickAccessCards.map((card, index) => (
+          {dockOperationsCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
               onClick={card.onClick}
-              style={{ cursor: 'pointer' }}
             >
               <div className="home-page__card-icon">{card.icon}</div>
               <div className="home-page__card-content">
                 <h3 className="home-page__card-title">{card.title}</h3>
                 <p className="home-page__card-desc">{card.description}</p>
-                <div className="home-page__card-tags">
-                  {card.tags.map((tag, tagIndex) => (
-                    <span key={tagIndex} className="home-page__card-tag">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="home-page__section">
+        <h2 className="home-page__section-title">Appointments</h2>
+        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
+          {appointmentCards.map((card, index) => (
+            <div 
+              key={index} 
+              className="home-page__card"
+              onClick={card.onClick}
+            >
+              <div className="home-page__card-icon">{card.icon}</div>
+              <div className="home-page__card-content">
+                <h3 className="home-page__card-title">{card.title}</h3>
+                <p className="home-page__card-desc">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="home-page__section">
+        <h2 className="home-page__section-title">Production</h2>
+        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
+          {productionCards.map((card, index) => (
+            <div 
+              key={index} 
+              className="home-page__card"
+              onClick={card.onClick}
+            >
+              <div className="home-page__card-icon">{card.icon}</div>
+              <div className="home-page__card-content">
+                <h3 className="home-page__card-title">{card.title}</h3>
+                <p className="home-page__card-desc">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="home-page__section">
+        <h2 className="home-page__section-title">Management</h2>
+        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
+          {managementCards.map((card, index) => (
+            <div 
+              key={index} 
+              className="home-page__card"
+              onClick={card.onClick}
+            >
+              <div className="home-page__card-icon">{card.icon}</div>
+              <div className="home-page__card-content">
+                <h3 className="home-page__card-title">{card.title}</h3>
+                <p className="home-page__card-desc">{card.description}</p>
               </div>
             </div>
           ))}

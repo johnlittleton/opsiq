@@ -1,0 +1,163 @@
+.executive-analytics {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.analytics-container {
+  padding: 12px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.analytics-header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.analytics-header .subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.back-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  height: fit-content;
+}
+
+.back-btn:hover {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%);
+  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
+  transform: translateY(-1px);
+}
+
+.back-btn:active {
+  transform: translateY(0);
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.chart-panel {
+  padding: 12px !important;
+}
+
+.chart-panel.line-output,
+.chart-panel.driver-performance {
+  grid-column: span 1;
+}
+
+.chart-panel.deliveries,
+.chart-panel.pallets-flow {
+  grid-column: span 1;
+}
+
+.chart-panel.labor-costs,
+.chart-panel.appointments {
+  grid-column: span 1;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 12px 0;
+}
+
+.loading {
+  color: white;
+  font-size: 18px;
+  text-align: center;
+  margin-top: 100px;
+}
+
+.error {
+  color: #ef4444;
+  font-size: 18px;
+  text-align: center;
+  margin-top: 100px;
+}
+
+/* Appointment Summary Stats */
+.appointment-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.summary-stat {
+  text-align: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.stat-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.stat-value.green {
+  color: #10b981;
+}
+
+.stat-value.orange {
+  color: #f59e0b;
+}
+
+/* Recharts tooltip customization */
+.recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.recharts-default-tooltip {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  border-radius: 6px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1400px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .chart-panel.line-output,
+  .chart-panel.driver-performance,
+  .chart-panel.deliveries,
+  .chart-panel.pallets-flow,
+  .chart-panel.labor-costs,
+  .chart-panel.appointments {
+    grid-column: span 1;
+  }
+}

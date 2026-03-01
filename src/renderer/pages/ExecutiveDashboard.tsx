@@ -1,28 +1,64 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { GlassPanel, StatPanel } from '../components';
 import { ExecutiveMetrics } from '../../shared/types';
+import { useAuth } from '../context/AuthContext';
+import PinEntry from '../components/PinEntry';
 import './ExecutiveDashboard.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+interface CurrentShift {
+  id: number;
+  date: string;
+  shiftNumber: number;
+  shiftName: string;
+  startTime: string;
+  status: string;
+  elapsedMinutes: number;
+  currentWarehouseHeadcount: number;
+  currentProductionHeadcount: number;
+  runningLaborCost: number;
+}
+
 const ExecutiveDashboard: React.FC = () => {
   console.log('ExecutiveDashboard component rendering...');
+  const navigate = useNavigate();
+  const { isAuthenticated, executiveName, login, logout } = useAuth();
   const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
+  
+  // Helper function to get local date string without timezone issues
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
   const [dateRange, setDateRange] = useState({
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
+    startDate: getLocalDateString(new Date()),
+    endDate: getLocalDateString(new Date()),
   });
 
+  // Handle successful PIN entry
+  const handlePinSuccess = (name: string) => {
+    login(name);
+  };
+
+  // Load metrics
   useEffect(() => {
+    if (!isAuthenticated) return;
     console.log('ExecutiveDashboard useEffect triggered, loading metrics...');
     loadMetrics();
-  }, [dateRange]);
+  }, [dateRange, isAuthenticated]);
 
   const loadMetrics = async () => {
     try {
       setLoading(true);
+      console.log('📅 Date Range Query:', { startDate: dateRange.startDate, endDate: dateRange.endDate });
       console.log('Fetching executive metrics from:', `${API_BASE}/api/executive/metrics`);
       const response = await fetch(
         `${API_BASE}/api/executive/metrics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
@@ -31,6 +67,12 @@ const ExecutiveDashboard: React.FC = () => {
       if (!response.ok) throw new Error('Failed to load metrics');
       const data = await response.json();
       console.log('Executive metrics data:', data);
+      console.log('🥇 Top Operators received:', data.topOperators);
+      if (data.topOperators && data.topOperators.length > 0) {
+        console.log('🥇 #1 Top Operator:', data.topOperators[0]);
+      } else {
+        console.log('⚠️ No top operators in response');
+      }
       setMetrics(data);
     } catch (error) {
       console.error('Failed to load executive metrics:', error);
@@ -52,11 +94,58 @@ const ExecutiveDashboard: React.FC = () => {
         productionLaborCostPerHour: 0,
         totalShiftLaborCost: 0,
         currentHeadcount: 0,
+        warehouseHeadcount: 0,
+        productionHeadcount: 0,
+        totalCasesCompleted: 0,
+        casesCompletedYTD: 0,
+        bestPerformingLine: null,
       });
     } finally {
       setLoading(false);
     }
   };
+
+  const setToday = () => {
+    const today = getLocalDateString(new Date());
+    setDateRange({ startDate: today, endDate: today });
+  };
+
+  // Load current active shift
+  const fetchCurrentShift = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      if (!response.ok) {
+        setCurrentShift(null);
+        return;
+      }
+      const data = await response.json();
+      setCurrentShift(data);
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      setCurrentShift(null);
+    }
+  };
+
+  // Auto-update shift every minute
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    // Initial fetch
+    fetchCurrentShift();
+    
+    // Set up interval to update every 60 seconds
+    const interval = setInterval(() => {
+      fetchCurrentShift();
+    }, 60000);
+    
+    // Cleanup
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
+  // Show PIN entry if not authenticated
+  if (!isAuthenticated) {
+    return <PinEntry onSuccess={handlePinSuccess} />;
+  }
 
   if (loading) {
     return (
@@ -92,26 +181,32 @@ const ExecutiveDashboard: React.FC = () => {
         <div className="executive-dashboard__header">
           <div>
             <h1 style={{ color: 'white' }}>Executive Dashboard</h1>
-            <p className="subtitle">Site Performance Overview</p>
+            <p className="subtitle">Site Performance Overview • Logged in as: {executiveName}</p>
           </div>
           
-          <div className="date-selector">
-            <div className="date-field">
-              <label>Start Date</label>
-              <input
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-              />
+          <div className="header-actions">
+            <div className="date-selector">
+              <div className="date-field">
+                <label>Start Date</label>
+                <input
+                  type="date"
+                  value={dateRange.startDate}
+                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                />
+              </div>
+              <div className="date-field">
+                <label>End Date</label>
+                <input
+                  type="date"
+                  value={dateRange.endDate}
+                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="date-field">
-              <label>End Date</label>
-              <input
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-              />
-            </div>
+            <button className="today-btn" onClick={setToday}>📅 Today</button>
+            <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
+            <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
+            <button className="logout-btn" onClick={logout}>🔒 Logout</button>
           </div>
         </div>
 
@@ -122,26 +217,155 @@ const ExecutiveDashboard: React.FC = () => {
             value={metrics.totalTrucksLoaded}
             subtitle={`${(metrics.totalPalletsLoaded || 0).toLocaleString()} pallets`}
             icon="truck"
+            compact
           />
           <StatPanel
             title="Trucks Offloaded"
             value={metrics.totalTrucksOffloaded}
             subtitle={`${(metrics.totalPalletsOffloaded || 0).toLocaleString()} pallets`}
             icon="package"
+            compact
           />
           <StatPanel
             title="Avg Load Time"
             value={`${metrics.avgLoadTimeMinutes} min`}
             subtitle="Per truck"
             icon="clock"
+            compact
           />
           <StatPanel
             title="Avg Offload Time"
             value={`${metrics.avgOffloadTimeMinutes} min`}
             subtitle="Per truck"
             icon="clock"
+            compact
           />
+          <StatPanel
+            title="Cases Completed"
+            value={(metrics.totalCasesCompleted || 0).toLocaleString()}
+            subtitle="Selected period"
+            icon="📦"
+            variant="green"
+            compact
+          />
+          <StatPanel
+            title="Cases YTD"
+            value={(metrics.casesCompletedYTD || 0).toLocaleString()}
+            subtitle="Jan 1 - Today"
+            icon="📈"
+            variant="blue"
+            compact
+          />
+          <StatPanel
+            title="Best Line"
+            value={metrics.bestPerformingLine ? `Line ${metrics.bestPerformingLine.lineNumber}` : 'N/A'}
+            subtitle={metrics.bestPerformingLine ? `${metrics.bestPerformingLine.totalCases.toLocaleString()} cases YTD` : 'No data'}
+            icon="🏆"
+            variant="yellow"
+            compact
+          />
+          <StatPanel
+            title="Pallets Loaded"
+            value={(metrics.totalPalletsLoaded || 0).toLocaleString()}
+            subtitle={`${metrics.totalTrucksLoaded || 0} trucks • Avg ${((metrics.totalPalletsLoaded || 0) / (metrics.totalTrucksLoaded || 1)).toFixed(1)} per truck`}
+            icon="📦"
+            compact
+          />
+          <StatPanel
+            title="Pallets Offloaded"
+            value={(metrics.totalPalletsOffloaded || 0).toLocaleString()}
+            subtitle={`${metrics.totalTrucksOffloaded || 0} trucks • Avg ${((metrics.totalPalletsOffloaded || 0) / (metrics.totalTrucksOffloaded || 1)).toFixed(1)} per truck`}
+            icon="📥"
+            compact
+          />
+          {/* Top Operators Card - Wide */}
+          <div className="top-operator-card">
+            <div className="top-operator-header">
+              <div className="top-operator-title">🏆 Top Operators</div>
+            </div>
+            <div className="top-operator-list">
+              {metrics.topOperators && metrics.topOperators.length > 0 ? (
+                metrics.topOperators.map((operator, index) => {
+                  let medal = '';
+                  if (index === 0) medal = '🥇';
+                  else if (index === 1) medal = '🥈';
+                  else if (index === 2) medal = '🥉';
+                  else if (index === 3 || index === 4) medal = '👍';
+                  
+                  return (
+                    <div key={operator.operatorName} className="operator-row">
+                      <span className="operator-rank">#{index + 1}</span>
+                      {medal && <span className="operator-medal">{medal}</span>}
+                      <span className="operator-name-stats">
+                        {operator.operatorName} - {operator.totalLoads} Load{operator.totalLoads !== 1 ? 's' : ''} • {operator.totalPallets} Pallet{operator.totalPallets !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="no-data-small">No data</div>
+              )}
+            </div>
+          </div>
         </div>
+
+        {/* Active Shift Tracker - Live Updates Every Minute */}
+        {currentShift && (
+          <GlassPanel className="shift-tracker-panel">
+            <div className="shift-tracker-header">
+              <div className="shift-tracker-title">
+                <div className="shift-badge">
+                  <div className="pulse-dot"></div>
+                  <span className="shift-name">{currentShift.shiftName}</span>
+                  <span className="shift-status">ACTIVE</span>
+                </div>
+                <span className="shift-start">Started {new Date(currentShift.startTime).toLocaleTimeString()}</span>
+              </div>
+              <div className="auto-update-indicator">
+                <span className="update-icon">🔄</span>
+                <span className="update-text">Live updates</span>
+              </div>
+            </div>
+            
+            <div className="shift-tracker-metrics">
+              <div className="shift-metric elapsed-time">
+                <div className="metric-icon">⏱️</div>
+                <div className="metric-content">
+                  <div className="metric-label">Elapsed Time</div>
+                  <div className="metric-value">
+                    {Math.floor(currentShift.elapsedMinutes / 60)}h {currentShift.elapsedMinutes % 60}m
+                  </div>
+                </div>
+              </div>
+              
+              <div className="shift-metric labor-cost">
+                <div className="metric-icon">💰</div>
+                <div className="metric-content">
+                  <div className="metric-label">Running Labor Cost</div>
+                  <div className="metric-value cost-value">
+                    ${currentShift.runningLaborCost.toFixed(2)}
+                  </div>
+                  <div className="metric-rate">
+                    ${(currentShift.runningLaborCost / (currentShift.elapsedMinutes || 1)).toFixed(2)}/min
+                  </div>
+                </div>
+              </div>
+              
+              <div className="shift-metric workers">
+                <div className="metric-icon">👥</div>
+                <div className="metric-content">
+                  <div className="metric-label">Active Workers</div>
+                  <div className="metric-value">
+                    {currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount}
+                  </div>
+                  <div className="metric-breakdown">
+                    Warehouse: {currentShift.currentWarehouseHeadcount} • Production: {currentShift.currentProductionHeadcount}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </GlassPanel>
+        )}
 
         {/* Performance Summary */}
         <GlassPanel className="performance-summary">
@@ -172,11 +396,11 @@ const ExecutiveDashboard: React.FC = () => {
           <div className="labor-grid">
             <div className="labor-card sr-card">
               <div className="labor-header">
-                <h3>Shipping & Receiving</h3>
+                <h3>Warehouse</h3>
                 <div className="icon">📦</div>
               </div>
               <div className="labor-value">${(metrics.shippingReceivingLaborCostPerHour || 0).toFixed(2)}/hr</div>
-              <div className="labor-subtitle">Current hourly rate</div>
+              <div className="labor-subtitle">{metrics.warehouseHeadcount || 0} employees</div>
             </div>
             
             <div className="labor-card prod-card">
@@ -185,7 +409,7 @@ const ExecutiveDashboard: React.FC = () => {
                 <div className="icon">🏭</div>
               </div>
               <div className="labor-value">${(metrics.productionLaborCostPerHour || 0).toFixed(2)}/hr</div>
-              <div className="labor-subtitle">Current hourly rate</div>
+              <div className="labor-subtitle">{metrics.productionHeadcount || 0} employees</div>
             </div>
             
             <div className="labor-card total-card">
@@ -199,68 +423,7 @@ const ExecutiveDashboard: React.FC = () => {
           </div>
         </GlassPanel>
 
-        {/* Top Performing Operators */}
-        <GlassPanel className="operators-panel">
-          <h2>Top Performing Forklift Operators</h2>
-          
-          {(metrics.topOperators?.length || 0) === 0 ? (
-            <div className="empty-state">
-              <p>No operator data available for selected period</p>
-            </div>
-          ) : (
-            <div className="operators-table">
-              <div className="table-header">
-                <div className="col-rank">#</div>
-                <div className="col-name">Operator</div>
-                <div className="col-loads">Total Loads</div>
-                <div className="col-pallets">Total Pallets</div>
-                <div className="col-avg-time">Avg Time</div>
-                <div className="col-avg-pallets">Avg Pallets</div>
-              </div>
-              
-              {metrics.topOperators.map((operator, index) => (
-                <div key={operator.operatorName} className={`table-row ${index < 3 ? 'top-three' : ''}`}>
-                  <div className="col-rank">
-                    {index === 0 && '🥇'}
-                    {index === 1 && '🥈'}
-                    {index === 2 && '🥉'}
-                    {index > 2 && index + 1}
-                  </div>
-                  <div className="col-name">{operator.operatorName}</div>
-                  <div className="col-loads">{operator.totalLoads}</div>
-                  <div className="col-pallets">{operator.totalPallets.toLocaleString()}</div>
-                  <div className="col-avg-time">{operator.avgTimeMinutes} min</div>
-                  <div className="col-avg-pallets">{operator.avgPalletsPerLoad}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </GlassPanel>
 
-        {/* Pallets Overview */}
-        <div className="pallets-grid">
-          <GlassPanel className="pallets-card loaded">
-            <div className="card-header">
-              <h3>Pallets Loaded</h3>
-              <div className="icon">📦</div>
-            </div>
-            <div className="card-value">{(metrics.totalPalletsLoaded || 0).toLocaleString()}</div>
-            <div className="card-subtitle">
-              {metrics.totalTrucksLoaded || 0} trucks • Avg {((metrics.totalPalletsLoaded || 0) / (metrics.totalTrucksLoaded || 1)).toFixed(1)} per truck
-            </div>
-          </GlassPanel>
-
-          <GlassPanel className="pallets-card offloaded">
-            <div className="card-header">
-              <h3>Pallets Offloaded</h3>
-              <div className="icon">📥</div>
-            </div>
-            <div className="card-value">{(metrics.totalPalletsOffloaded || 0).toLocaleString()}</div>
-            <div className="card-subtitle">
-              {metrics.totalTrucksOffloaded || 0} trucks • Avg {((metrics.totalPalletsOffloaded || 0) / (metrics.totalTrucksOffloaded || 1)).toFixed(1)} per truck
-            </div>
-          </GlassPanel>
-        </div>
       </div>
     </div>
   );

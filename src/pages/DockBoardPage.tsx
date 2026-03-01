@@ -14,11 +14,30 @@ export const DockBoardPage: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
   const [, setTick] = useState(0);
   const [editingCheckin, setEditingCheckin] = useState<DockCheckin | null>(null);
+  const [parkedTrucks, setParkedTrucks] = useState<DockCheckin[]>([]);
   
   // Initialize data sync on mount
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
+  
+  // Fetch parked trucks (status='Parked', no door assigned)
+  useEffect(() => {
+    const fetchParkedTrucks = async () => {
+      try {
+        const checkins = await apiClient.getActiveCheckins();
+        const parked = checkins.filter((c: DockCheckin) => c.status === 'Parked' && !c.doorId);
+        setParkedTrucks(parked);
+      } catch (error) {
+        console.error('Failed to fetch parked trucks:', error);
+      }
+    };
+    
+    fetchParkedTrucks();
+    // Refresh every 10 seconds
+    const interval = setInterval(fetchParkedTrucks, 10000);
+    return () => clearInterval(interval);
+  }, []);
   
   // Force re-render every second to update elapsed times
   useEffect(() => {
@@ -121,6 +140,25 @@ export const DockBoardPage: React.FC = () => {
               onEdit={door.checkin ? () => handleEditCheckin(door.checkin) : undefined}
             />
           ))}
+          {parkedTrucks.length > 0 && (
+            <div 
+              className="dock-board-page__parked-truck pulsing"
+              data-status="parked"
+            >
+              <div className="dock-board-page__parked-label">PARKED</div>
+              <div className="dock-board-page__parked-list">
+                {parkedTrucks.map((truck) => (
+                  <div 
+                    key={truck.id}
+                    className="dock-board-page__parked-item"
+                    onClick={() => setEditingCheckin(truck)}
+                  >
+                    #{truck.pickupNumber}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

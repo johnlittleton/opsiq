@@ -123,9 +123,30 @@
 }
 
 .appointment-history__table-wrapper {
+  max-height: calc(100vh - 350px);
   overflow-x: auto;
+  overflow-y: auto;
   border-radius: 8px;
   border: 1px solid var(--border);
+}
+
+.appointment-history__table-wrapper::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.appointment-history__table-wrapper::-webkit-scrollbar-track {
+  background: rgba(15, 20, 25, 0.3);
+  border-radius: 6px;
+}
+
+.appointment-history__table-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 6px;
+}
+
+.appointment-history__table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.7);
 }
 
 .appointment-history__table {

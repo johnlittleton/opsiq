@@ -1,0 +1,179 @@
+.downtime-tracker {
+  position: relative;
+}
+
+.btn-downtime {
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #f57c00 0%, #ef6c00 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-downtime:hover {
+  background: linear-gradient(135deg, #fb8c00 0%, #f57c00 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.active-downtimes {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  background: #2a3142;
+  border: 1px solid #3a4152;
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 320px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.active-downtimes h3 {
+  margin: 0 0 12px 0;
+  font-size: 0.9rem;
+  color: #f57c00;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.downtime-card {
+  background: #1e2433;
+  border-left: 3px solid #f57c00;
+  padding: 10px 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.downtime-card:last-child {
+  margin-bottom: 0;
+}
+
+.downtime-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.downtime-info strong {
+  color: #7ffb7f;
+  font-size: 0.85rem;
+}
+
+.downtime-reason {
+  color: #f3f6fa;
+  font-size: 0.8rem;
+}
+
+.downtime-duration {
+  color: #f57c00;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.btn-end-downtime {
+  padding: 6px 12px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-end-downtime:hover {
+  background: #218838;
+  transform: scale(1.05);
+}
+
+.downtime-modal {
+  max-width: 500px;
+}
+
+.downtime-modal .form-group {
+  margin-bottom: 16px;
+}
+
+.downtime-modal label {
+  display: block;
+  margin-bottom: 6px;
+  color: #f3f6fa;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.downtime-modal select,
+.downtime-modal textarea {
+  width: 100%;
+  padding: 10px;
+  background: #2a3142;
+  border: 1px solid #3a4152;
+  border-radius: 4px;
+  color: #f3f6fa;
+  font-size: 0.9rem;
+  font-family: inherit;
+}
+
+.downtime-modal select:focus,
+.downtime-modal textarea:focus {
+  outline: none;
+  border-color: #f57c00;
+}
+
+.downtime-modal textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.modal-actions button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-actions button:first-child {
+  background: #3a4152;
+  color: #f3f6fa;
+}
+
+.modal-actions button:first-child:hover {
+  background: #4a5162;
+}
+
+.modal-actions .btn-primary {
+  background: linear-gradient(135deg, #f57c00 0%, #ef6c00 100%);
+  color: white;
+}
+
+.modal-actions .btn-primary:hover {
+  background: linear-gradient(135deg, #fb8c00 0%, #f57c00 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}

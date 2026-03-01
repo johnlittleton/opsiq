@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TitleBar } from '../../components/layout/TitleBar';
+import { DockTile, DockStatus } from '../../components/docks/DockTile';
 import { apiClient } from '../services/api';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import './Scheduler.css';
+
+const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
 
 interface Appointment {
   id: number;
@@ -12,6 +15,8 @@ interface Appointment {
   contactName: string;
   contactPhone: string;
   pickupNumber?: string;
+  customer?: string;
+  carrier?: string;
   type: 'Inbound' | 'Outbound';
   doorId?: number;
   pallets?: number;
@@ -23,11 +28,13 @@ interface Appointment {
 const Scheduler: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [showModal, setShowModal] = useState(false);
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('');
-  const [view, setView] = useState<'list' | 'calendar'>('list');
+  const [view, setView] = useState<'list' | 'calendar' | 'timeslot'>('list');
+  const [selectedTimeslotDate, setSelectedTimeslotDate] = useState(new Date());
+  const [hoveredSlot, setHoveredSlot] = useState<{ door: number; time: string; appointment: Appointment } | null>(null);
 
   const [formData, setFormData] = useState({
     appointmentDate: '',
@@ -36,6 +43,8 @@ const Scheduler: React.FC = () => {
     contactName: '',
     contactPhone: '',
     pickupNumber: '',
+    customer: '',
+    carrier: '',
     type: 'Inbound' as 'Inbound' | 'Outbound',
     doorId: '',
     pallets: '',
@@ -43,41 +52,7 @@ const Scheduler: React.FC = () => {
     notes: '',
   });
 
-  // Subscribe to real-time updates (only once)
-  useEffect(() => {
-    const handleCreated = (appointment: Appointment) => {
-      setAppointments(prev => {
-        // Only add if not already present
-        if (prev.find(a => a.id === appointment.id)) {
-          return prev;
-        }
-        return [...prev, appointment];
-      });
-    };
-
-    const handleUpdated = (appointment: Appointment) => {
-      setAppointments(prev => prev.map(a => a.id === appointment.id ? appointment : a));
-    };
-
-    const handleDeleted = ({ id }: { id: number }) => {
-      setAppointments(prev => prev.filter(a => a.id !== id));
-    };
-
-    apiClient.onAppointmentCreated(handleCreated);
-    apiClient.onAppointmentUpdated(handleUpdated);
-    apiClient.onAppointmentDeleted(handleDeleted);
-
-    return () => {
-      // Cleanup listeners on unmount
-    };
-  }, []);
-
-  // Load appointments when month, filter, or view changes
-  useEffect(() => {
-    loadAppointments();
-  }, [currentMonth, typeFilter, view]);
-
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       let start: Date;
       let end: Date;
@@ -86,6 +61,12 @@ const Scheduler: React.FC = () => {
         // In list view, load appointments for 3 months (past, current, and future)
         start = startOfMonth(subMonths(new Date(), 1));
         end = endOfMonth(addMonths(new Date(), 2));
+      } else if (view === 'timeslot') {
+        // In timeslot view, load appointments for the selected date only
+        start = new Date(selectedTimeslotDate);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(selectedTimeslotDate);
+        end.setHours(23, 59, 59, 999);
       } else {
         // In calendar view, load appointments for the current month only
         start = startOfMonth(currentMonth);
@@ -99,13 +80,55 @@ const Scheduler: React.FC = () => {
       
       if (typeFilter) filters.type = typeFilter;
       
+      console.log(`📅 Loading appointments for ${view} view:`, filters);
       const data = await apiClient.getAppointments(filters);
-      console.log('Loaded appointments:', data);
+      console.log(`✅ Loaded ${data.length} appointments:`, data);
       setAppointments(data);
     } catch (error) {
       console.error('Failed to load appointments:', error);
     }
-  };
+  }, [view, currentMonth, selectedTimeslotDate, typeFilter]);
+
+  // Subscribe to real-time updates (only once)
+  useEffect(() => {
+    const handleCreated = (appointment: Appointment) => {
+      console.log('🔔 Socket: appointment created:', appointment);
+      console.log('📊 Current view:', view, 'Current month:', format(currentMonth, 'yyyy-MM'));
+      console.log('📦 Appointment date:', appointment.appointmentDate);
+      // Add appointment directly to state instead of reloading
+      setAppointments(prev => {
+        // Check if already exists to prevent duplicates
+        if (prev.find(a => a.id === appointment.id)) {
+          console.log('⚠️ Appointment already exists, skipping:', appointment.id);
+          return prev;
+        }
+        console.log('✅ Adding new appointment to state:', appointment.id);
+        return [...prev, appointment];
+      });
+    };
+
+    const handleUpdated = (appointment: Appointment) => {
+      console.log('Socket: appointment updated:', appointment);
+      setAppointments(prev => prev.map(a => a.id === appointment.id ? appointment : a));
+    };
+
+    const handleDeleted = ({ id }: { id: number }) => {
+      console.log('Socket: appointment deleted:', id);
+      setAppointments(prev => prev.filter(a => a.id !== id));
+    };
+
+    apiClient.onAppointmentCreated(handleCreated);
+    apiClient.onAppointmentUpdated(handleUpdated);
+    apiClient.onAppointmentDeleted(handleDeleted);
+
+    // No cleanup - listeners should persist on the singleton ApiClient
+    // Cleanup would reset the flag and cause re-registration on remount
+  }, []);
+
+  // Load appointments when month, filter, view, or timeslot date changes
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
 
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
@@ -121,6 +144,8 @@ const Scheduler: React.FC = () => {
         contactName: appointment.contactName,
         contactPhone: appointment.contactPhone,
         pickupNumber: appointment.pickupNumber || '',
+        customer: appointment.customer || '',
+        carrier: appointment.carrier || '',
         type: appointment.type,
         doorId: appointment.doorId?.toString() || '',
         pallets: appointment.pallets?.toString() || '',
@@ -136,6 +161,8 @@ const Scheduler: React.FC = () => {
         contactName: '',
         contactPhone: '',
         pickupNumber: '',
+        customer: '',
+        carrier: '',
         type: 'Inbound',
         doorId: '',
         pallets: '',
@@ -156,7 +183,7 @@ const Scheduler: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Form submitted!', formData);
+    console.log('📝 handleSubmit called - Form submitted!', formData);
     
     try {
       const data = {
@@ -165,20 +192,19 @@ const Scheduler: React.FC = () => {
         pallets: formData.pallets ? parseInt(formData.pallets) : undefined,
       };
 
-      console.log('Prepared data:', data);
+      console.log('📦 Prepared data:', data);
 
       if (editingAppointment) {
-        console.log('Updating appointment:', editingAppointment.id);
+        console.log('✏️ Updating appointment:', editingAppointment.id);
         await apiClient.updateAppointment(editingAppointment.id, data);
       } else {
-        console.log('Creating new appointment');
+        console.log('➕ Creating new appointment - calling API');
         const result = await apiClient.createAppointment(data);
-        console.log('Created successfully:', result);
+        console.log('✅ API returned created appointment:', result);
       }
       
       closeModal();
-      // Reload appointments to ensure the list is current
-      await loadAppointments();
+      // Socket event will handle adding the new appointment to the list
     } catch (error: any) {
       console.error('Error submitting appointment:', error);
       alert(error.message);
@@ -207,47 +233,232 @@ const Scheduler: React.FC = () => {
     return appointments.filter(apt => apt.appointmentDate === dayStr);
   };
 
+  // Time slot grid helpers
+  const TIME_SLOTS = [
+    '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+    '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+    '18:00', '19:00'
+  ];
+  
+  const DOORS = Array.from({ length: 39 }, (_, i) => i + 1);
+
+  const getAppointmentForSlot = (doorId: number, timeSlot: string) => {
+    const dateStr = format(selectedTimeslotDate, 'yyyy-MM-dd');
+    return appointments.find(
+      apt => apt.doorId === doorId && 
+             apt.appointmentDate === dateStr && 
+             apt.appointmentTime === timeSlot
+    );
+  };
+
+  const handleTimeslotClick = (doorId: number, timeSlot: string, appointment?: Appointment) => {
+    if (appointment) {
+      openModal(selectedTimeslotDate, appointment);
+    } else {
+      setFormData({
+        appointmentDate: format(selectedTimeslotDate, 'yyyy-MM-dd'),
+        appointmentTime: timeSlot,
+        company: '',
+        contactName: '',
+        contactPhone: '',
+        pickupNumber: '',
+        customer: '',
+        carrier: '',
+        type: 'Inbound',
+        doorId: doorId.toString(),
+        pallets: '',
+        commodity: '',
+        notes: '',
+      });
+      setShowModal(true);
+    }
+  };
+
   return (
     <div className="scheduler">
-      <TitleBar showLegend={false} />
-      
-      <div className="scheduler__content">
-        <div className="scheduler__header">
-          <h1 className="scheduler__title">Appointment Scheduler</h1>
-          
-          <div className="scheduler__controls">
-            <div className="scheduler__view-toggle">
-              <button
-                className={`scheduler__view-btn ${view === 'list' ? 'scheduler__view-btn--active' : ''}`}
-                onClick={() => setView('list')}
-              >
-                📋 List View
-              </button>
-              <button
-                className={`scheduler__view-btn ${view === 'calendar' ? 'scheduler__view-btn--active' : ''}`}
-                onClick={() => setView('calendar')}
-              >
-                📅 Calendar View
-              </button>
-            </div>
-            
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="scheduler__filter"
+      <TitleBar showLegend={false}>
+        <div className="scheduler__title-controls">
+          <div className="scheduler__view-toggle">
+            <button
+              className={`scheduler__view-btn ${view === 'list' ? 'scheduler__view-btn--active' : ''}`}
+              onClick={() => setView('list')}
             >
-              <option value="">All Types</option>
-              <option value="Inbound">Inbound</option>
-              <option value="Outbound">Outbound</option>
-            </select>
-            
-            <button onClick={() => openModal(new Date())} className="scheduler__btn scheduler__btn--primary">
-              + New Appointment
+              📋 List View
+            </button>
+            <button
+              className={`scheduler__view-btn ${view === 'calendar' ? 'scheduler__view-btn--active' : ''}`}
+              onClick={() => setView('calendar')}
+            >
+              📅 Calendar View
+            </button>
+            <button
+              className={`scheduler__view-btn ${view === 'timeslot' ? 'scheduler__view-btn--active' : ''}`}
+              onClick={() => setView('timeslot')}
+            >
+              🕐 Time Slot Grid
             </button>
           </div>
+          
+          {view === 'timeslot' && (
+            <>
+              <label className="scheduler__date-picker-label">
+                Select Date:
+                <input
+                  type="date"
+                  value={format(selectedTimeslotDate, 'yyyy-MM-dd')}
+                  onChange={(e) => {
+                    const newDate = new Date(e.target.value + 'T00:00:00');
+                    setSelectedTimeslotDate(newDate);
+                  }}
+                  className="scheduler__date-picker"
+                />
+              </label>
+              <button 
+                onClick={() => setSelectedTimeslotDate(new Date())}
+                className="scheduler__today-btn"
+              >
+                Today
+              </button>
+              <h2 className="scheduler__timeslot-date">
+                {format(selectedTimeslotDate, 'EEEE, MMMM d, yyyy')}
+              </h2>
+              
+              <div className="scheduler__timeslot-legend">
+                <span className="scheduler__legend-title">STATUS LEGEND</span>
+                <div className="scheduler__legend-items">
+                  <div className="scheduler__legend-item">
+                    <div className="scheduler__legend-dot scheduler__legend-dot--available"></div>
+                    <span className="scheduler__legend-label">Available</span>
+                  </div>
+                  <div className="scheduler__legend-item">
+                    <div className="scheduler__legend-dot scheduler__legend-dot--inbound"></div>
+                    <span className="scheduler__legend-label">Inbound</span>
+                  </div>
+                  <div className="scheduler__legend-item">
+                    <div className="scheduler__legend-dot scheduler__legend-dot--outbound"></div>
+                    <span className="scheduler__legend-label">Outbound</span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+          
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="scheduler__filter"
+          >
+            <option value="">All Types</option>
+            <option value="Inbound">Inbound</option>
+            <option value="Outbound">Outbound</option>
+          </select>
+          
+          <button onClick={() => openModal(new Date())} className="scheduler__btn scheduler__btn--primary">
+            + New Appointment
+          </button>
         </div>
-
-        {view === 'list' ? (
+      </TitleBar>
+      
+      <div className="scheduler__content">        {view === 'timeslot' ? (
+          <div className="scheduler__timeslot-view">
+            <div className="scheduler__timeslot-grid">
+              {DOORS.map(door => {
+                return (
+                  <div key={door} className="scheduler__door-tile">
+                    <div className="scheduler__door-tile-label">D{door}</div>
+                    <div className="scheduler__door-tile-slots">
+                      {TIME_SLOTS.map(timeSlot => {
+                        const appointment = getAppointmentForSlot(door, timeSlot);
+                        const isBooked = !!appointment;
+                        
+                        let className = 'scheduler__time-text';
+                        if (isBooked && appointment.type === 'Inbound') {
+                          className += ' scheduler__time-text--inbound';
+                        } else if (isBooked && appointment.type === 'Outbound') {
+                          className += ' scheduler__time-text--outbound';
+                        } else if (!isBooked) {
+                          className += ' scheduler__time-text--open';
+                        }
+                        
+                        return (
+                          <span
+                            key={timeSlot}
+                            className={className}
+                            onClick={() => handleTimeslotClick(door, timeSlot, appointment)}
+                            onMouseEnter={() => isBooked && appointment && setHoveredSlot({ door, time: timeSlot, appointment })}
+                            onMouseLeave={() => setHoveredSlot(null)}
+                          >
+                            {timeSlot}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {hoveredSlot && (
+              <div className="scheduler__tooltip">
+                <div className="scheduler__tooltip-header">
+                  <strong>{hoveredSlot.appointment.company}</strong>
+                </div>
+                {hoveredSlot.appointment.customer && (
+                  <div className="scheduler__tooltip-row">
+                    <span className="scheduler__tooltip-label">Customer:</span>
+                    <span>{hoveredSlot.appointment.customer}</span>
+                  </div>
+                )}
+                {hoveredSlot.appointment.carrier && (
+                  <div className="scheduler__tooltip-row">
+                    <span className="scheduler__tooltip-label">Carrier:</span>
+                    <span>{hoveredSlot.appointment.carrier}</span>
+                  </div>
+                )}
+                <div className="scheduler__tooltip-row">
+                  <span className="scheduler__tooltip-label">
+                    {hoveredSlot.appointment.type === 'Inbound' ? 'P/U #:' : 'S/O #:'}
+                  </span>
+                  <span>{hoveredSlot.appointment.pickupNumber || 'N/A'}</span>
+                </div>
+                <div className="scheduler__tooltip-row">
+                  <span className="scheduler__tooltip-label">Commodity:</span>
+                  <span>{hoveredSlot.appointment.commodity || 'Not specified'}</span>
+                </div>
+                <div className="scheduler__tooltip-row">
+                  <span className="scheduler__tooltip-label">Type:</span>
+                  <span className={`scheduler__tooltip-badge scheduler__tooltip-badge--${hoveredSlot.appointment.type.toLowerCase()}`}>
+                    {hoveredSlot.appointment.type}
+                  </span>
+                </div>
+                {hoveredSlot.appointment.pallets && (
+                  <div className="scheduler__tooltip-row">
+                    <span className="scheduler__tooltip-label">Pallets:</span>
+                    <span>{hoveredSlot.appointment.pallets}</span>
+                  </div>
+                )}
+                {hoveredSlot.appointment.contactName && (
+                  <div className="scheduler__tooltip-row">
+                    <span className="scheduler__tooltip-label">Contact:</span>
+                    <span>{hoveredSlot.appointment.contactName}</span>
+                  </div>
+                )}
+                {hoveredSlot.appointment.contactPhone && (
+                  <div className="scheduler__tooltip-row">
+                    <span className="scheduler__tooltip-label">Phone:</span>
+                    <span>{hoveredSlot.appointment.contactPhone}</span>
+                  </div>
+                )}
+                {hoveredSlot.appointment.notes && (
+                  <div className="scheduler__tooltip-row">
+                    <span className="scheduler__tooltip-label">Notes:</span>
+                    <span className="scheduler__tooltip-notes">{hoveredSlot.appointment.notes}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : view === 'list' ? (
           <div className="scheduler__list">
             <table className="scheduler__table">
               <thead>
@@ -256,7 +467,7 @@ const Scheduler: React.FC = () => {
                   <th>Time</th>
                   <th>Type</th>
                   <th>Company</th>
-                  <th>Pickup #</th>
+                  <th>P/U # / S/O #</th>
                   <th>Contact</th>
                   <th>Phone</th>
                   <th>Door</th>
@@ -418,12 +629,33 @@ const Scheduler: React.FC = () => {
                     />
                   </div>
                   <div className="scheduler__form-field">
-                    <label>Pickup Number</label>
+                    <label>{formData.type === 'Inbound' ? 'P/U Number' : 'S/O Number'}</label>
                     <input
                       type="text"
                       value={formData.pickupNumber}
                       onChange={(e) => setFormData({ ...formData, pickupNumber: e.target.value })}
                       placeholder="Optional"
+                    />
+                  </div>
+                </div>
+
+                <div className="scheduler__form-row">
+                  <div className="scheduler__form-field">
+                    <label>Customer</label>
+                    <input
+                      type="text"
+                      value={formData.customer}
+                      onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+                      placeholder="Customer name"
+                    />
+                  </div>
+                  <div className="scheduler__form-field">
+                    <label>Carrier</label>
+                    <input
+                      type="text"
+                      value={formData.carrier}
+                      onChange={(e) => setFormData({ ...formData, carrier: e.target.value })}
+                      placeholder="Carrier name"
                     />
                   </div>
                 </div>
@@ -473,12 +705,15 @@ const Scheduler: React.FC = () => {
                   </div>
                   <div className="scheduler__form-field">
                     <label>Commodity</label>
-                    <input
-                      type="text"
+                    <select
                       value={formData.commodity}
                       onChange={(e) => setFormData({ ...formData, commodity: e.target.value })}
-                      placeholder="Product type"
-                    />
+                    >
+                      <option value="">Select commodity...</option>
+                      {COMMODITIES.map(commodity => (
+                        <option key={commodity} value={commodity}>{commodity}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 

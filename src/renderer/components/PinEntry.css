@@ -1,0 +1,127 @@
+.pin-entry-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(8px);
+}
+
+.pin-entry-modal {
+  background: #232837;
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  max-width: 450px;
+  width: 90%;
+  border: 2px solid #2a3142;
+}
+
+.pin-entry-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.pin-entry-header h2 {
+  margin: 0 0 8px 0;
+  color: #7ffb7f;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.pin-entry-header p {
+  margin: 0;
+  color: #a0aec0;
+  font-size: 1rem;
+}
+
+.pin-entry-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.pin-input {
+  width: 100%;
+  padding: 16px 24px;
+  font-size: 2rem;
+  text-align: center;
+  background: #181c24;
+  border: 2px solid #2a3142;
+  border-radius: 12px;
+  color: #f3f6fa;
+  letter-spacing: 12px;
+  transition: all 0.3s ease;
+  font-family: 'Courier New', monospace;
+}
+
+.pin-input:focus {
+  outline: none;
+  border-color: #7ffb7f;
+  box-shadow: 0 0 0 3px rgba(127, 251, 127, 0.1);
+}
+
+.pin-input.error {
+  border-color: #dc3545;
+  animation: shake 0.5s ease;
+}
+
+.pin-input::placeholder {
+  color: #4a5568;
+  letter-spacing: 16px;
+}
+
+.pin-dots {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.pin-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2a3142;
+  transition: all 0.2s ease;
+}
+
+.pin-dot.filled {
+  background: #7ffb7f;
+  box-shadow: 0 0 8px rgba(127, 251, 127, 0.5);
+}
+
+.pin-error {
+  color: #dc3545;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.pin-verifying {
+  color: #7ffb7f;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pin-entry-footer {
+  margin-top: 32px;
+  text-align: center;
+}
+
+.pin-hint {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.85rem;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+  20%, 40%, 60%, 80% { transform: translateX(8px); }
+}

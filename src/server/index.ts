@@ -14,6 +14,18 @@ import {
   DoorStatus,
 } from '../shared/types';
 
+// Helper to get local time as ISO string (without UTC conversion)
+function getLocalISOString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+  const ms = String(date.getMilliseconds()).padStart(3, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
+}
+
 const app = express();
 const httpServer = createServer(app);
 const io = new SocketServer(httpServer, {
@@ -158,6 +170,17 @@ app.put('/api/checkins/:id', async (req, res) => {
   }
 });
 
+// Get audit log for a check-in
+app.get('/api/checkins/:id/audit', async (req, res) => {
+  try {
+    const checkinId = parseInt(req.params.id);
+    const auditLog = await db.getCheckinAuditLog(checkinId);
+    res.json(auditLog);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Create production entry
 app.post('/api/production', async (req, res) => {
   try {
@@ -192,7 +215,7 @@ app.get('/api/production', async (req, res) => {
 // Get shipping/receiving KPIs
 app.get('/api/kpi/shipping-receiving', async (req, res) => {
   try {
-    const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const date = (req.query.date as string) || getLocalISOString().split('T')[0];
     const kpi = await calculateShippingReceivingKPI(date);
     res.json(kpi);
   } catch (error: any) {
@@ -239,6 +262,7 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
     Blocked: 0,
     Waiting: 0,
     Parked: 0,
+    Offline: 0,
   };
 
   const doors = await db.getAllDoorsWithCheckins();
@@ -378,7 +402,10 @@ app.post('/api/appointments', async (req, res) => {
     console.log('✅ Appointment created:', appointment);
     
     // Broadcast update to all clients
+    const clientCount = io.engine.clientsCount;
+    console.log('📡 Broadcasting appointment:created to', clientCount, 'connected clients');
     io.emit('appointment:created', appointment);
+    console.log('✅ Broadcast complete');
     
     res.json(appointment);
   } catch (error: any) {
@@ -486,6 +513,39 @@ app.get('/api/labor/summary', async (req, res) => {
   }
 });
 
+// Get current active shift session (for live tracking)
+app.get('/api/labor/shift/current', async (req, res) => {
+  try {
+    const currentShift = await db.getCurrentShiftSession();
+    res.json(currentShift);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// End shift session
+app.post('/api/labor/shift/:shiftNumber/end', async (req, res) => {
+  try {
+    const shiftNumber = parseInt(req.params.shiftNumber);
+    const { endedBy } = req.body;
+    const result = await db.endShiftSession(shiftNumber, endedBy || 'Manager');
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get shift sessions history
+app.get('/api/labor/shifts', async (req, res) => {
+  try {
+    const date = req.query.date as string | undefined;
+    const shifts = await db.getShiftSessions(date);
+    res.json(shifts);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== PERFORMANCE TRACKING API ====================
 
 // Mark load start for a checkin
@@ -516,10 +576,253 @@ app.get('/api/executive/metrics', async (req, res) => {
   try {
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
+    console.log('📊 GET /api/executive/metrics called with:', { startDate, endDate });
     const metrics = await db.getExecutiveMetrics(startDate, endDate);
+    console.log('📊 Returning metrics - topOperators:', metrics.topOperators?.length || 0);
+    if (metrics.topOperators?.length > 0) {
+      console.log('📊 Top operator:', metrics.topOperators[0]);
+    }
     res.json(metrics);
   } catch (error: any) {
+    console.error('❌ Error in GET /api/executive/metrics:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Executive Analytics - Chart Data
+app.get('/api/executive/analytics', async (req, res) => {
+  try {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    console.log('📊 GET /api/executive/analytics called with:', { startDate, endDate });
+    const analytics = await db.getExecutiveAnalytics(startDate, endDate);
+    res.json(analytics);
+  } catch (error: any) {
+    console.error('❌ Error in GET /api/executive/analytics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Production Costing Analytics
+app.get('/api/production/costing', async (req, res) => {
+  try {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const costingData = await db.getProductionCostingAnalytics(startDate, endDate);
+    res.json(costingData);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== PRODUCTION TOOLS API ====================
+
+// Work Orders
+app.get('/api/production/work-orders', async (req, res) => {
+  console.log('📥 GET /api/production/work-orders called');
+  try {
+    const date = req.query.date as string | undefined;
+    console.log('  Date filter:', date);
+    const workOrders = await db.getWorkOrders(date);
+    console.log('  Found', workOrders.length, 'work orders');
+    res.json(workOrders);
+  } catch (error: any) {
+    console.error('❌ Error in GET /api/production/work-orders:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/production/work-orders/:id', async (req, res) => {
+  try {
+    const workOrder = await db.getWorkOrderById(req.params.id);
+    if (workOrder) {
+      res.json(workOrder);
+    } else {
+      res.status(404).json({ error: 'Work order not found' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/production/work-orders', async (req, res) => {
+  console.log('📥 POST /api/production/work-orders called');
+  console.log('  Body:', req.body);
+  try {
+    const workOrder = await db.createWorkOrder(req.body);
+    console.log('  Created work order:', workOrder);
+    io.emit('workorder:updated', workOrder);
+    res.json(workOrder);
+  } catch (error: any) {
+    console.error('❌ Error in POST /api/production/work-orders:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/production/work-orders/:id', async (req, res) => {
+  try {
+    const workOrder = await db.updateWorkOrder(req.params.id, req.body);
+    if (workOrder) {
+      io.emit('workorder:updated', workOrder);
+      res.json(workOrder);
+    } else {
+      res.status(404).json({ error: 'Work order not found' });
+    }
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/production/work-orders/:id', async (req, res) => {
+  try {
+    const success = await db.deleteWorkOrder(req.params.id);
+    if (success) {
+      io.emit('workorder:deleted', req.params.id);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Work order not found' });
+    }
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Production Downtime
+app.post('/api/production/downtime', async (req, res) => {
+  try {
+    const downtime = await db.createDowntime(req.body);
+    io.emit('downtime:created', downtime);
+    res.status(201).json(downtime);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/production/downtime', async (req, res) => {
+  try {
+    const { line, startDate, endDate } = req.query;
+    console.log('Fetching downtimes with filters:', { line, startDate, endDate });
+    const downtimes = await db.getDowntimes({
+      line: line ? parseInt(line as string) : undefined,
+      startDate: startDate as string,
+      endDate: endDate ? `${endDate}T23:59:59` : undefined
+    });
+    console.log('Returning', downtimes.length, 'downtime records');
+    res.json(downtimes);
+  } catch (error: any) {
+    console.error('Error fetching downtimes:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/production/downtime/:id/end', async (req, res) => {
+  try {
+    console.log('Ending downtime ID:', req.params.id);
+    const downtime = await db.endDowntime(parseInt(req.params.id));
+    console.log('Downtime ended:', downtime);
+    io.emit('downtime:ended', downtime);
+    res.json(downtime);
+  } catch (error: any) {
+    console.error('Error ending downtime:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Executive Authentication
+app.post('/api/auth/verify-pin', async (req, res) => {
+  try {
+    const { pin } = req.body;
+    const executive = await db.verifyExecutivePin(pin);
+    if (executive) {
+      res.json({ success: true, name: executive.name });
+    } else {
+      res.status(401).json({ success: false, error: 'Invalid PIN' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/executives', async (req, res) => {
+  try {
+    const executives = await db.getExecutives();
+    res.json(executives);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Production Dock Statuses
+app.get('/api/production/dock-statuses', async (req, res) => {
+  try {
+    const statuses = await db.getProductionDockStatuses();
+    res.json(statuses);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/production/dock-statuses/:dockNumber', async (req, res) => {
+  try {
+    const dockNumber = parseInt(req.params.dockNumber);
+    const status = await db.updateProductionDockStatus(dockNumber, req.body);
+    if (status) {
+      io.emit('production-dock:updated', status);
+      res.json(status);
+    } else {
+      res.status(404).json({ error: 'Dock not found' });
+    }
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Production Dock Appointments
+app.get('/api/production/dock-appointments', async (req, res) => {
+  try {
+    const date = req.query.date as string | undefined;
+    const appointments = await db.getProductionDockAppointments(date);
+    res.json(appointments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/production/dock-appointments', async (req, res) => {
+  try {
+    const appointment = await db.createProductionDockAppointment(req.body);
+    io.emit('production-appointment:created', appointment);
+    res.json(appointment);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/production/dock-appointments/:id', async (req, res) => {
+  try {
+    const appointment = await db.updateProductionDockAppointment(req.params.id, req.body);
+    if (appointment) {
+      io.emit('production-appointment:updated', appointment);
+      res.json(appointment);
+    } else {
+      res.status(404).json({ error: 'Appointment not found' });
+    }
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/production/dock-appointments/:id', async (req, res) => {
+  try {
+    const success = await db.deleteProductionDockAppointment(req.params.id);
+    if (success) {
+      io.emit('production-appointment:deleted', req.params.id);
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Appointment not found' });
+    }
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -536,17 +839,37 @@ async function startServer() {
     console.log('✓ PostgreSQL initialized and seeded');
   }
 
-  httpServer.listen(PORT, () => {
-    console.log(`✓ OpsIQ Server running on http://localhost:${PORT}`);
-    console.log(`✓ Socket.IO ready for real-time updates`);
-    console.log(`✓ Database ready`);
+  return new Promise((resolve, reject) => {
+    httpServer.listen(PORT, () => {
+      console.log(`✓ OpsIQ Server running on http://localhost:${PORT}`);
+      console.log(`✓ Socket.IO ready for real-time updates`);
+      console.log(`✓ Database ready`);
+      resolve(undefined);
+    }).on('error', (error) => {
+      console.error('❌ Failed to start HTTP server:', error);
+      reject(error);
+    });
   });
 }
+
+// Catch all unhandled rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+});
 
 startServer().catch((error) => {
   console.error('❌ Failed to start server:', error);
   process.exit(1);
 });
+
+// Keep the process alive
+setInterval(() => {
+  // This keeps the event loop running
+}, 1000000);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

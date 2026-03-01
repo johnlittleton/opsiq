@@ -12,6 +12,7 @@ interface StatPanelProps {
   variant?: 'default' | 'blue' | 'green' | 'yellow' | 'red' | 'purple';
   icon?: React.ReactNode;
   className?: string;
+  compact?: boolean;
 }
 
 export const StatPanel: React.FC<StatPanelProps> = ({
@@ -24,6 +25,7 @@ export const StatPanel: React.FC<StatPanelProps> = ({
   variant = 'default',
   icon,
   className,
+  compact = false,
 }) => {
   const variantClasses = {
     default: 'border-panel-border',
@@ -49,32 +51,33 @@ export const StatPanel: React.FC<StatPanelProps> = ({
   return (
     <div
       className={clsx(
-        'glass rounded-sm p-4 border transition-all duration-150 hover:shadow-glass-hover',
+        'glass rounded-sm border transition-all duration-150 hover:shadow-glass-hover',
+        compact ? 'p-2' : 'p-4',
         variantClasses[variant],
         className
       )}
     >
-      <div className="flex items-start justify-between mb-2">
-        <div className="text-xs uppercase tracking-wide text-text-muted font-medium">
+      <div className={clsx('flex items-start justify-between', compact ? 'mb-1' : 'mb-2')}>
+        <div className={clsx('uppercase tracking-wide text-text-muted font-medium', compact ? 'text-[9px]' : 'text-xs')}>
           {title}
         </div>
         {icon && <div className="text-text-subtle">{icon}</div>}
       </div>
       
-      <div className="flex items-baseline gap-2 mb-1">
-        <div className={clsx('text-3xl font-bold', valueColorClasses[variant])}>
+      <div className={clsx('flex items-baseline gap-2', compact ? 'mb-0' : 'mb-1')}>
+        <div className={clsx('font-bold', compact ? 'text-lg' : 'text-3xl', valueColorClasses[variant])}>
           {value}
         </div>
         {unit && (
-          <div className="text-sm text-text-muted">{unit}</div>
+          <div className={clsx('text-text-muted', compact ? 'text-xs' : 'text-sm')}>{unit}</div>
         )}
       </div>
 
       {(subtitle || trend) && (
-        <div className="flex items-center gap-2 text-xs">
+        <div className={clsx('flex items-center gap-2', compact ? 'text-[9px]' : 'text-xs')}>
           {trend && (
             <div className={clsx('flex items-center gap-1', trendColor)}>
-              <TrendIcon size={12} />
+              <TrendIcon size={compact ? 10 : 12} />
               {trendValue && <span>{trendValue}</span>}
             </div>
           )}

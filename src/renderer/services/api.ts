@@ -26,9 +26,10 @@ console.log('🔧 API Configuration:', {
 });
 
 class ApiClient {
-  private socket: Socket | null = null;
+  public socket: Socket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
+  private appointmentListenersRegistered = false;
 
   constructor() {
     this.initSocket();
@@ -45,6 +46,7 @@ class ApiClient {
 
     this.socket.on('connect', () => {
       console.log('✓ Connected to OpsIQ server');
+      console.log('📊 Appointment listeners registered flag:', this.appointmentListenersRegistered);
       this.reconnectAttempts = 0;
       // Request sync on connect
       this.socket?.emit('sync:request');
@@ -155,6 +157,24 @@ class ApiClient {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to update checkin');
+    }
+    return response.json();
+  }
+
+  async getCheckinAuditLog(checkinId: number): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/api/checkins/${checkinId}/audit`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch audit log');
+    }
+    return response.json();
+  }
+
+  async getCheckinAuditLog(checkinId: number): Promise<any[]> {
+    const response = await fetch(`${API_BASE}/api/checkins/${checkinId}/audit`);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch audit log');
     }
     return response.json();
   }
@@ -334,15 +354,42 @@ class ApiClient {
   }
 
   onAppointmentCreated(callback: (appointment: any) => void) {
+    console.log('🎯 onAppointmentCreated called, flag =', this.appointmentListenersRegistered);
+    if (this.appointmentListenersRegistered) {
+      console.warn('⚠️ Appointment listeners already registered, skipping duplicate registration');
+      return;
+    }
+    // Clear any existing listeners first (in case of hot reload)
+    this.socket?.off('appointment:created');
     this.socket?.on('appointment:created', callback);
+    console.log('✅ Registered appointment:created listener');
   }
 
   onAppointmentUpdated(callback: (appointment: any) => void) {
+    console.log('🎯 onAppointmentUpdated called');
+    // Clear any existing listeners first (in case of hot reload)
+    this.socket?.off('appointment:updated');
     this.socket?.on('appointment:updated', callback);
+    console.log('✅ Registered appointment:updated listener');
   }
 
   onAppointmentDeleted(callback: (data: { id: number }) => void) {
+    console.log('🎯 onAppointmentDeleted called');
+    // Clear any existing listeners first (in case of hot reload)
+    this.socket?.off('appointment:deleted');
     this.socket?.on('appointment:deleted', callback);
+    console.log('✅ Registered appointment:deleted listener');
+    this.appointmentListenersRegistered = true;
+    console.log('🔒 Flag set to true, future registrations will be blocked');
+  }
+  
+  clearAppointmentListeners() {
+    console.log('🧹 Clearing appointment listeners');
+    this.socket?.off('appointment:created');
+    this.socket?.off('appointment:updated');
+    this.socket?.off('appointment:deleted');
+    this.appointmentListenersRegistered = false;
+    console.log('🔓 Flag reset to false');
   }
 
   disconnect() {

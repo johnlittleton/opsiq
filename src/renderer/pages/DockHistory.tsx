@@ -16,9 +16,18 @@ const DockHistory: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [actualPalletsInput, setActualPalletsInput] = useState('');
+  
+  // Helper function to get local date string without timezone issues
+  const getLocalDateString = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
   const [filters, setFilters] = useState({
     startDate: '2020-01-01',
-    endDate: new Date().toISOString().split('T')[0],
+    endDate: getLocalDateString(new Date()),
     doorId: '',
     status: '' as DoorStatus | '',
   });
@@ -142,7 +151,7 @@ const DockHistory: React.FC = () => {
             <div style={{ color: '#94a3b8', marginBottom: '24px', lineHeight: '1.6' }}>
               <p><strong>Driver:</strong> {checkin.driverName}</p>
               <p><strong>Company:</strong> {checkin.company}</p>
-              <p><strong>Pickup #:</strong> {checkin.pickupNumber}</p>
+              <p><strong>{checkin.inboundOutbound === 'Inbound' ? 'P/U #:' : 'S/O #:'}</strong> {checkin.pickupNumber}</p>
               <p><strong>Door:</strong> {checkoutDoor}</p>
             </div>
             <div style={{ marginBottom: '24px' }}>
@@ -294,7 +303,7 @@ const DockHistory: React.FC = () => {
             {searchText ? 'No events match your search' : 'No events found for the selected filters'}
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-container">
             <table className="data-table">
               <thead>
                 <tr>
@@ -302,9 +311,13 @@ const DockHistory: React.FC = () => {
                   <th>Door</th>
                   <th>Company</th>
                   <th>Driver</th>
-                  <th>Pickup #</th>
+                  <th>Forklift Driver</th>
+                  <th>Checker</th>
+                  <th>P/U # / S/O #</th>
                   <th>Type</th>
                   <th>Pallets</th>
+                  <th>Start Time</th>
+                  <th>End Time</th>
                   <th>Old Status</th>
                   <th>New Status</th>
                   <th>Elapsed Time</th>
@@ -320,14 +333,26 @@ const DockHistory: React.FC = () => {
                     <tr key={event.id}>
                       <td>{isValidDate ? format(eventDate, 'MMM dd, yyyy HH:mm:ss') : 'Invalid Date'}</td>
                       <td><strong>Door {event.doorId}</strong></td>
-                      <td>{(event as any).company || '—'}</td>
-                      <td>{(event as any).driverName || '—'}</td>
-                      <td>{(event as any).pickupNumber || '—'}</td>
-                      <td>{(event as any).type || '—'}</td>
+                      <td>{event.company || '—'}</td>
+                      <td>{event.driverName || '—'}</td>
+                      <td>{event.forkliftDriver || '—'}</td>
+                      <td>{event.checker || '—'}</td>
+                      <td>{event.pickupNumber || '—'}</td>
+                      <td>{event.type || '—'}</td>
                       <td>
-                        {(event as any).actualPallets 
-                          ? `${(event as any).actualPallets} (${(event as any).pallets || '0'} expected)` 
-                          : (event as any).pallets || '—'}
+                        {event.actualPallets 
+                          ? `${event.actualPallets} (${event.pallets || '0'} expected)` 
+                          : event.pallets || '—'}
+                      </td>
+                      <td>
+                        {event.loadStartTime 
+                          ? format(new Date(event.loadStartTime), 'MMM dd, HH:mm') 
+                          : '—'}
+                      </td>
+                      <td>
+                        {event.loadEndTime 
+                          ? format(new Date(event.loadEndTime), 'MMM dd, HH:mm') 
+                          : '—'}
                       </td>
                       <td>
                       {event.oldStatus ? (

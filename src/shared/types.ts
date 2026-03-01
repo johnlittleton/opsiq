@@ -1,6 +1,6 @@
 // Shared type definitions across server and client
 
-export type DoorStatus = 'Open' | 'Offload' | 'Loading' | 'Blocked' | 'Waiting' | 'Parked';
+export type DoorStatus = 'Open' | 'Offload' | 'Loading' | 'Blocked' | 'Waiting' | 'Parked' | 'Offline';
 
 export type InboundOutbound = 'Inbound' | 'Outbound';
 
@@ -27,7 +27,7 @@ export interface DockCheckin {
   checker: string;
   plateNumber: string;
   phoneNumber: string;
-  doorId: number;
+  doorId: number | null;
   status: DoorStatus;
   statusStartTime: string;
   loadStartTime: string | null;
@@ -49,6 +49,17 @@ export interface DockEvent {
   elapsedSeconds: number;
   updatedBy: string;
   note: string | null;
+  // Fields from joined dock_checkins table
+  company?: string;
+  driverName?: string;
+  pickupNumber?: string;
+  type?: InboundOutbound;
+  pallets?: number;
+  actualPallets?: number;
+  forkliftDriver?: string;
+  checker?: string;
+  loadStartTime?: string;
+  loadEndTime?: string;
 }
 
 export interface ProductionEntry {
@@ -79,6 +90,7 @@ export interface CreateCheckinRequest {
   doorId: number;
   status: DoorStatus;
   clientRequestId: string;
+  hasAppointment: boolean;
 }
 
 export interface UpdateDoorStatusRequest {
@@ -164,6 +176,8 @@ export interface LaborSnapshot {
   recordedBy: string;
   shift: Shift;
   notes: string | null;
+  warehouseOvertimeHours: number;
+  productionOvertimeHours: number;
 }
 
 export interface CreateLaborSnapshotRequest {
@@ -172,6 +186,8 @@ export interface CreateLaborSnapshotRequest {
   recordedBy: string;
   shift: Shift;
   notes?: string;
+  warehouseOvertimeHours?: number;
+  productionOvertimeHours?: number;
 }
 
 export interface LaborSummary {
@@ -220,4 +236,14 @@ export interface ExecutiveMetrics {
   productionLaborCostPerHour: number;
   totalShiftLaborCost: number;
   currentHeadcount: number;
+  warehouseHeadcount: number;
+  productionHeadcount: number;
+  
+  // Production metrics
+  totalCasesCompleted: number; // For selected date range
+  casesCompletedYTD: number; // Always Jan 1 to today
+  bestPerformingLine: {
+    lineNumber: number;
+    totalCases: number;
+  } | null;
 }

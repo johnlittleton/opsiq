@@ -133,7 +133,7 @@ const DoorTile: React.FC<{ door: DockDoorWithCheckin }> = ({ door }) => {
             <span className="door-info-value">{door.checkin.driverName}</span>
           </div>
           <div className="door-info-row">
-            <span className="door-info-label">Pickup #:</span>
+            <span className="door-info-label">{door.checkin.inboundOutbound === 'Inbound' ? 'P/U #:' : 'S/O #:'}</span>
             <span className="door-info-value">{door.checkin.pickupNumber}</span>
           </div>
           <div className="door-info-row">

@@ -1,7 +1,7 @@
 .home-page {
   width: 100%;
   min-height: 100vh;
-  padding: 20px 40px 40px;
+  padding: 15px 30px 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -106,23 +106,23 @@
 
 .home-page__header {
   text-align: center;
-  margin-top: 40px;
-  margin-bottom: 32px;
+  margin-top: 35px;
+  margin-bottom: 20px;
 }
 
 .home-page__title {
-  font-size: 40px;
+  font-size: 32px;
   font-weight: 700;
   background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   letter-spacing: -0.03em;
 }
 
 .home-page__subtitle {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-muted);
   font-weight: 400;
   letter-spacing: 0.01em;
@@ -131,29 +131,31 @@
 .home-page__section {
   width: 100%;
   max-width: 1400px;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .home-page__section-title {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--accent-primary);
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
 }
 
 .home-page__quick-access {
   display: grid;
-  gap: 16px;
+  gap: 10px;
 }
 
 .home-page__quick-access--compact {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .home-page__quick-access--grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .home-page__card {
@@ -161,25 +163,25 @@
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-bright);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 10px 12px;
   box-shadow: var(--shadow);
   transition: all var(--transition-normal);
   cursor: pointer;
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 10px;
 }
 
 .home-page__card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
   border-color: var(--accent-primary);
-  box-shadow: var(--shadow-heavy), 0 0 32px rgba(59, 130, 246, 0.2);
+  box-shadow: var(--shadow-heavy), 0 0 24px rgba(59, 130, 246, 0.2);
 }
 
 .home-page__card-icon {
-  font-size: 36px;
-  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+  font-size: 22px;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
   flex-shrink: 0;
 }
 
@@ -188,31 +190,31 @@
 }
 
 .home-page__card-title {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-bright);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .home-page__card-desc {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--text-muted);
-  line-height: 1.5;
+  line-height: 1.3;
 }
 
 .home-page__card-tags {
   display: flex;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 5px;
+  margin-top: 6px;
   flex-wrap: wrap;
 }
 
 .home-page__card-tag {
-  padding: 4px 10px;
+  padding: 3px 8px;
   background: rgba(59, 130, 246, 0.15);
   border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 6px;
-  font-size: 11px;
+  border-radius: 5px;
+  font-size: 10px;
   font-weight: 500;
   color: var(--accent-primary);
   letter-spacing: 0.02em;
@@ -220,8 +222,8 @@
 
 .home-page__status {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
 }
 
 .home-page__status-card {
@@ -229,19 +231,19 @@
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 14px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .home-page__status-indicator {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--glow-open);
-  box-shadow: 0 0 12px var(--glow-open);
+  box-shadow: 0 0 10px var(--glow-open);
   flex-shrink: 0;
 }
 
@@ -250,15 +252,15 @@
 }
 
 .home-page__status-label {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .home-page__status-value {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-bright);
 }

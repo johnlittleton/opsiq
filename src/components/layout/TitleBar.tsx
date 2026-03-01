@@ -5,9 +5,10 @@ import './TitleBar.css';
 
 interface TitleBarProps {
   showLegend?: boolean;
+  children?: React.ReactNode;
 }
 
-export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false }) => {
+export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children }) => {
   const navigate = useNavigate();
   const [showViewMenu, setShowViewMenu] = useState(false);
 
@@ -71,6 +72,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false }) => {
         </div>
 
         {showLegend && <Legend />}
+        {children && <div className="title-bar__content">{children}</div>}
       </div>
       <button className="title-bar__home-btn" onClick={() => navigate('/')}>← Home</button>
       <div className="title-bar__controls">
