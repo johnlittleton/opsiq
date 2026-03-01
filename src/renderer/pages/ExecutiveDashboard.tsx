@@ -126,16 +126,17 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
-  // Auto-update shift every minute
+  // Auto-update shift and metrics every minute
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    // Initial fetch
+    // Initial fetch for shift only (metrics already loaded by dateRange useEffect)
     fetchCurrentShift();
     
     // Set up interval to update every 60 seconds
     const interval = setInterval(() => {
       fetchCurrentShift();
+      loadMetrics();
     }, 60000);
     
     // Cleanup
