@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
+import path from 'path';
 // Use factory to switch between SQLite (local) and Postgres (Railway)
 import { db } from './db-factory';
 import {
@@ -836,6 +837,16 @@ app.delete('/api/production/dock-appointments/:id', async (req, res) => {
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// ==================== SERVE REACT APP ====================
+
+// Serve static files from the React build
+app.use(express.static(path.join(__dirname, '../../renderer')));
+
+// Handle React Router - send all non-API requests to index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../renderer/index.html'));
 });
 
 // ==================== SERVER START ====================
