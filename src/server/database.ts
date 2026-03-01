@@ -1632,22 +1632,41 @@ export class DatabaseService implements IDatabaseService {
     
     console.log('📊 Found ALL-TIME completed checkins for operators:', allCompletedCheckins.length);
     
+    // Normalize driver names to combine variants
+    const normalizeDriverName = (name: string): string | null => {
+      if (!name || typeof name !== 'string') return null;
+      const n = name.trim().toUpperCase();
+      
+      // Combine J CARLOS variants
+      if (n === 'J CARLOS' || n === 'JANCARLOS' || n === 'JCARLOS') return 'JAN CARLOS';
+      
+      // Combine LINWOOD variants
+      if (n === 'LENNY' || n === 'LINDWOOD' || n === 'LYNWOOD') return 'LINWOOD';
+      
+      // Whitelist of approved drivers (case-normalized)
+      const approved = ['LINWOOD', 'JAN CARLOS', 'SANCHEZ', 'DRE', 'KYLE', 'BRIAN', 'CESAR', 'MIKE', 'CARLOS', 'ERIC', 'NOE'];
+      
+      if (approved.includes(n)) return n;
+      return null; // Filter out non-approved drivers
+    };
+    
     const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
     
     allCompletedCheckins.forEach(c => {
-      const driver = c.forkliftDriver || 'Unknown';
-      if (!operatorStats[driver]) {
-        operatorStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
+      const normalizedName = normalizeDriverName(c.forkliftDriver);
+      if (!normalizedName) return; // Skip non-approved drivers
+      
+      if (!operatorStats[normalizedName]) {
+        operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
-      operatorStats[driver].loads++;
-      operatorStats[driver].pallets += (c.actualPallets || c.pallets);
-      operatorStats[driver].totalMinutes += c.totalMinutes;
+      operatorStats[normalizedName].loads++;
+      operatorStats[normalizedName].pallets += (c.actualPallets || c.pallets);
+      operatorStats[normalizedName].totalMinutes += c.totalMinutes;
     });
 
     console.log('📊 Raw operator stats:', operatorStats);
 
     const topOperators = Object.entries(operatorStats)
-      .filter(([name]) => name !== 'TBD' && name !== 'Unknown' && name.trim() !== '')
       .map(([name, stats]) => ({
         operatorName: name,
         totalLoads: stats.loads,
@@ -1656,7 +1675,7 @@ export class DatabaseService implements IDatabaseService {
         avgPalletsPerLoad: Math.round((stats.pallets / stats.loads) * 10) / 10,
       }))
       .sort((a, b) => b.totalLoads - a.totalLoads)
-      .slice(0, 14);
+      .slice(0, 15); // 3 columns × 5 rows
 
     console.log('📊 Top operators after filtering:', topOperators);
 
@@ -2216,14 +2235,14 @@ export class DatabaseService implements IDatabaseService {
   async seedCompletedCheckins(): Promise<any> {
     console.log('🌱 Seeding completed checkins for Top Operators data...');
     
-    const operators = ['Miguel', 'Carlos', 'Juan', 'Jose', 'David', 'Luis', 'Manuel', 'Roberto'];
+    const operators = ['Linwood', 'Jan Carlos', 'Sanchez', 'Dre', 'Kyle', 'Brian', 'Cesar', 'Mike', 'Carlos', 'Eric', 'Noe'];
     const companies = ['Sunkist', 'Wonderful Citrus', 'Limoneira', 'Sun Pacific', 'Bee Sweet Citrus'];
     const commodities = ['Lemons', 'Navels', 'Mandarins', 'Limes', 'Avocado'];
     const checkers = ['Sarah', 'Emma', 'Lisa', 'Maria'];
     
     // Create completed checkins over the past 7 days (Feb 22 - Feb 28, 2026)
     const now = new Date('2026-02-28T17:00:00'); // End of Feb 28
-    const seedCount = 50; // Create 50 completed loads
+    const seedCount = 100; // Create 100 completed loads for better data distribution
     
     for (let i = 0; i < seedCount; i++) {
       // Random timestamp in the past 7 days
