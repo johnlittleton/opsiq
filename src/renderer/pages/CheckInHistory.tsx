@@ -39,7 +39,7 @@ const CheckInHistory: React.FC = () => {
     setLoading(true);
     try {
       const filterParams: any = {
-        startDate: filters.startDate,
+        startDate: `${filters.startDate}T00:00:00`,
         endDate: `${filters.endDate}T23:59:59`,
       };
       
@@ -47,7 +47,9 @@ const CheckInHistory: React.FC = () => {
       if (filters.type) filterParams.type = filters.type;
       if (!filters.includeActive) filterParams.includeActive = false;
 
+      console.log('🔍 Loading checkins with filters:', filterParams);
       const data = await apiClient.getAllCheckins(filterParams);
+      console.log('📊 Loaded checkins:', data.length);
       setCheckins(data);
     } catch (error) {
       console.error('Failed to load checkins:', error);

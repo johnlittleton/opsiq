@@ -50,14 +50,16 @@ const AppointmentHistory: React.FC = () => {
     setLoading(true);
     try {
       const filterParams: any = {
-        startDate: filters.startDate,
-        endDate: filters.endDate,
+        startDate: `${filters.startDate}T00:00:00`,
+        endDate: `${filters.endDate}T23:59:59`,
       };
       
       if (filters.type) filterParams.type = filters.type;
       if (filters.status) filterParams.status = filters.status;
 
+      console.log('🔍 Loading appointments with filters:', filterParams);
       const data = await apiClient.getAppointments(filterParams);
+      console.log('📊 Loaded appointments:', data.length);
       setAppointments(data);
     } catch (error) {
       console.error('Failed to load appointments:', error);

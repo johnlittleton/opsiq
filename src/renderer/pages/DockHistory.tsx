@@ -85,13 +85,15 @@ const DockHistory: React.FC = () => {
     setLoading(true);
     try {
       const filterParams: any = {
-        startDate: filters.startDate,
+        startDate: `${filters.startDate}T00:00:00`,
         endDate: `${filters.endDate}T23:59:59`,
       };
       if (filters.doorId) filterParams.doorId = parseInt(filters.doorId);
       if (filters.status) filterParams.status = filters.status;
 
+      console.log('🔍 Loading dock events with filters:', filterParams);
       const data = await apiClient.getDockEvents(filterParams);
+      console.log('📊 Loaded dock events:', data.length);
       setEvents(data);
     } catch (error) {
       console.error('Failed to load events:', error);

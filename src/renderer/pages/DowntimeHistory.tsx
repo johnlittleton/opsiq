@@ -53,12 +53,15 @@ export default function DowntimeHistory() {
 
   const fetchDowntimes = async () => {
     try {
+      const startDateTime = `${startDate}T00:00:00`;
+      const endDateTime = `${endDate}T23:59:59`;
+      console.log('🔍 Loading downtimes with date range:', startDateTime, 'to', endDateTime);
       const response = await fetch(
-        `${API_BASE}/api/production/downtime?startDate=${startDate}&endDate=${endDate}`
+        `${API_BASE}/api/production/downtime?startDate=${startDateTime}&endDate=${endDateTime}`
       );
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched downtimes:', data.length, 'records');
+        console.log('📊 Fetched downtimes:', data.length, 'records');
         console.log('Sample downtime:', data[0]);
         setDowntimes(data);
       }
