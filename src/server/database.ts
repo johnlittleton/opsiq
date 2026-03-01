@@ -2203,6 +2203,56 @@ export class DatabaseService implements IDatabaseService {
     return this.getExecutives();
   }
 
+  async seedCompletedCheckins(): Promise<any> {
+    console.log('🌱 Seeding completed checkins for Top Operators data...');
+    
+    const operators = ['Miguel', 'Carlos', 'Juan', 'Jose', 'David', 'Luis', 'Manuel', 'Roberto'];
+    const companies = ['Sunkist', 'Wonderful Citrus', 'Limoneira', 'Sun Pacific', 'Bee Sweet Citrus'];
+    const commodities = ['Lemons', 'Navels', 'Mandarins', 'Limes', 'Avocado'];
+    const checkers = ['Sarah', 'Emma', 'Lisa', 'Maria'];
+    
+    // Create completed checkins over the past 7 days (Feb 22 - Feb 28, 2026)
+    const now = new Date('2026-02-28T17:00:00'); // End of Feb 28
+    const seedCount = 50; // Create 50 completed loads
+    
+    for (let i = 0; i < seedCount; i++) {
+      // Random timestamp in the past 7 days
+      const daysAgo = Math.floor(Math.random() * 7);
+      const hoursOffset = Math.floor(Math.random() * 10) + 6; // 6am-4pm
+      const checkinTime = new Date(now);
+      checkinTime.setDate(checkinTime.getDate() - daysAgo);
+      checkinTime.setHours(hoursOffset, Math.floor(Math.random() * 60), 0, 0);
+      
+      const loadDuration = Math.floor(Math.random() * 45) + 15; // 15-60 minutes
+      const closeTime = new Date(checkinTime.getTime() + loadDuration * 60 * 1000);
+      
+      const operator = operators[Math.floor(Math.random() * operators.length)];
+      const company = companies[Math.floor(Math.random() * companies.length)];
+      const commodity = commodities[Math.floor(Math.random() * commodities.length)];
+      const checker = checkers[Math.floor(Math.random() * checkers.length)];
+      const type = Math.random() > 0.5 ? 'Inbound' : 'Outbound';
+      const pallets = Math.floor(Math.random() * 20) + 5; // 5-25 pallets
+      
+      this.db.prepare(`
+        INSERT INTO dock_checkins (
+          inboundOutbound, company, driverName, pickupNumber, pallets, actualPallets,
+          commodity, forkliftDriver, checker, plateNumber, phoneNumber,
+          doorId, status, statusStartTime, loadStartTime, loadEndTime,
+          totalMinutes, createdAt, updatedAt, closedAt, clientRequestId, hasAppointment
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        type, company, `Driver ${i}`, `PU${1000 + i}`, pallets, pallets,
+        commodity, operator, checker, `ABC${1000 + i}`, '555-0100',
+        null, 'Open', checkinTime.toISOString(), checkinTime.toISOString(), closeTime.toISOString(),
+        loadDuration, checkinTime.toISOString(), closeTime.toISOString(), closeTime.toISOString(),
+        `seed-${i}-${Date.now()}`, 0
+      );
+    }
+    
+    console.log(`✓ Seeded ${seedCount} completed checkins`);
+    return { success: true, count: seedCount };
+  }
+
   // Executive Analytics - Chart Data
   getExecutiveAnalytics(startDate?: string, endDate?: string): any {
     const today = getLocalISOString().split('T')[0];

@@ -765,6 +765,18 @@ app.post('/api/executives/seed', async (req, res) => {
   }
 });
 
+// Force seed completed checkins for Top Operators data (one-time setup endpoint)
+app.post('/api/checkins/seed', async (req, res) => {
+  try {
+    console.log('🌱 Force seeding completed checkins...');
+    const result = await db.seedCompletedCheckins();
+    res.json({ success: true, message: 'Completed checkins seeded successfully', result });
+  } catch (error: any) {
+    console.error('Error seeding checkins:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Production Dock Statuses
 app.get('/api/production/dock-statuses', async (req, res) => {
   try {
