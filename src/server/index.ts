@@ -752,6 +752,18 @@ app.get('/api/executives', async (req, res) => {
   }
 });
 
+// Force seed executives (one-time setup endpoint)
+app.post('/api/executives/seed', async (req, res) => {
+  try {
+    console.log('🌱 Force seeding executives...');
+    const result = await db.seedExecutives();
+    res.json({ success: true, message: 'Executives seeded successfully', executives: result });
+  } catch (error: any) {
+    console.error('Error seeding executives:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Production Dock Statuses
 app.get('/api/production/dock-statuses', async (req, res) => {
   try {

@@ -2175,6 +2175,34 @@ export class DatabaseService implements IDatabaseService {
     return this.db.prepare('SELECT id, name, isActive, createdAt FROM executives ORDER BY name').all();
   }
 
+  async seedExecutives(): Promise<any[]> {
+    // Delete existing executives
+    this.db.prepare('DELETE FROM executives').run();
+    
+    const now = getLocalISOString();
+    const executives = [
+      { name: 'Phil Sr', pin: '14723' },
+      { name: 'Tyler', pin: '28591' },
+      { name: 'Phil Jr', pin: '36847' },
+      { name: 'Julia', pin: '45129' },
+      { name: 'Michelle', pin: '57263' },
+      { name: 'Izzy', pin: '69384' },
+      { name: 'John', pin: '78420' }
+    ];
+
+    const insert = this.db.prepare(`
+      INSERT INTO executives (name, pin, isActive, createdAt, updatedAt)
+      VALUES (?, ?, 1, ?, ?)
+    `);
+
+    for (const exec of executives) {
+      insert.run(exec.name, exec.pin, now, now);
+    }
+    
+    console.log('✓ Force-seeded 7 executives');
+    return this.getExecutives();
+  }
+
   // Executive Analytics - Chart Data
   getExecutiveAnalytics(startDate?: string, endDate?: string): any {
     const today = getLocalISOString().split('T')[0];

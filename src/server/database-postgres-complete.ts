@@ -2224,6 +2224,31 @@ export class DatabaseService implements IDatabaseService {
     return result.rows.map(row => this.toCamelCase(row));
   }
 
+  async seedExecutives(): Promise<any[]> {
+    // Delete existing executives
+    await this.pool.query('DELETE FROM executives');
+    
+    const executives = [
+      { name: 'Phil Sr', pin: '14723' },
+      { name: 'Tyler', pin: '28591' },
+      { name: 'Phil Jr', pin: '36847' },
+      { name: 'Julia', pin: '45129' },
+      { name: 'Michelle', pin: '57263' },
+      { name: 'Izzy', pin: '69384' },
+      { name: 'John', pin: '78420' }
+    ];
+
+    for (const exec of executives) {
+      await this.pool.query(`
+        INSERT INTO executives (name, pin, is_active)
+        VALUES ($1, $2, true)
+      `, [exec.name, exec.pin]);
+    }
+    
+    console.log('✓ Force-seeded 7 executives');
+    return await this.getExecutives();
+  }
+
   // Executive Analytics - Chart Data
   async getExecutiveAnalytics(startDate?: string, endDate?: string): Promise<any> {
     const today = getLocalISOString().split('T')[0];
