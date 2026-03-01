@@ -802,7 +802,7 @@ export class DatabaseService implements IDatabaseService {
       params.push(filters.status);
     }
 
-    query += ' ORDER BY e.event_time DESC LIMIT 1000';
+    query += ' ORDER BY e.event_time DESC LIMIT 10000';
 
     const result = await this.pool.query(query, params);
     return this.toCamelCase(result.rows);

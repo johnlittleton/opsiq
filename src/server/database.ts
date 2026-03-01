@@ -848,7 +848,7 @@ export class DatabaseService implements IDatabaseService {
       params.push(filters.status);
     }
 
-    query += ' ORDER BY e.eventTime DESC LIMIT 1000';
+    query += ' ORDER BY e.eventTime DESC LIMIT 10000';
 
     return this.db.prepare(query).all(...params) as DockEvent[];
   }
