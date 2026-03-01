@@ -2280,23 +2280,28 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async seedCompletedCheckins(): Promise<any> {
-    console.log('🌱 Seeding completed checkins for Top Operators data...');
+    console.log('🌱 Seeding historical dock data from Jan 2024 through Feb 2026...');
     
     const operators = ['Linwood', 'Jan Carlos', 'Sanchez', 'Dre', 'Kyle', 'Brian', 'Cesar', 'Mike', 'Carlos', 'Eric', 'Noe'];
     const companies = ['Sunkist', 'Wonderful Citrus', 'Limoneira', 'Sun Pacific', 'Bee Sweet Citrus'];
     const commodities = ['Lemons', 'Navels', 'Mandarins', 'Limes', 'Avocado'];
     const checkers = ['Sarah', 'Emma', 'Lisa', 'Maria'];
+    const doors = [1, 2, 5, 11, 15, 17, 24, 26, 29, 31, 32]; // Common doors
     
-    // Create completed checkins over the past 7 days (Feb 22 - Feb 28, 2026)
-    const now = new Date('2026-02-28T17:00:00'); // End of Feb 28
-    const seedCount = 100; // Create 100 completed loads for better data distribution
+    // Create historical data from Jan 1, 2024 through Feb 28, 2026 (over 2 years)
+    const startDate = new Date('2024-01-01T08:00:00');
+    const endDate = new Date('2026-02-28T17:00:00');
+    const seedCount = 500; // Create 500 loads spread over 2 years
+    
+    const totalDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    console.log(`📊 Creating ${seedCount} loads across ${totalDays} days...`);
     
     for (let i = 0; i < seedCount; i++) {
-      // Random timestamp in the past 7 days
-      const daysAgo = Math.floor(Math.random() * 7);
+      // Random timestamp across the full date range
+      const randomDay = Math.floor(Math.random() * totalDays);
       const hoursOffset = Math.floor(Math.random() * 10) + 6; // 6am-4pm
-      const checkinTime = new Date(now);
-      checkinTime.setDate(checkinTime.getDate() - daysAgo);
+      const checkinTime = new Date(startDate);
+      checkinTime.setDate(checkinTime.getDate() + randomDay);
       checkinTime.setHours(hoursOffset, Math.floor(Math.random() * 60), 0, 0);
       
       const loadDuration = Math.floor(Math.random() * 45) + 15; // 15-60 minutes
@@ -2308,25 +2313,48 @@ export class DatabaseService implements IDatabaseService {
       const checker = checkers[Math.floor(Math.random() * checkers.length)];
       const type = Math.random() > 0.5 ? 'Inbound' : 'Outbound';
       const pallets = Math.floor(Math.random() * 20) + 5; // 5-25 pallets
+      const doorId = doors[Math.floor(Math.random() * doors.length)];
       
-      await this.pool.query(`
+      // Create the checkin
+      const checkinResult = await this.pool.query(`
         INSERT INTO dock_checkins (
           inbound_outbound, company, driver_name, pickup_number, pallets, actual_pallets,
           commodity, forklift_driver, checker, plate_number, phone_number,
           door_id, status, status_start_time, load_start_time, load_end_time,
           total_minutes, created_at, updated_at, closed_at, client_request_id, has_appointment
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        RETURNING id
       `, [
-        type, company, `Driver ${i}`, `PU${1000 + i}`, pallets, pallets,
-        commodity, operator, checker, `ABC${1000 + i}`, '555-0100',
-        null, 'Open', checkinTime.toISOString(), checkinTime.toISOString(), closeTime.toISOString(),
+        type, company, `Driver ${i}`, `PU${10000 + i}`, pallets, pallets,
+        commodity, operator, checker, `ABC${10000 + i}`, '555-0100',
+        doorId, 'Open', checkinTime.toISOString(), checkinTime.toISOString(), closeTime.toISOString(),
         loadDuration, checkinTime.toISOString(), closeTime.toISOString(), closeTime.toISOString(),
         `seed-${i}-${Date.now()}`, false
       ]);
+      
+      const checkinId = checkinResult.rows[0].id;
+      
+      // Create corresponding dock events for this load (check-in and completion)
+      // Event 1: Door assigned and loading started
+      await this.pool.query(`
+        INSERT INTO dock_events (door_id, checkin_id, old_status, new_status, event_time, elapsed_seconds, updated_by, note)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [doorId, checkinId, 'Open', 'Loading', checkinTime.toISOString(), 0, 'System', `${type} load started - ${company}`]);
+      
+      // Event 2: Load completed
+      await this.pool.query(`
+        INSERT INTO dock_events (door_id, checkin_id, old_status, new_status, event_time, elapsed_seconds, updated_by, note)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `, [doorId, checkinId, 'Loading', 'Open', closeTime.toISOString(), loadDuration * 60, 'System', `${type} load completed - ${pallets} pallets`]);
+      
+      if ((i + 1) % 50 === 0) {
+        console.log(`   📦 Created ${i + 1}/${seedCount} loads with events...`);
+      }
     }
     
-    console.log(`✓ Seeded ${seedCount} completed checkins`);
-    return { success: true, count: seedCount };
+    console.log(`✓ Seeded ${seedCount} completed loads with ${seedCount * 2} dock events`);
+    console.log(`📅 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    return { success: true, count: seedCount, events: seedCount * 2 };
   }
 
   // Executive Analytics - Chart Data
