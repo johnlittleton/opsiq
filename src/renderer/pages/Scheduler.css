@@ -189,7 +189,9 @@
   background: var(--glass);
   border: 1px solid var(--border);
   border-radius: 12px;
-  overflow: hidden;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  overflow-x: hidden;
   backdrop-filter: blur(10px);
 }
 

@@ -204,7 +204,8 @@ const Scheduler: React.FC = () => {
       }
       
       closeModal();
-      // Socket event will handle adding the new appointment to the list
+      // Reload appointments to ensure the new appointment shows in the grid
+      await loadAppointments();
     } catch (error: any) {
       console.error('Error submitting appointment:', error);
       alert(error.message);
@@ -215,6 +216,8 @@ const Scheduler: React.FC = () => {
     if (confirm('Are you sure you want to delete this appointment?')) {
       try {
         await apiClient.deleteAppointment(id);
+        // Reload appointments to ensure the grid updates
+        await loadAppointments();
       } catch (error: any) {
         alert(error.message);
       }
