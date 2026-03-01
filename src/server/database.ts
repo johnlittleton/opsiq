@@ -1621,10 +1621,20 @@ export class DatabaseService implements IDatabaseService {
       ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
       : 0;
 
-    // Top operators
+    // Top operators - ALL TIME (not filtered by date range)
+    const allCompletedCheckins = this.db.prepare(`
+      SELECT forkliftDriver, actualPallets, pallets, totalMinutes
+      FROM dock_checkins
+      WHERE closedAt IS NOT NULL
+        AND totalMinutes IS NOT NULL
+        AND forkliftDriver IS NOT NULL
+    `).all() as any[];
+    
+    console.log('📊 Found ALL-TIME completed checkins for operators:', allCompletedCheckins.length);
+    
     const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
     
-    completedCheckins.forEach(c => {
+    allCompletedCheckins.forEach(c => {
       const driver = c.forkliftDriver || 'Unknown';
       if (!operatorStats[driver]) {
         operatorStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
