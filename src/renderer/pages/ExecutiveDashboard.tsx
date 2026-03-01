@@ -38,8 +38,12 @@ const ExecutiveDashboard: React.FC = () => {
     return `${year}-${month}-${day}`;
   };
   
+  // Default to past 30 days to show historical analytics data
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
   const [dateRange, setDateRange] = useState({
-    startDate: getLocalDateString(new Date()),
+    startDate: getLocalDateString(thirtyDaysAgo),
     endDate: getLocalDateString(new Date()),
   });
 
