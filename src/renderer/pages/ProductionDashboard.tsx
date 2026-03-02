@@ -20,6 +20,8 @@ export default function ProductionDashboard() {
   const lineParam = searchParams.get('line');
   const specificLine = lineParam ? parseInt(lineParam) : null;
   
+  console.log('🔧 ProductionDashboard - Line filter from URL:', lineParam, '→ specificLine:', specificLine);
+  
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
     const year = date.getFullYear();
@@ -50,6 +52,8 @@ export default function ProductionDashboard() {
       const response = await fetch(`${API_BASE}/api/production/work-orders?date=${selectedDate}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 Fetched work orders:', data.length, 'orders');
+        console.log('   Active orders:', data.filter((wo: any) => wo.status === 'Active').map((wo: any) => ({ id: wo.id, line: wo.line, status: wo.status })));
         setWorkOrders(data);
       }
     } catch (error) {
@@ -99,7 +103,11 @@ export default function ProductionDashboard() {
   };
 
   const getActiveWorkOrder = (lineId: number) => {
-    return workOrders.find(wo => wo.line === lineId && wo.status === 'Active');
+    const wo = workOrders.find(wo => wo.line === lineId && wo.status === 'Active');
+    if (wo) {
+      console.log(`✅ Found active WO for line ${lineId}:`, { id: wo.id, line: wo.line, lineType: typeof wo.line, status: wo.status });
+    }
+    return wo;
   };
 
   const getLineStatus = (lineId: number) => {
@@ -163,6 +171,13 @@ export default function ProductionDashboard() {
   const displayLines = specificLine 
     ? LINES.filter(line => line.id === specificLine)
     : LINES;
+
+  console.log('🔍 Display lines:', displayLines.map(l => ({ id: l.id, name: l.name })));
+  console.log('🔍 Checking for active work orders on these lines...');
+  displayLines.forEach(line => {
+    const wo = getActiveWorkOrder(line.id);
+    console.log(`   Line ${line.id} (${line.name}): ${wo ? `WO #${wo.id} - ${wo.status}` : 'No active work order'}`);
+  });
 
   // Get page title based on line filter
   const pageTitle = specificLine 
