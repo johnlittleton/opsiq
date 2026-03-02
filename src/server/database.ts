@@ -200,8 +200,7 @@ export class DatabaseService implements IDatabaseService {
         finalProductionHeadcount INTEGER,
         totalLaborCost REAL DEFAULT 0,
         elapsedMinutes INTEGER DEFAULT 0,
-        endedBy TEXT,
-        UNIQUE(date, shiftNumber)
+        endedBy TEXT
       );
 
       CREATE TABLE IF NOT EXISTS work_orders (
@@ -285,6 +284,10 @@ export class DatabaseService implements IDatabaseService {
       CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
       CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
       CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointmentDate);
+      
+      -- Partial unique index: only one active shift per date/shift_number
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
+      ON shift_sessions(date, shiftNumber) WHERE status = 'active';
     `);
 
     // Migration: Add performance tracking columns if they don't exist

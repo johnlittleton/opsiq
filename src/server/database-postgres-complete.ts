@@ -170,8 +170,7 @@ export class DatabaseService implements IDatabaseService {
           final_production_headcount INTEGER,
           total_labor_cost REAL DEFAULT 0,
           elapsed_minutes INTEGER DEFAULT 0,
-          ended_by TEXT,
-          UNIQUE(date, shift_number)
+          ended_by TEXT
         );
 
         CREATE TABLE IF NOT EXISTS checkin_audit_log (
@@ -277,7 +276,25 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
         CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
+        
+        -- Partial unique index: only one active shift per date/shift_number
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
+        ON shift_sessions(date, shift_number) WHERE status = 'active';
       `);
+
+      // Migration: Drop old shift_sessions unique constraint (allows multiple sessions per day/shift)
+      try {
+        await client.query(`
+          ALTER TABLE shift_sessions 
+          DROP CONSTRAINT IF EXISTS shift_sessions_date_shift_number_key;
+        `);
+        console.log('✅ Migration: Dropped old shift_sessions unique constraint');
+      } catch (error: any) {
+        // Constraint might not exist or already dropped
+        if (!error.message.includes('does not exist')) {
+          console.log('⚠️ Could not drop shift_sessions constraint:', error.message);
+        }
+      }
 
       // Add pickup_number column if it doesn't exist (migration)
       await client.query(`
