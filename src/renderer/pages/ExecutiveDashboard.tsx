@@ -116,15 +116,19 @@ const ExecutiveDashboard: React.FC = () => {
   // Load current active shift
   const fetchCurrentShift = async () => {
     try {
+      console.log('🔄 Fetching current shift from:', `${API_BASE}/api/labor/shift/current`);
       const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      console.log('Shift response status:', response.status);
       if (!response.ok) {
+        console.log('⚠️ No active shift found (status not ok)');
         setCurrentShift(null);
         return;
       }
       const data = await response.json();
+      console.log('✅ Active shift data:', data);
       setCurrentShift(data);
     } catch (error) {
-      console.error('Failed to fetch current shift:', error);
+      console.error('❌ Failed to fetch current shift:', error);
       setCurrentShift(null);
     }
   };

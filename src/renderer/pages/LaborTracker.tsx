@@ -87,6 +87,16 @@ export default function LaborTracker() {
     setLoading(true);
 
     try {
+      console.log('📝 Recording labor snapshot to:', `${API_BASE}/api/labor/snapshot`);
+      console.log('📝 Snapshot data:', {
+        shippingReceivingHeadcount: parseInt(shippingHeadcount),
+        productionHeadcount: parseInt(productionHeadcount),
+        warehouseOvertimeHours: warehouseOvertimeHours ? parseFloat(warehouseOvertimeHours) : 0,
+        productionOvertimeHours: productionOvertimeHours ? parseFloat(productionOvertimeHours) : 0,
+        recordedBy,
+        shift,
+      });
+      
       const response = await fetch(`${API_BASE}/api/labor/snapshot`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,10 +111,15 @@ export default function LaborTracker() {
         }),
       });
 
+      console.log('Snapshot response status:', response.status);
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Snapshot recording failed:', errorData);
         throw new Error(errorData.error || 'Failed to save labor data');
       }
+
+      const result = await response.json();
+      console.log('✅ Snapshot recorded successfully:', result);
 
       // Reset form
       setWarehouseOvertimeHours('');
@@ -116,6 +131,7 @@ export default function LaborTracker() {
       // Refresh data
       await fetchSummary();
     } catch (err: any) {
+      console.error('❌ Error submitting snapshot:', err);
       setError(err.message);
     } finally {
       setLoading(false);
