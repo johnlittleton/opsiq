@@ -23,7 +23,7 @@ import {
 import './ExecutiveAnalytics.css';
 
 interface AnalyticsData {
-  lineOutput: Array<{ line: number; totalCases: number }>;
+  lineOutput: Array<{ line: number; totalCases: number; totalBags: number }>;
   deliveries: Array<{ date: string; inboundOutbound: string; count: number; totalPallets: number }>;
   driverPerformance: Array<{ name: string; loads: number; pallets: number; avgMinutes: number }>;
   laborCosts: Array<{ date: string; warehouseCost: number; productionCost: number; totalCost: number }>;
@@ -120,7 +120,8 @@ const ExecutiveAnalytics: React.FC = () => {
   // Prepare chart data
   const lineOutputData = analytics.lineOutput.map(item => ({
     name: `Line ${item.line}`,
-    cases: item.totalCases
+    cases: item.totalCases,
+    bags: item.totalBags
   }));
 
   // Combine deliveries by date
@@ -223,7 +224,8 @@ const ExecutiveAnalytics: React.FC = () => {
                   }} 
                 />
                 <Legend wrapperStyle={{ fontSize: '11px' }} />
-                <Bar dataKey="cases" fill="#3b82f6" name="Cases Completed" />
+                <Bar dataKey="cases" fill="#3b82f6" name="Cases" />
+                <Bar dataKey="bags" fill="#10b981" name="Bags" />
               </BarChart>
             </ResponsiveContainer>
           </GlassPanel>

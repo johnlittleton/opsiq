@@ -47,6 +47,13 @@ export class DatabaseService implements IDatabaseService {
     // Don't call initialize in constructor - let server call it explicitly
   }
 
+  // Helper method to parse bags per case from bag size (e.g., "12X3" -> 12, "17KG" -> 17)
+  private parseBagsPerCase(bagSize: string | null | undefined): number {
+    if (!bagSize) return 1;
+    const match = bagSize.match(/^(\d+)/);
+    return match ? parseInt(match[1], 10) : 1;
+  }
+
   async initialize() {
     const client = await this.pool.connect();
     
@@ -1737,6 +1744,18 @@ export class DatabaseService implements IDatabaseService {
       WHERE created_at >= $1 AND created_at <= $2
     `, [start, end]);
 
+    // Production metrics - bags completed in date range (cases × bags per case)
+    const bagsResult = await this.pool.query(`
+      SELECT bag_size, completed_cases
+      FROM work_orders
+      WHERE completed_cases > 0
+        AND created_at >= $1 AND created_at <= $2
+    `, [start, end]);
+    const totalBags = bagsResult.rows.reduce((sum, row) => {
+      const bagsPerCase = this.parseBagsPerCase(row.bag_size);
+      return sum + (parseInt(row.completed_cases) * bagsPerCase);
+    }, 0);
+
     // Production metrics - cases completed YTD (Jan 1 to today)
     const currentYear = new Date().getFullYear();
     const ytdStart = `${currentYear}-01-01T00:00:00`;
@@ -1747,6 +1766,18 @@ export class DatabaseService implements IDatabaseService {
       FROM work_orders
       WHERE created_at >= $1 AND created_at <= $2
     `, [ytdStart, ytdEnd]);
+
+    // Bags YTD
+    const bagsYTDResult = await this.pool.query(`
+      SELECT bag_size, completed_cases
+      FROM work_orders
+      WHERE completed_cases > 0
+        AND created_at >= $1 AND created_at <= $2
+    `, [ytdStart, ytdEnd]);
+    const totalBagsYTD = bagsYTDResult.rows.reduce((sum, row) => {
+      const bagsPerCase = this.parseBagsPerCase(row.bag_size);
+      return sum + (parseInt(row.completed_cases) * bagsPerCase);
+    }, 0);
 
     // Best performing line YTD
     const bestLineResult = await this.pool.query(`
@@ -1778,7 +1809,9 @@ export class DatabaseService implements IDatabaseService {
       warehouseHeadcount: latestLabor ? latestLabor.shippingReceivingHeadcount : 0,
       productionHeadcount: latestLabor ? latestLabor.productionHeadcount : 0,
       totalCasesCompleted: parseInt(totalCasesResult.rows[0].total) || 0,
+      totalBagsCompleted: totalBags,
       casesCompletedYTD: parseInt(casesYTDResult.rows[0].total) || 0,
+      bagsCompletedYTD: totalBagsYTD,
       bestPerformingLine: bestLineResult.rows.length > 0 ? {
         lineNumber: bestLineResult.rows[0].line,
         totalCases: parseInt(bestLineResult.rows[0].total_cases) || 0
@@ -1837,10 +1870,12 @@ export class DatabaseService implements IDatabaseService {
     const lineBreakdown: Record<number, {
       lineNumber: number;
       totalCases: number;
+      totalBags: number;
       totalLaborCost: number;
       costPerCase: number;
       totalTimeHours: number;
       casesPerHour: number;
+      bagsPerHour: number;
     }> = {};
 
     workOrders.forEach((wo: any) => {
@@ -1901,13 +1936,17 @@ export class DatabaseService implements IDatabaseService {
         lineBreakdown[wo.line] = {
           lineNumber: wo.line,
           totalCases: 0,
+          totalBags: 0,
           totalLaborCost: 0,
           costPerCase: 0,
           totalTimeHours: 0,
           casesPerHour: 0,
+          bagsPerHour: 0,
         };
       }
+      const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
       lineBreakdown[wo.line].totalCases += wo.completedCases;
+      lineBreakdown[wo.line].totalBags += wo.completedCases * bagsPerCase;
       lineBreakdown[wo.line].totalLaborCost += laborCost;
       lineBreakdown[wo.line].totalTimeHours += timeHours;
     });
@@ -1930,6 +1969,7 @@ export class DatabaseService implements IDatabaseService {
     Object.values(lineBreakdown).forEach(l => {
       l.costPerCase = l.totalCases > 0 ? l.totalLaborCost / l.totalCases : 0;
       l.casesPerHour = l.totalTimeHours > 0 ? l.totalCases / l.totalTimeHours : 0;
+      l.bagsPerHour = l.totalTimeHours > 0 ? l.totalBags / l.totalTimeHours : 0;
     });
 
     // Sort arrays
@@ -2365,16 +2405,32 @@ export class DatabaseService implements IDatabaseService {
 
     // 1. Line Output - Cases per production line
     const lineOutputResult = await this.pool.query(`
-      SELECT line, COALESCE(SUM(completed_cases), 0) as total_cases
+      SELECT line, bag_size, completed_cases
       FROM work_orders
-      WHERE created_at >= $1 AND created_at <= $2
-      GROUP BY line
-      ORDER BY line
+      WHERE completed_cases > 0
+        AND created_at >= $1 AND created_at <= $2
     `, [start, end]);
-    const lineOutput = lineOutputResult.rows.map(row => ({
-      line: row.line,
-      totalCases: parseInt(row.total_cases)
-    }));
+    
+    // Aggregate by line with bags calculation
+    const lineAggregation: Record<number, { totalCases: number; totalBags: number }> = {};
+    lineOutputResult.rows.forEach(row => {
+      const line = row.line;
+      if (!lineAggregation[line]) {
+        lineAggregation[line] = { totalCases: 0, totalBags: 0 };
+      }
+      const cases = parseInt(row.completed_cases) || 0;
+      const bagsPerCase = this.parseBagsPerCase(row.bag_size);
+      lineAggregation[line].totalCases += cases;
+      lineAggregation[line].totalBags += cases * bagsPerCase;
+    });
+    
+    const lineOutput = Object.entries(lineAggregation)
+      .map(([line, data]) => ({
+        line: parseInt(line),
+        totalCases: data.totalCases,
+        totalBags: data.totalBags
+      }))
+      .sort((a, b) => a.line - b.line);
 
     // 2. Inbound/Outbound Deliveries by date
     const deliveriesResult = await this.pool.query(`

@@ -247,7 +247,7 @@ const ExecutiveDashboard: React.FC = () => {
           <StatPanel
             title="Cases Completed"
             value={(metrics.totalCasesCompleted || 0).toLocaleString()}
-            subtitle="Selected period"
+            subtitle={`${(metrics.totalBagsCompleted || 0).toLocaleString()} bags • Selected period`}
             icon="📦"
             variant="green"
             compact
@@ -255,7 +255,7 @@ const ExecutiveDashboard: React.FC = () => {
           <StatPanel
             title="Cases YTD"
             value={(metrics.casesCompletedYTD || 0).toLocaleString()}
-            subtitle="Jan 1 - Today"
+            subtitle={`${(metrics.bagsCompletedYTD || 0).toLocaleString()} bags • Jan 1 - Today`}
             icon="📈"
             variant="blue"
             compact

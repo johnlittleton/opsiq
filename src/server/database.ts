@@ -54,6 +54,13 @@ export class DatabaseService implements IDatabaseService {
     return Promise.resolve();
   }
 
+  // Helper method to parse bags per case from bag size (e.g., "12X3" -> 12, "17KG" -> 17)
+  private parseBagsPerCase(bagSize: string | null | undefined): number {
+    if (!bagSize) return 1;
+    const match = bagSize.match(/^(\d+)/);
+    return match ? parseInt(match[1], 10) : 1;
+  }
+
   private initializeSync() {
     // Create tables
     this.db.exec(`
@@ -1713,6 +1720,18 @@ export class DatabaseService implements IDatabaseService {
       WHERE createdAt >= ? AND createdAt <= ?
     `).get(start, end) as any;
 
+    // Production metrics - bags completed in date range (cases × bags per case)
+    const bagsRows = this.db.prepare(`
+      SELECT bagSize, completedCases
+      FROM work_orders
+      WHERE completedCases > 0
+        AND createdAt >= ? AND createdAt <= ?
+    `).all(start, end) as any[];
+    const totalBags = bagsRows.reduce((sum, row) => {
+      const bagsPerCase = this.parseBagsPerCase(row.bagSize);
+      return sum + (row.completedCases * bagsPerCase);
+    }, 0);
+
     // Production metrics - cases completed YTD (Jan 1 to today)
     const currentYear = new Date().getFullYear();
     const ytdStart = `${currentYear}-01-01T00:00:00`;
@@ -1723,6 +1742,18 @@ export class DatabaseService implements IDatabaseService {
       FROM work_orders
       WHERE createdAt >= ? AND createdAt <= ?
     `).get(ytdStart, ytdEnd) as any;
+
+    // Bags YTD
+    const bagsYTDRows = this.db.prepare(`
+      SELECT bagSize, completedCases
+      FROM work_orders
+      WHERE completedCases > 0
+        AND createdAt >= ? AND createdAt <= ?
+    `).all(ytdStart, ytdEnd) as any[];
+    const totalBagsYTD = bagsYTDRows.reduce((sum, row) => {
+      const bagsPerCase = this.parseBagsPerCase(row.bagSize);
+      return sum + (row.completedCases * bagsPerCase);
+    }, 0);
 
     // Best performing line YTD
     const bestLine = this.db.prepare(`
@@ -1754,7 +1785,9 @@ export class DatabaseService implements IDatabaseService {
       warehouseHeadcount: latestLabor ? latestLabor.shippingReceivingHeadcount : 0,
       productionHeadcount: latestLabor ? latestLabor.productionHeadcount : 0,
       totalCasesCompleted: totalCasesCompleted.total || 0,
+      totalBagsCompleted: totalBags,
       casesCompletedYTD: casesCompletedYTD.total || 0,
+      bagsCompletedYTD: totalBagsYTD,
       bestPerformingLine: bestLine ? {
         lineNumber: bestLine.line,
         totalCases: bestLine.totalCases || 0
@@ -1811,10 +1844,12 @@ export class DatabaseService implements IDatabaseService {
     const lineBreakdown: Record<number, {
       lineNumber: number;
       totalCases: number;
+      totalBags: number;
       totalLaborCost: number;
       costPerCase: number;
       totalTimeHours: number;
       casesPerHour: number;
+      bagsPerHour: number;
     }> = {};
 
     workOrders.forEach(wo => {
@@ -1875,13 +1910,17 @@ export class DatabaseService implements IDatabaseService {
         lineBreakdown[wo.line] = {
           lineNumber: wo.line,
           totalCases: 0,
+          totalBags: 0,
           totalLaborCost: 0,
           costPerCase: 0,
           totalTimeHours: 0,
           casesPerHour: 0,
+          bagsPerHour: 0,
         };
       }
+      const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
       lineBreakdown[wo.line].totalCases += wo.completedCases;
+      lineBreakdown[wo.line].totalBags += wo.completedCases * bagsPerCase;
       lineBreakdown[wo.line].totalLaborCost += laborCost;
       lineBreakdown[wo.line].totalTimeHours += timeHours;
     });
@@ -1904,6 +1943,7 @@ export class DatabaseService implements IDatabaseService {
     Object.values(lineBreakdown).forEach(l => {
       l.costPerCase = l.totalCases > 0 ? l.totalLaborCost / l.totalCases : 0;
       l.casesPerHour = l.totalTimeHours > 0 ? l.totalCases / l.totalTimeHours : 0;
+      l.bagsPerHour = l.totalTimeHours > 0 ? l.totalBags / l.totalTimeHours : 0;
     });
 
     // Sort arrays
@@ -2316,13 +2356,33 @@ export class DatabaseService implements IDatabaseService {
     const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
 
     // 1. Line Output - Cases per production line
-    const lineOutput = this.db.prepare(`
-      SELECT line, COALESCE(SUM(completedCases), 0) as totalCases
+    const lineOutputRows = this.db.prepare(`
+      SELECT line, bagSize, completedCases
       FROM work_orders
-      WHERE createdAt >= ? AND createdAt <= ?
-      GROUP BY line
-      ORDER BY line
+      WHERE completedCases > 0
+        AND createdAt >= ? AND createdAt <= ?
     `).all(start, end) as any[];
+    
+    // Aggregate by line with bags calculation
+    const lineAggregation: Record<number, { totalCases: number; totalBags: number }> = {};
+    lineOutputRows.forEach(row => {
+      const line = row.line;
+      if (!lineAggregation[line]) {
+        lineAggregation[line] = { totalCases: 0, totalBags: 0 };
+      }
+      const cases = row.completedCases || 0;
+      const bagsPerCase = this.parseBagsPerCase(row.bagSize);
+      lineAggregation[line].totalCases += cases;
+      lineAggregation[line].totalBags += cases * bagsPerCase;
+    });
+    
+    const lineOutput = Object.entries(lineAggregation)
+      .map(([line, data]) => ({
+        line: parseInt(line),
+        totalCases: data.totalCases,
+        totalBags: data.totalBags
+      }))
+      .sort((a, b) => a.line - b.line);
 
     // 2. Inbound/Outbound Deliveries by date
     const deliveries = this.db.prepare(`

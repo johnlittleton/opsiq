@@ -241,7 +241,9 @@ export interface ExecutiveMetrics {
   
   // Production metrics
   totalCasesCompleted: number; // For selected date range
+  totalBagsCompleted: number; // For selected date range
   casesCompletedYTD: number; // Always Jan 1 to today
+  bagsCompletedYTD: number; // Always Jan 1 to today
   bestPerformingLine: {
     lineNumber: number;
     totalCases: number;

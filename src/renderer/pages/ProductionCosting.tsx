@@ -41,10 +41,12 @@ interface CostingData {
   byLine: Array<{
     lineNumber: number;
     totalCases: number;
+    totalBags: number;
     totalLaborCost: number;
     costPerCase: number;
     totalTimeHours: number;
     casesPerHour: number;
+    bagsPerHour: number;
   }>;
   bestPerformer: {
     product: string;
@@ -347,8 +349,10 @@ const ProductionCosting: React.FC = () => {
                     <tr>
                       <th>Line</th>
                       <th className="align-right">Total Cases</th>
+                      <th className="align-right">Total Bags</th>
                       <th className="align-right">Labor Hours</th>
                       <th className="align-right">Cases/Hour</th>
+                      <th className="align-right">Bags/Hour</th>
                       <th className="align-right">Total Labor Cost</th>
                       <th className="align-right">Cost Per Case</th>
                     </tr>
@@ -358,8 +362,10 @@ const ProductionCosting: React.FC = () => {
                       <tr key={idx}>
                         <td className="line-number">Line {item.lineNumber}</td>
                         <td className="number">{item.totalCases.toLocaleString()}</td>
+                        <td className="number">{(item.totalBags || 0).toLocaleString()}</td>
                         <td className="number">{(item.totalTimeHours || 0).toFixed(1)}</td>
                         <td className="number highlight">{(item.casesPerHour || 0).toFixed(0)}</td>
+                        <td className="number highlight">{(item.bagsPerHour || 0).toFixed(0)}</td>
                         <td className="currency">${(item.totalLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.costPerCase || 0).toFixed(3)}</td>
                       </tr>
