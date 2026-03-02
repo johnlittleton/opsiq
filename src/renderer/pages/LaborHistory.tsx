@@ -20,6 +20,8 @@ interface LaborSnapshot {
   recordedBy: string;
   shift: 'A' | 'B';
   notes: string | null;
+  warehouseOvertimeHours?: number;
+  productionOvertimeHours?: number;
 }
 
 export default function LaborHistory() {
@@ -248,10 +250,10 @@ export default function LaborHistory() {
                         <span className="label">Headcount:</span>
                         <span className="value">{snapshot.shippingReceivingHeadcount}</span>
                       </div>
-                      {snapshot.warehouseOvertimeHours > 0 && (
+                      {(snapshot.warehouseOvertimeHours || 0) > 0 && (
                         <div className="data-row">
                           <span className="label">Overtime:</span>
-                          <span className="value">{snapshot.warehouseOvertimeHours.toFixed(1)} hrs</span>
+                          <span className="value">{snapshot.warehouseOvertimeHours?.toFixed(1)} hrs</span>
                         </div>
                       )}
                       <div className="data-row">
@@ -266,10 +268,10 @@ export default function LaborHistory() {
                         <span className="label">Headcount:</span>
                         <span className="value">{snapshot.productionHeadcount}</span>
                       </div>
-                      {snapshot.productionOvertimeHours > 0 && (
+                      {(snapshot.productionOvertimeHours || 0) > 0 && (
                         <div className="data-row">
                           <span className="label">Overtime:</span>
-                          <span className="value">{snapshot.productionOvertimeHours.toFixed(1)} hrs</span>
+                          <span className="value">{snapshot.productionOvertimeHours?.toFixed(1)} hrs</span>
                         </div>
                       )}
                       <div className="data-row">
