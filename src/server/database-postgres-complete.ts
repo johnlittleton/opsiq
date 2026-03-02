@@ -289,6 +289,11 @@ export class DatabaseService implements IDatabaseService {
         ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS country_of_origin TEXT;
       `);
 
+      // Add lead column to work_orders if it doesn't exist (migration)
+      await client.query(`
+        ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS lead TEXT;
+      `);
+
       // Add overtime columns to labor_snapshots if they don't exist (migration)
       await client.query(`
         ALTER TABLE labor_snapshots ADD COLUMN IF NOT EXISTS warehouse_overtime_hours REAL DEFAULT 0;

@@ -17,7 +17,7 @@ const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', 
 
 const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
 const BAG_SIZES = ['4X5', '4X8', '5X6', '5X8', '6X3', '6X5', '7X4', '8X5', '9X3', '10X3', '10X4', '12X3', '15X2', '17X2', '17KG', '18X2', '18KG'];
-const CUSTOMERS = ['Kings River', 'Limoneira', 'Fresh Taste', 'Produce Depot', 'Slingshot'];
+const CUSTOMERS = ['Kings River', 'Limoneira', 'Fresh Taste', 'Produce Depot', 'Slingshot', 'Vanguard'];
 const PRIORITIES = ['High', 'Normal', 'Low'];
 const COUNTRIES = ['USA', 'Mexico', 'Chile', 'Peru', 'South Africa', 'Spain', 'Australia', 'Morocco'];
 
@@ -29,6 +29,7 @@ interface WorkOrder {
   product?: string;
   bagSize?: string;
   customer?: string;
+  lead?: string;
   countryOfOrigin?: string;
   numPallets?: number;
   labor?: number;
@@ -651,6 +652,15 @@ export default function ProductionScheduler() {
                     <option value="">Select...</option>
                     {CUSTOMERS.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
+                </div>
+                <div className="form-group">
+                  <label>Lead</label>
+                  <input
+                    type="text"
+                    placeholder="Lead name..."
+                    value={editingWorkOrder.lead || ''}
+                    onChange={(e) => setEditingWorkOrder({ ...editingWorkOrder, lead: e.target.value })}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Country of Origin</label>

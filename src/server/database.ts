@@ -212,6 +212,7 @@ export class DatabaseService implements IDatabaseService {
         product TEXT,
         bagSize TEXT,
         customer TEXT,
+        lead TEXT,
         countryOfOrigin TEXT,
         numPallets INTEGER,
         labor INTEGER,
