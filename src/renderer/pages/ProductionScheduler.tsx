@@ -19,7 +19,7 @@ const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'A
 const BAG_SIZES = ['4X5', '4X8', '5X6', '5X8', '6X3', '6X5', '7X4', '8X5', '9X3', '10X3', '10X4', '12X3', '15X2', '17X2', '17KG', '18X2', '18KG'];
 const CUSTOMERS = ['Kings River', 'Limoneira', 'Fresh Taste', 'Produce Depot', 'Slingshot'];
 const PRIORITIES = ['High', 'Normal', 'Low'];
-const COUNTRIES = ['USA', 'Mexico', 'Chile', 'Peru', 'South Africa', 'Spain', 'Australia'];
+const COUNTRIES = ['USA', 'Mexico', 'Chile', 'Peru', 'South Africa', 'Spain', 'Australia', 'Morocco'];
 
 interface WorkOrder {
   id: string;
