@@ -132,11 +132,20 @@ export default function ProductionDashboard() {
     return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
   };
 
+  const getBagsPerCase = (wo: any): number => {
+    // Parse bagSize like "12X3" to extract bags per case (first number)
+    if (!wo?.bagSize) return 1;
+    const match = wo.bagSize.match(/^(\d+)X/i);
+    return match ? parseInt(match[1], 10) : 1;
+  };
+
   const calculateRequiredRate = (wo: any) => {
     if (!wo || !wo.targetCases || !wo.startTimestamp) return '--';
     // Calculate bags per minute needed to complete target in 8 hours
     const targetMinutes = 480; // 8 hours
-    return Math.round(wo.targetCases / targetMinutes);
+    const casesPerMin = wo.targetCases / targetMinutes;
+    const bagsPerCase = getBagsPerCase(wo);
+    return Math.round(casesPerMin * bagsPerCase);
   };
 
   const calculateCurrentRate = (wo: any) => {
@@ -144,7 +153,9 @@ export default function ProductionDashboard() {
     const elapsedMs = (wo.elapsedMs || 0) + (wo.isPaused ? 0 : Date.now() - wo.startTimestamp);
     const elapsedMinutes = elapsedMs / 60000;
     if (elapsedMinutes === 0) return '--';
-    return Math.round(wo.completedCases / elapsedMinutes);
+    const casesPerMin = wo.completedCases / elapsedMinutes;
+    const bagsPerCase = getBagsPerCase(wo);
+    return Math.round(casesPerMin * bagsPerCase);
   };
 
   const hasDriverAlertForLine = (lineId: number): boolean => {
