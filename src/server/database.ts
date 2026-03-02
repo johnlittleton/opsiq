@@ -2400,7 +2400,7 @@ export class DatabaseService implements IDatabaseService {
         DATE(closedAt) as date,
         inboundOutbound,
         COUNT(*) as count,
-        COALESCE(SUM(actualPallets), SUM(pallets)) as totalPallets
+        SUM(COALESCE(actualPallets, pallets, 0)) as totalPallets
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND closedAt >= ? AND closedAt <= ?
@@ -2457,14 +2457,15 @@ export class DatabaseService implements IDatabaseService {
     const palletsFlow = this.db.prepare(`
       SELECT 
         DATE(closedAt) as date,
-        SUM(CASE WHEN inboundOutbound = 'Inbound' THEN COALESCE(actualPallets, pallets) ELSE 0 END) as received,
-        SUM(CASE WHEN inboundOutbound = 'Outbound' THEN COALESCE(actualPallets, pallets) ELSE 0 END) as shipped
+        SUM(CASE WHEN inboundOutbound = 'Inbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) as received,
+        SUM(CASE WHEN inboundOutbound = 'Outbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) as shipped
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND closedAt >= ? AND closedAt <= ?
       GROUP BY DATE(closedAt)
       ORDER BY date
     `).all(start, end) as any[];
+    console.log('📦 Pallets Flow Results (SQLite):', palletsFlow);
 
     // 6. Appointments vs Walk-ins
     const appointmentStats = this.db.prepare(`

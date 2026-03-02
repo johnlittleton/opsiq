@@ -2448,7 +2448,7 @@ export class DatabaseService implements IDatabaseService {
         DATE(closed_at) as date,
         inbound_outbound as type,
         COUNT(*) as count,
-        COALESCE(SUM(actual_pallets), SUM(pallets)) as total_pallets
+        SUM(COALESCE(actual_pallets, pallets, 0)) as total_pallets
       FROM dock_checkins
       WHERE closed_at IS NOT NULL
         AND closed_at >= $1 AND closed_at <= $2
@@ -2519,19 +2519,21 @@ export class DatabaseService implements IDatabaseService {
     const palletsFlowResult = await this.pool.query(`
       SELECT 
         DATE(closed_at) as date,
-        SUM(CASE WHEN inbound_outbound = 'Inbound' THEN COALESCE(actual_pallets, pallets) ELSE 0 END) as received,
-        SUM(CASE WHEN inbound_outbound = 'Outbound' THEN COALESCE(actual_pallets, pallets) ELSE 0 END) as shipped
+        SUM(CASE WHEN inbound_outbound = 'Inbound' THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) as received,
+        SUM(CASE WHEN inbound_outbound = 'Outbound' THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) as shipped
       FROM dock_checkins
       WHERE closed_at IS NOT NULL
         AND closed_at >= $1 AND closed_at <= $2
       GROUP BY DATE(closed_at)
       ORDER BY date
     `, [start, end]);
+    console.log('📦 Pallets Flow Raw Results:', palletsFlowResult.rows);
     const palletsFlow = palletsFlowResult.rows.map(row => ({
       date: row.date,
       received: parseInt(row.received) || 0,
       shipped: parseInt(row.shipped) || 0
     }));
+    console.log('📦 Pallets Flow Mapped:', palletsFlow);
 
     // 6. Appointments vs Walk-ins
     const appointmentStatsResult = await this.pool.query(`
