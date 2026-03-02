@@ -133,9 +133,9 @@ export default function ProductionDashboard() {
   };
 
   const getBagsPerCase = (wo: any): number => {
-    // Parse bagSize like "12X3" to extract bags per case (first number)
+    // Parse bagSize like "12X3" or "17KG" to extract bags per case (first number)
     if (!wo?.bagSize) return 1;
-    const match = wo.bagSize.match(/^(\d+)X/i);
+    const match = wo.bagSize.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : 1;
   };
 
