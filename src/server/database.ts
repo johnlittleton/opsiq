@@ -1288,10 +1288,10 @@ export class DatabaseService implements IDatabaseService {
   startOrGetShiftSession(shiftNumber: number, shiftName: string, warehouseHeadcount: number, productionHeadcount: number): any {
     const today = getLocalISOString().split('T')[0];
     
-    // Check if shift already exists today
+    // Check if ACTIVE shift already exists today
     const existing = this.db.prepare(`
       SELECT * FROM shift_sessions 
-      WHERE date = ? AND shiftNumber = ?
+      WHERE date = ? AND shiftNumber = ? AND status = 'active'
     `).get(today, shiftNumber) as any;
 
     if (existing) {

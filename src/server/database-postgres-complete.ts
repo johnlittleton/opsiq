@@ -1445,18 +1445,18 @@ export class DatabaseService implements IDatabaseService {
     const today = getLocalISOString().split('T')[0];
     console.log('🚀 startOrGetShiftSession called:', { today, shiftNumber, shiftName, warehouseHeadcount, productionHeadcount });
     
-    // Check if shift already exists today
+    // Check if ACTIVE shift already exists today
     const existingResult = await this.pool.query(`
       SELECT * FROM shift_sessions 
-      WHERE date = $1 AND shift_number = $2
+      WHERE date = $1 AND shift_number = $2 AND status = 'active'
     `, [today, shiftNumber]);
 
     if (existingResult.rows.length > 0) {
-      console.log('✅ Shift already exists:', existingResult.rows[0]);
+      console.log('✅ Active shift already exists:', existingResult.rows[0]);
       return this.toCamelCase(existingResult.rows[0]);
     }
 
-    console.log('📝 Creating new shift session...');
+    console.log('📝 Creating new shift session (no active shift found)...');
     // Create new shift session
     const now = getLocalISOString();
     const result = await this.pool.query(`
