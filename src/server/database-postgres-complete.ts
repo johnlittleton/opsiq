@@ -1662,16 +1662,15 @@ export class DatabaseService implements IDatabaseService {
 
     console.log('📊 getExecutiveMetrics query:', { start, end });
 
-    // Get completed checkins for the period
+    // Get ALL completed checkins (all-time data for trucks and operators)
     const completedResult = await this.pool.query(`
       SELECT * FROM dock_checkins
       WHERE closed_at IS NOT NULL
-        AND closed_at >= $1 AND closed_at <= $2
         AND total_minutes IS NOT NULL
-    `, [start, end]);
+    `);
     
     const completedCheckins = this.toCamelCase(completedResult.rows);
-    console.log('📊 Found completed checkins:', completedCheckins.length);
+    console.log('📊 Found ALL-TIME completed checkins:', completedCheckins.length);
     if (completedCheckins.length > 0) {
       console.log('📊 Sample checkin:', completedCheckins[0]);
       console.log('📊 First 3 forklift drivers:', completedCheckins.slice(0, 3).map((c: any) => c.forkliftDriver));
@@ -1696,17 +1695,8 @@ export class DatabaseService implements IDatabaseService {
       ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
       : 0;
 
-    // Top operators - ALL TIME (not filtered by date range)
-    const allCompletedResult = await this.pool.query(`
-      SELECT forklift_driver, actual_pallets, pallets, total_minutes
-      FROM dock_checkins
-      WHERE closed_at IS NOT NULL
-        AND total_minutes IS NOT NULL
-        AND forklift_driver IS NOT NULL
-    `);
-    
-    const allCompletedCheckins = this.toCamelCase(allCompletedResult.rows);
-    console.log('📊 Found ALL-TIME completed checkins for operators:', allCompletedCheckins.length);
+    // Top operators - using same all-time data as truck totals
+    console.log('📊 Calculating top operators from all-time checkins:', completedCheckins.length);
     
     // Normalize driver names to combine variants
     const normalizeDriverName = (name: string): string | null => {
@@ -1728,7 +1718,7 @@ export class DatabaseService implements IDatabaseService {
     
     const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
     
-    allCompletedCheckins.forEach((c: any) => {
+    completedCheckins.forEach((c: any) => {
       const normalizedName = normalizeDriverName(c.forkliftDriver);
       if (!normalizedName) return; // Skip non-approved drivers
       
