@@ -456,6 +456,7 @@ export default function ProductionScheduler() {
                       <td>{wo.product || 'N/A'}</td>
                       <td>{wo.bagSize || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
+                      <td>{wo.lead || 'N/A'}</td>
                       <td>{wo.countryOfOrigin || 'N/A'}</td>
                       <td>
                         <span className={`priority-badge-sm priority-${(wo.priority || 'Normal').toLowerCase()}`}>
@@ -511,6 +512,7 @@ export default function ProductionScheduler() {
                     <th>Product</th>
                     <th>Bag</th>
                     <th>Customer</th>
+                    <th>Lead</th>
                     <th>Country</th>
                     <th>Priority</th>
                     <th>Pallets</th>
@@ -529,6 +531,7 @@ export default function ProductionScheduler() {
                       <td>{wo.product || 'N/A'}</td>
                       <td>{wo.bagSize || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
+                      <td>{wo.lead || 'N/A'}</td>
                       <td>{wo.countryOfOrigin || 'N/A'}</td>
                       <td>
                         <span className={`priority-badge-sm priority-${(wo.priority || 'Normal').toLowerCase()}`}>
@@ -565,6 +568,7 @@ export default function ProductionScheduler() {
                     <th>Line</th>
                     <th>Product</th>
                     <th>Customer</th>
+                    <th>Lead</th>
                     <th>Country</th>
                     <th>Completed</th>
                     <th>Notes</th>
@@ -577,6 +581,7 @@ export default function ProductionScheduler() {
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
+                      <td>{wo.lead || 'N/A'}</td>
                       <td>{wo.countryOfOrigin || 'N/A'}</td>
                       <td><span className="completed-badge-sm">✓ {wo.completedCases || 0} cases</span></td>
                       <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
