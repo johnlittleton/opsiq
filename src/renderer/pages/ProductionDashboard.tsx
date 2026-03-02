@@ -139,6 +139,21 @@ export default function ProductionDashboard() {
     return match ? parseInt(match[1], 10) : 1;
   };
 
+  const calculateRequiredRateCases = (wo: any) => {
+    if (!wo || !wo.targetCases || !wo.startTimestamp) return '--';
+    // Calculate cases per minute needed to complete target in 8 hours
+    const targetMinutes = 480; // 8 hours
+    return (wo.targetCases / targetMinutes).toFixed(1);
+  };
+
+  const calculateCurrentRateCases = (wo: any) => {
+    if (!wo || !wo.completedCases || !wo.startTimestamp) return '--';
+    const elapsedMs = (wo.elapsedMs || 0) + (wo.isPaused ? 0 : Date.now() - wo.startTimestamp);
+    const elapsedMinutes = elapsedMs / 60000;
+    if (elapsedMinutes === 0) return '--';
+    return (wo.completedCases / elapsedMinutes).toFixed(1);
+  };
+
   const calculateRequiredRate = (wo: any) => {
     if (!wo || !wo.targetCases || !wo.startTimestamp) return '--';
     // Calculate bags per minute needed to complete target in 8 hours
@@ -271,6 +286,16 @@ export default function ProductionDashboard() {
                       <div className="metric">
                         <span className="metric-label">Current Rate:</span>
                         <span className="metric-value current-rate">{calculateCurrentRate(wo)} bags/min</span>
+                      </div>
+                    </div>
+                    <div className="metric-row">
+                      <div className="metric">
+                        <span className="metric-label">Required Rate (Cases):</span>
+                        <span className="metric-value required-rate">{calculateRequiredRateCases(wo)} cases/min</span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">Current Rate (Cases):</span>
+                        <span className="metric-value current-rate">{calculateCurrentRateCases(wo)} cases/min</span>
                       </div>
                     </div>
                     <div className="metric-row">
