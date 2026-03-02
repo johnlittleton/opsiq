@@ -126,24 +126,33 @@ const ExecutiveDashboard: React.FC = () => {
       }
       const data = await response.json();
       console.log('✅ Active shift data:', data);
-      setCurrentShift(data);
+      
+      // Only update state if data actually changed (prevents unnecessary re-renders)
+      setCurrentShift(prevShift => {
+        if (!prevShift || 
+            prevShift.id !== data.id || 
+            prevShift.elapsedMinutes !== data.elapsedMinutes ||
+            prevShift.runningLaborCost !== data.runningLaborCost) {
+          return data;
+        }
+        return prevShift;
+      });
     } catch (error) {
       console.error('❌ Failed to fetch current shift:', error);
       setCurrentShift(null);
     }
   };
 
-  // Auto-update shift and metrics every minute
+  // Auto-update shift every minute (without reloading all metrics)
   useEffect(() => {
     if (!isAuthenticated) return;
     
     // Initial fetch for shift only (metrics already loaded by dateRange useEffect)
     fetchCurrentShift();
     
-    // Set up interval to update every 60 seconds
+    // Set up interval to update shift only every 60 seconds
     const interval = setInterval(() => {
-      fetchCurrentShift();
-      loadMetrics();
+      fetchCurrentShift(); // Only update shift, not metrics
     }, 60000);
     
     // Cleanup
