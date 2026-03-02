@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { API_BASE } from './config';
 import {
   DockDoorWithCheckin,
   CreateCheckinRequest,
@@ -12,18 +13,7 @@ import {
   DoorStatus,
 } from '../shared/types';
 
-// Use environment variable if set, otherwise default to localhost
-const DEFAULT_API_URL = 'http://localhost:3000';
-const API_BASE = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
-const SOCKET_URL = import.meta.env.VITE_API_URL || DEFAULT_API_URL;
-
-// Debug logging
-console.log('🔧 API Configuration:', {
-  VITE_API_URL: import.meta.env.VITE_API_URL,
-  API_BASE,
-  SOCKET_URL,
-  allEnvVars: import.meta.env
-});
+const SOCKET_URL = API_BASE;
 
 class ApiClient {
   public socket: Socket | null = null;

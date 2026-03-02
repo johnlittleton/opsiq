@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../services/config';
 import './WorkOrderHistory.css';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function WorkOrderHistory() {
   const navigate = useNavigate();

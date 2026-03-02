@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../services/config';
 import './DowntimeTracker.css';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const DOWNTIME_REASONS = [
   'No fruit',

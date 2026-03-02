@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
+import { API_BASE } from '../services/config';
 import './DriverWaitingTicker.css';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 interface DriverAlert {
   pickupNumber: string;

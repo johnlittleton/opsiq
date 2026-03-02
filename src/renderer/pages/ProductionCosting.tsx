@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { GlassPanel, StatPanel } from '../components';
 import { useAuth } from '../context/AuthContext';
 import PinEntry from '../components/PinEntry';
 import './ProductionCosting.css';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 interface CostingData {
   dateRange: { start: string; end: string };

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { GlassPanel } from '../components';
 import { useAuth } from '../context/AuthContext';
@@ -20,8 +21,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import './ExecutiveAnalytics.css';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 interface AnalyticsData {
   lineOutput: Array<{ line: number; totalCases: number }>;

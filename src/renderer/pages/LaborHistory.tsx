@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE } from '../services/config';
 import { GlassPanel } from '../components';
 import { TitleBar } from '../../components/layout/TitleBar';
 import './LaborHistory.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const SR_HOURLY_WAGE = 27; // Warehouse
 const PROD_HOURLY_WAGE = 24.50; // Production
 

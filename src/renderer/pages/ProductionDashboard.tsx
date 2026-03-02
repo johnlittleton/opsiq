@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { API_BASE } from '../services/config';
 import './ProductionDashboard.css';
 import DriverWaitingTicker from '../components/DriverWaitingTicker';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const LINES = [
   { id: 1, name: 'Giro Line 1' },
