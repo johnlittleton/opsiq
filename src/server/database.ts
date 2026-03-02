@@ -1717,7 +1717,9 @@ export class DatabaseService implements IDatabaseService {
     const totalCasesCompleted = this.db.prepare(`
       SELECT COALESCE(SUM(completedCases), 0) as total
       FROM work_orders
-      WHERE createdAt >= ? AND createdAt <= ?
+      WHERE completedCases > 0
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
     `).get(start, end) as any;
 
     // Production metrics - bags completed in date range (cases × bags per case)
@@ -1725,7 +1727,8 @@ export class DatabaseService implements IDatabaseService {
       SELECT bagSize, completedCases
       FROM work_orders
       WHERE completedCases > 0
-        AND createdAt >= ? AND createdAt <= ?
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
     `).all(start, end) as any[];
     const totalBags = bagsRows.reduce((sum, row) => {
       const bagsPerCase = this.parseBagsPerCase(row.bagSize);
@@ -1740,7 +1743,9 @@ export class DatabaseService implements IDatabaseService {
     const casesCompletedYTD = this.db.prepare(`
       SELECT COALESCE(SUM(completedCases), 0) as total
       FROM work_orders
-      WHERE createdAt >= ? AND createdAt <= ?
+      WHERE completedCases > 0
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
     `).get(ytdStart, ytdEnd) as any;
 
     // Bags YTD
@@ -1748,7 +1753,8 @@ export class DatabaseService implements IDatabaseService {
       SELECT bagSize, completedCases
       FROM work_orders
       WHERE completedCases > 0
-        AND createdAt >= ? AND createdAt <= ?
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
     `).all(ytdStart, ytdEnd) as any[];
     const totalBagsYTD = bagsYTDRows.reduce((sum, row) => {
       const bagsPerCase = this.parseBagsPerCase(row.bagSize);
@@ -1759,7 +1765,9 @@ export class DatabaseService implements IDatabaseService {
     const bestLine = this.db.prepare(`
       SELECT line, COALESCE(SUM(completedCases), 0) as totalCases
       FROM work_orders
-      WHERE createdAt >= ? AND createdAt <= ?
+      WHERE completedCases > 0
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
       GROUP BY line
       ORDER BY totalCases DESC
       LIMIT 1
@@ -1808,7 +1816,8 @@ export class DatabaseService implements IDatabaseService {
     const workOrders = this.db.prepare(`
       SELECT * FROM work_orders
       WHERE completedCases > 0
-        AND createdAt >= ? AND createdAt <= ?
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
     `).all(start, end) as any[];
 
     // Aggregate by commodity/product
@@ -2360,7 +2369,8 @@ export class DatabaseService implements IDatabaseService {
       SELECT line, bagSize, completedCases
       FROM work_orders
       WHERE completedCases > 0
-        AND createdAt >= ? AND createdAt <= ?
+        AND status = 'Completed'
+        AND updatedAt >= ? AND updatedAt <= ?
     `).all(start, end) as any[];
     
     // Aggregate by line with bags calculation

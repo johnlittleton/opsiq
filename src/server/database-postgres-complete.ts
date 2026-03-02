@@ -1741,7 +1741,9 @@ export class DatabaseService implements IDatabaseService {
     const totalCasesResult = await this.pool.query(`
       SELECT COALESCE(SUM(completed_cases), 0) as total
       FROM work_orders
-      WHERE created_at >= $1 AND created_at <= $2
+      WHERE completed_cases > 0
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
     `, [start, end]);
 
     // Production metrics - bags completed in date range (cases × bags per case)
@@ -1749,7 +1751,8 @@ export class DatabaseService implements IDatabaseService {
       SELECT bag_size, completed_cases
       FROM work_orders
       WHERE completed_cases > 0
-        AND created_at >= $1 AND created_at <= $2
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
     `, [start, end]);
     const totalBags = bagsResult.rows.reduce((sum, row) => {
       const bagsPerCase = this.parseBagsPerCase(row.bag_size);
@@ -1764,7 +1767,9 @@ export class DatabaseService implements IDatabaseService {
     const casesYTDResult = await this.pool.query(`
       SELECT COALESCE(SUM(completed_cases), 0) as total
       FROM work_orders
-      WHERE created_at >= $1 AND created_at <= $2
+      WHERE completed_cases > 0
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
     `, [ytdStart, ytdEnd]);
 
     // Bags YTD
@@ -1772,7 +1777,8 @@ export class DatabaseService implements IDatabaseService {
       SELECT bag_size, completed_cases
       FROM work_orders
       WHERE completed_cases > 0
-        AND created_at >= $1 AND created_at <= $2
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
     `, [ytdStart, ytdEnd]);
     const totalBagsYTD = bagsYTDResult.rows.reduce((sum, row) => {
       const bagsPerCase = this.parseBagsPerCase(row.bag_size);
@@ -1783,7 +1789,9 @@ export class DatabaseService implements IDatabaseService {
     const bestLineResult = await this.pool.query(`
       SELECT line, COALESCE(SUM(completed_cases), 0) as total_cases
       FROM work_orders
-      WHERE created_at >= $1 AND created_at <= $2
+      WHERE completed_cases > 0
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
       GROUP BY line
       ORDER BY total_cases DESC
       LIMIT 1
@@ -1832,7 +1840,8 @@ export class DatabaseService implements IDatabaseService {
     const result = await this.pool.query(`
       SELECT * FROM work_orders
       WHERE completed_cases > 0
-        AND created_at >= $1 AND created_at <= $2
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
     `, [start, end]);
     
     const workOrders = this.toCamelCase(result.rows);
@@ -2408,7 +2417,8 @@ export class DatabaseService implements IDatabaseService {
       SELECT line, bag_size, completed_cases
       FROM work_orders
       WHERE completed_cases > 0
-        AND created_at >= $1 AND created_at <= $2
+        AND status = 'Completed'
+        AND updated_at >= $1 AND updated_at <= $2
     `, [start, end]);
     
     // Aggregate by line with bags calculation
