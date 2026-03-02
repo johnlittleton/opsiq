@@ -57,6 +57,10 @@ export default function LaborTracker() {
   const [loading, setLoading] = useState(false);
   const [endingShift, setEndingShift] = useState(false);
   const [startingShift, setStartingShift] = useState(false);
+  const [showStartShiftModal, setShowStartShiftModal] = useState(false);
+  const [newShiftName, setNewShiftName] = useState('');
+  const [newWarehouseHeadcount, setNewWarehouseHeadcount] = useState('');
+  const [newProductionHeadcount, setNewProductionHeadcount] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -87,14 +91,10 @@ export default function LaborTracker() {
   };
 
   const handleStartShift = async () => {
-    const shiftName = prompt('Enter shift name (e.g., "Day Shift", "Shift A"):');
-    if (!shiftName) return;
-
-    const warehouse = prompt('Enter initial warehouse headcount:');
-    if (!warehouse) return;
-
-    const production = prompt('Enter initial production headcount:');
-    if (!production) return;
+    if (!newShiftName || !newWarehouseHeadcount || !newProductionHeadcount) {
+      setError('Please fill in all shift details');
+      return;
+    }
 
     setStartingShift(true);
     try {
@@ -102,9 +102,9 @@ export default function LaborTracker() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          shiftName,
-          warehouseHeadcount: parseInt(warehouse),
-          productionHeadcount: parseInt(production),
+          shiftName: newShiftName,
+          warehouseHeadcount: parseInt(newWarehouseHeadcount),
+          productionHeadcount: parseInt(newProductionHeadcount),
         }),
       });
 
@@ -112,10 +112,13 @@ export default function LaborTracker() {
       
       const newShift = await response.json();
       setCurrentShift(newShift);
-      alert(`${shiftName} started successfully!`);
+      setShowStartShiftModal(false);
+      setNewShiftName('');
+      setNewWarehouseHeadcount('');
+      setNewProductionHeadcount('');
+      setError(null);
     } catch (err: any) {
       setError(err.message);
-      alert('Failed to start shift: ' + err.message);
     } finally {
       setStartingShift(false);
     }
@@ -245,7 +248,7 @@ export default function LaborTracker() {
           <button
             type="button"
             className="start-shift-btn"
-            onClick={handleStartShift}
+            onClick={() => setShowStartShiftModal(true)}
             disabled={startingShift}
           >
             {startingShift ? '⏳ Starting Shift...' : '🟢 Start New Shift'}
@@ -451,6 +454,80 @@ export default function LaborTracker() {
           </form>
         </GlassPanel>
       </div>
+
+      {/* Start Shift Modal */}
+      {showStartShiftModal && (
+        <div className="modal-overlay" onClick={() => setShowStartShiftModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Start New Shift</h2>
+              <button className="modal-close" onClick={() => setShowStartShiftModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Shift Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Day Shift, Shift A, Night Shift"
+                  value={newShiftName}
+                  onChange={(e) => setNewShiftName(e.target.value)}
+                  autoFocus
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Initial Warehouse Headcount</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={newWarehouseHeadcount}
+                  onChange={(e) => setNewWarehouseHeadcount(e.target.value)}
+                  min="0"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Initial Production Headcount</label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={newProductionHeadcount}
+                  onChange={(e) => setNewProductionHeadcount(e.target.value)}
+                  min="0"
+                />
+              </div>
+
+              {error && (
+                <div className="error-message">{error}</div>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button 
+                className="btn-cancel" 
+                onClick={() => {
+                  setShowStartShiftModal(false);
+                  setNewShiftName('');
+                  setNewWarehouseHeadcount('');
+                  setNewProductionHeadcount('');
+                  setError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleStartShift}
+                disabled={startingShift || !newShiftName || !newWarehouseHeadcount || !newProductionHeadcount}
+              >
+                {startingShift ? '⏳ Starting...' : '🟢 Start Shift'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
     </div>
   );
