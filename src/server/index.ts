@@ -467,7 +467,7 @@ io.on('connection', (socket) => {
 app.post('/api/labor/snapshot', async (req, res) => {
   try {
     const data = req.body;
-    const result = db.createLaborSnapshot(data);
+    const result = await db.createLaborSnapshot(data);
     
     // Broadcast update to all clients
     io.emit('labor:updated', result);
@@ -481,7 +481,7 @@ app.post('/api/labor/snapshot', async (req, res) => {
 // Get latest labor snapshot
 app.get('/api/labor/latest', async (req, res) => {
   try {
-    const latest = db.getLatestLaborSnapshot();
+    const latest = await db.getLatestLaborSnapshot();
     res.json(latest || null);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -497,7 +497,7 @@ app.get('/api/labor/snapshots', async (req, res) => {
       shift: req.query.shift as string,
       limit: req.query.limit ? parseInt(req.query.limit as string) : undefined,
     };
-    const snapshots = db.getLaborSnapshots(options);
+    const snapshots = await db.getLaborSnapshots(options);
     res.json(snapshots);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -507,7 +507,7 @@ app.get('/api/labor/snapshots', async (req, res) => {
 // Get labor summary
 app.get('/api/labor/summary', async (req, res) => {
   try {
-    const summary = db.getLaborSummary();
+    const summary = await db.getLaborSummary();
     res.json(summary);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
