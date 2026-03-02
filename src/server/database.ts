@@ -444,7 +444,8 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Julia', pin: '45129' },
         { name: 'Michelle', pin: '57263' },
         { name: 'Izzy', pin: '69384' },
-        { name: 'John', pin: '78420' }
+        { name: 'John', pin: '78420' },
+        { name: 'Ryan', pin: '34090' }
       ];
 
       const insertExec = this.db.prepare(`
@@ -2274,7 +2275,8 @@ export class DatabaseService implements IDatabaseService {
       { name: 'Julia', pin: '45129' },
       { name: 'Michelle', pin: '57263' },
       { name: 'Izzy', pin: '69384' },
-      { name: 'John', pin: '78420' }
+      { name: 'John', pin: '78420' },
+      { name: 'Ryan', pin: '34090' }
     ];
 
     const insert = this.db.prepare(`
@@ -2286,7 +2288,7 @@ export class DatabaseService implements IDatabaseService {
       insert.run(exec.name, exec.pin, now, now);
     }
     
-    console.log('✓ Force-seeded 7 executives');
+    console.log('✓ Force-seeded 8 executives');
     return this.getExecutives();
   }
 

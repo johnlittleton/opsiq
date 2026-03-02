@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { GlassPanel, StatPanel } from '../components';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { API_BASE } from '../services/config';
+import { useAuth } from '../context/AuthContext';
+import PinEntry from '../components/PinEntry';
 import './LaborTracker.css';
 
 const SR_HOURLY_WAGE = 27; // Warehouse
@@ -47,6 +49,7 @@ interface CurrentShift {
 
 export default function LaborTracker() {
   const navigate = useNavigate();
+  const { isAuthenticated, executiveName, login, logout } = useAuth();
   const [shippingHeadcount, setShippingHeadcount] = useState('');
   const [productionHeadcount, setProductionHeadcount] = useState('');
   const [warehouseOvertimeHours, setWarehouseOvertimeHours] = useState('');
@@ -70,14 +73,28 @@ export default function LaborTracker() {
   const [error, setError] = useState<string | null>(null);
   const [endingShift, setEndingShift] = useState(false);
 
+  // Handle successful PIN entry
+  const handlePinSuccess = (name: string) => {
+    login(name);
+  };
+
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     fetchSummary();
     fetchCurrentShift();
     
     // Poll for current shift every 30 seconds
     const interval = setInterval(fetchCurrentShift, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
+
+  // Auto-fill recordedBy with authenticated executive's name
+  useEffect(() => {
+    if (executiveName && !recordedBy) {
+      setRecordedBy(executiveName);
+    }
+  }, [executiveName]);
 
   const fetchSummary = async () => {
     try {
@@ -228,6 +245,11 @@ export default function LaborTracker() {
   };
 
   const preview = calculatePreview();
+
+  // Show PIN entry if not authenticated
+  if (!isAuthenticated) {
+    return <PinEntry onSuccess={handlePinSuccess} />;
+  }
 
   return (
     <div className="labor-tracker">
@@ -404,6 +426,12 @@ export default function LaborTracker() {
                   onChange={(e) => setRecordedBy(e.target.value)}
                   placeholder="Your name"
                   required
+                  readOnly
+                  style={{
+                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                    cursor: 'not-allowed',
+                    opacity: 0.9
+                  }}
                 />
               </div>
 

@@ -368,7 +368,8 @@ export class DatabaseService implements IDatabaseService {
           { name: 'Julia', pin: '45129' },
           { name: 'Michelle', pin: '57263' },
           { name: 'Izzy', pin: '69384' },
-          { name: 'John', pin: '78420' }
+          { name: 'John', pin: '78420' },
+          { name: 'Ryan', pin: '34090' }
         ];
 
         for (const exec of executives) {
@@ -377,7 +378,7 @@ export class DatabaseService implements IDatabaseService {
             VALUES ($1, $2, true)
           `, [exec.name, exec.pin]);
         }
-        console.log('✓ Initialized 7 executives with PINs');
+        console.log('✓ Initialized 8 executives with PINs');
       }
 
       // Seed production dock statuses if empty
@@ -2361,7 +2362,8 @@ export class DatabaseService implements IDatabaseService {
       { name: 'Julia', pin: '45129' },
       { name: 'Michelle', pin: '57263' },
       { name: 'Izzy', pin: '69384' },
-      { name: 'John', pin: '78420' }
+      { name: 'John', pin: '78420' },
+      { name: 'Ryan', pin: '34090' }
     ];
 
     for (const exec of executives) {
@@ -2371,7 +2373,7 @@ export class DatabaseService implements IDatabaseService {
       `, [exec.name, exec.pin]);
     }
     
-    console.log('✓ Force-seeded 7 executives');
+    console.log('✓ Force-seeded 8 executives');
     return await this.getExecutives();
   }
 
