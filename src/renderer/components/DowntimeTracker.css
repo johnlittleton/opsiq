@@ -25,9 +25,9 @@
 }
 
 .active-downtimes {
-  position: absolute;
-  top: 50px;
-  right: 0;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
   background: #2a3142;
   border: 1px solid #3a4152;
   border-radius: 8px;
@@ -35,7 +35,7 @@
   min-width: 320px;
   max-width: 400px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  z-index: 1000;
 }
 
 .active-downtimes h3 {

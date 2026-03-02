@@ -394,7 +394,11 @@ export default function ProductionScheduler() {
           <input
             type="date"
             value={selectedDateStr}
-            onChange={(e) => setSelectedDate(new Date(e.target.value))}
+            onChange={(e) => {
+              // Parse date locally without timezone conversion
+              const [year, month, day] = e.target.value.split('-').map(Number);
+              setSelectedDate(new Date(year, month - 1, day));
+            }}
           />
           <DowntimeTracker />
           <button onClick={() => navigate('/production-dashboard')}>
