@@ -2009,11 +2009,11 @@ export class DatabaseService implements IDatabaseService {
       
       const stmt = this.db.prepare(`
         INSERT INTO work_orders (
-          id, line, slot, date, product, bagSize, customer, countryOfOrigin, numPallets, 
+          id, line, slot, date, product, bagSize, customer, lead, countryOfOrigin, numPallets, 
           labor, priority, lot1, lot2, lot3, lot4, notes, status, 
           targetCases, completedCases, startTimestamp, elapsedMs, 
           isPaused, elapsedDisplay, createdAt, updatedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       console.log('  Executing INSERT...');
@@ -2025,6 +2025,7 @@ export class DatabaseService implements IDatabaseService {
         workOrder.product || null,
         workOrder.bagSize || null,
         workOrder.customer || null,
+        workOrder.lead || null,
         workOrder.countryOfOrigin || null,
         workOrder.numPallets || null,
         workOrder.labor || null,

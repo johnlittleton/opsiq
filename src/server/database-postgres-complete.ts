@@ -2052,11 +2052,11 @@ export class DatabaseService implements IDatabaseService {
     const now = getLocalISOString();
     const result = await this.pool.query(`
       INSERT INTO work_orders (
-        id, line, slot, date, product, bag_size, customer, country_of_origin, num_pallets, 
+        id, line, slot, date, product, bag_size, customer, lead, country_of_origin, num_pallets, 
         labor, priority, lot1, lot2, lot3, lot4, notes, status, 
         target_cases, completed_cases, start_timestamp, elapsed_ms, 
         is_paused, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
       RETURNING *
     `, [
       workOrder.id || Date.now().toString(),
@@ -2066,6 +2066,7 @@ export class DatabaseService implements IDatabaseService {
       workOrder.product || null,
       workOrder.bagSize || null,
       workOrder.customer || null,
+      workOrder.lead || null,
       workOrder.countryOfOrigin || null,
       workOrder.numPallets || null,
       workOrder.labor || null,
