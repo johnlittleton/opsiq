@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GlassPanel, StatPanel } from '../components';
 import { TitleBar } from '../../components/layout/TitleBar';
+import { API_BASE } from '../services/config';
 import './LaborTracker.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const SR_HOURLY_WAGE = 27; // Warehouse
 const PROD_HOURLY_WAGE = 24.50; // Production
 
@@ -33,6 +33,18 @@ interface LaborSummary {
   averageProductionHeadcount: number;
 }
 
+interface CurrentShift {
+  id: number;
+  shiftNumber: number;
+  shiftName: string;
+  startTime: string;
+  status: string;
+  elapsedMinutes: number;
+  runningLaborCost: number;
+  currentWarehouseHeadcount: number;
+  currentProductionHeadcount: number;
+}
+
 export default function LaborTracker() {
   const navigate = useNavigate();
   const [shippingHeadcount, setShippingHeadcount] = useState('');
@@ -53,11 +65,18 @@ export default function LaborTracker() {
   
   const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [summary, setSummary] = useState<LaborSummary | null>(null);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [endingShift, setEndingShift] = useState(false);
 
   useEffect(() => {
     fetchSummary();
+    fetchCurrentShift();
+    
+    // Poll for current shift every 30 seconds
+    const interval = setInterval(fetchCurrentShift, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const fetchSummary = async () => {
@@ -68,6 +87,64 @@ export default function LaborTracker() {
       setSummary(data);
     } catch (err: any) {
       console.error('Error fetching summary:', err);
+    }
+  };
+
+  const fetchCurrentShift = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      if (!response.ok) {
+        setCurrentShift(null);
+        return;
+      }
+      const data = await response.json();
+      setCurrentShift(data);
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      setCurrentShift(null);
+    }
+  };
+
+  const handleEndShift = async () => {
+    if (!currentShift) return;
+    
+    const confirmEnd = window.confirm(
+      `End ${currentShift.shiftName} shift?\n\n` +
+      `Elapsed: ${Math.floor(currentShift.elapsedMinutes / 60)}h ${currentShift.elapsedMinutes % 60}m\n` +
+      `Running Cost: $${currentShift.runningLaborCost.toFixed(2)}`
+    );
+    
+    if (!confirmEnd) return;
+    
+    setEndingShift(true);
+    setError(null);
+    
+    try {
+      const endedBy = recordedBy || 'Manager';
+      const response = await fetch(`${API_BASE}/api/labor/shift/${currentShift.shiftNumber}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endedBy }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to end shift');
+      }
+      
+      const result = await response.json();
+      console.log('✅ Shift ended successfully:', result);
+      
+      // Refresh data
+      await fetchCurrentShift();
+      await fetchSummary();
+      
+      alert(`${currentShift.shiftName} shift ended successfully!`);
+    } catch (err: any) {
+      console.error('❌ Error ending shift:', err);
+      setError(err.message);
+    } finally {
+      setEndingShift(false);
     }
   };
 
@@ -130,6 +207,7 @@ export default function LaborTracker() {
 
       // Refresh data
       await fetchSummary();
+      await fetchCurrentShift();
     } catch (err: any) {
       console.error('❌ Error submitting snapshot:', err);
       setError(err.message);
@@ -187,14 +265,64 @@ export default function LaborTracker() {
         <GlassPanel className="labor-tracker__form-panel">
           <div className="labor-tracker__form-header">
             <h2>Record Current Headcount</h2>
-            <button 
-              type="button"
-              className="labor-tracker__history-btn"
-              onClick={() => navigate('/labor-history')}
-            >
-              📊 View History
-            </button>
+            <div className="labor-tracker__header-buttons">
+              {currentShift && (
+                <button 
+                  type="button"
+                  className="labor-tracker__end-shift-btn"
+                  onClick={handleEndShift}
+                  disabled={endingShift}
+                  style={{
+                    padding: '8px 16px',
+                    marginRight: '8px',
+                    backgroundColor: '#ef4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: endingShift ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    opacity: endingShift ? 0.6 : 1,
+                  }}
+                >
+                  {endingShift ? '⏳ Ending...' : `🛑 End ${currentShift.shiftName} Shift`}
+                </button>
+              )}
+              <button 
+                type="button"
+                className="labor-tracker__history-btn"
+                onClick={() => navigate('/labor-history')}
+              >
+                📊 View History
+              </button>
+            </div>
           </div>
+          
+          {/* Active Shift Indicator */}
+          {currentShift && (
+            <div style={{
+              padding: '12px',
+              marginBottom: '16px',
+              backgroundColor: 'rgba(34, 197, 94, 0.1)',
+              border: '1px solid rgba(34, 197, 94, 0.3)',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <div style={{ fontSize: '24px' }}>⏱️</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, color: '#22c55e', marginBottom: '4px' }}>
+                  {currentShift.shiftName} Shift Active
+                </div>
+                <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
+                  Started {new Date(currentShift.startTime).toLocaleTimeString()} • 
+                  Elapsed: {Math.floor(currentShift.elapsedMinutes / 60)}h {currentShift.elapsedMinutes % 60}m • 
+                  Cost: ${currentShift.runningLaborCost.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          )}
           
           {error && (
             <div className="labor-tracker__error">
