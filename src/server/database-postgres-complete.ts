@@ -2095,6 +2095,9 @@ export class DatabaseService implements IDatabaseService {
     let paramCount = 1;
 
     Object.keys(updates).forEach(key => {
+      // Skip updatedAt since we'll add it manually
+      if (key === 'updatedAt' || key === 'updated_at') return;
+      
       const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase();
       fields.push(`${snakeKey} = $${paramCount}`);
       values.push(updates[key]);

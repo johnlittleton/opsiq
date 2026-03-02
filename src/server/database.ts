@@ -2062,6 +2062,9 @@ export class DatabaseService implements IDatabaseService {
     const values = [];
 
     Object.keys(updates).forEach(key => {
+      // Skip updatedAt since we'll add it manually
+      if (key === 'updatedAt' || key === 'updated_at') return;
+      
       fields.push(`${key} = ?`);
       // Convert boolean to integer for SQLite
       const value = updates[key];
