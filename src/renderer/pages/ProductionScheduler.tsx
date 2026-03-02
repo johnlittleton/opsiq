@@ -323,6 +323,7 @@ export default function ProductionScheduler() {
       >
         <div className="wo-number">WO: {wo.id}</div>
         <div className="customer"><b>Customer:</b> {wo.customer || 'N/A'}</div>
+        <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
         <div className="product"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
         <div className="bag-size"><b>Bag Size:</b> {wo.bagSize || 'N/A'}</div>
         <div className="pallets"><b>Pallets:</b> {wo.numPallets || ''}</div>

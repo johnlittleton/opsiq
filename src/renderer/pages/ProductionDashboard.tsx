@@ -245,6 +245,7 @@ export default function ProductionDashboard() {
                 <div className="job-info">
                   <div className="wo-id">SO: {wo.id}</div>
                   <div className="detail"><b>Customer:</b> {wo.customer || 'N/A'}</div>
+                  <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
                   <div className="detail"><b>Country:</b> {wo.countryOfOrigin || 'N/A'}</div>
                   <div className="detail"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
                   <div className="detail"><b>Bag Size:</b> {wo.bagSize || 'N/A'}</div>
