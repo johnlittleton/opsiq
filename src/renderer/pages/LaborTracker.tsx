@@ -53,19 +53,11 @@ export default function LaborTracker() {
   
   const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [summary, setSummary] = useState<LaborSummary | null>(null);
-  const [currentShift, setCurrentShift] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [endingShift, setEndingShift] = useState(false);
-  const [startingShift, setStartingShift] = useState(false);
-  const [showStartShiftModal, setShowStartShiftModal] = useState(false);
-  const [newShiftName, setNewShiftName] = useState('');
-  const [newWarehouseHeadcount, setNewWarehouseHeadcount] = useState('');
-  const [newProductionHeadcount, setNewProductionHeadcount] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSummary();
-    fetchCurrentShift();
   }, []);
 
   const fetchSummary = async () => {
@@ -79,76 +71,9 @@ export default function LaborTracker() {
     }
   };
 
-  const fetchCurrentShift = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
-      if (!response.ok) throw new Error('Failed to fetch current shift');
-      const data = await response.json();
-      setCurrentShift(data);
-    } catch (err: any) {
-      console.error('Error fetching current shift:', err);
-    }
-  };
 
-  const handleStartShift = async () => {
-    if (!newShiftName || !newWarehouseHeadcount || !newProductionHeadcount) {
-      setError('Please fill in all shift details');
-      return;
-    }
 
-    setStartingShift(true);
-    try {
-      const response = await fetch(`${API_BASE}/api/labor/shift/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shiftName: newShiftName,
-          warehouseHeadcount: parseInt(newWarehouseHeadcount),
-          productionHeadcount: parseInt(newProductionHeadcount),
-        }),
-      });
 
-      if (!response.ok) throw new Error('Failed to start shift');
-      
-      const newShift = await response.json();
-      setCurrentShift(newShift);
-      setShowStartShiftModal(false);
-      setNewShiftName('');
-      setNewWarehouseHeadcount('');
-      setNewProductionHeadcount('');
-      setError(null);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setStartingShift(false);
-    }
-  };
-
-  const handleEndShift = async () => {
-    if (!currentShift) return;
-    
-    if (!confirm(`End ${currentShift.shiftName}? This will record the final shift cost of $${currentShift.runningLaborCost?.toFixed(2) || '0.00'}.`)) {
-      return;
-    }
-
-    setEndingShift(true);
-    try {
-      const response = await fetch(`${API_BASE}/api/labor/shift/${currentShift.shiftNumber}/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endedBy: recordedBy || 'Manager' }),
-      });
-
-      if (!response.ok) throw new Error('Failed to end shift');
-      
-      setCurrentShift(null);
-      alert('Shift ended successfully!');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setEndingShift(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,7 +115,6 @@ export default function LaborTracker() {
 
       // Refresh data
       await fetchSummary();
-      await fetchCurrentShift();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -240,55 +164,6 @@ export default function LaborTracker() {
             icon="users"
           />
         </div>
-      )}
-
-      {/* Start Shift Button - Show when no active shift */}
-      {!currentShift && (
-        <div className="start-shift-container">
-          <button
-            type="button"
-            className="start-shift-btn"
-            onClick={() => setShowStartShiftModal(true)}
-            disabled={startingShift}
-          >
-            {startingShift ? '⏳ Starting Shift...' : '🟢 Start New Shift'}
-          </button>
-          <p className="start-shift-hint">Start a shift to track live labor costs and elapsed time</p>
-        </div>
-      )}
-
-      {/* Active Shift Info */}
-      {currentShift && (
-        <GlassPanel className="labor-tracker__shift-panel">
-          <div className="shift-info">
-            <div className="shift-header">
-              <span className="shift-badge active">🟢 {currentShift.shiftName} ACTIVE</span>
-              <span className="shift-time">Started: {new Date(currentShift.startTime).toLocaleTimeString()}</span>
-            </div>
-            <div className="shift-stats">
-              <div className="shift-stat">
-                <span className="label">Elapsed Time:</span>
-                <span className="value">{Math.floor(currentShift.elapsedMinutes / 60)}h {currentShift.elapsedMinutes % 60}m</span>
-              </div>
-              <div className="shift-stat">
-                <span className="label">Running Cost:</span>
-                <span className="value cost">${currentShift.runningLaborCost?.toFixed(2) || '0.00'}</span>
-              </div>
-              <div className="shift-stat">
-                <span className="label">Workers:</span>
-                <span className="value">{currentShift.currentTotalHeadcount}</span>
-              </div>
-            </div>
-            <button 
-              type="button"
-              className="end-shift-btn" 
-              onClick={handleEndShift}
-              disabled={endingShift}
-            >
-              {endingShift ? 'Ending Shift...' : '🛑 End Shift'}
-            </button>
-          </div>
-        </GlassPanel>
       )}
 
       <div className="labor-tracker__content">
@@ -455,78 +330,7 @@ export default function LaborTracker() {
         </GlassPanel>
       </div>
 
-      {/* Start Shift Modal */}
-      {showStartShiftModal && (
-        <div className="modal-overlay" onClick={() => setShowStartShiftModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Start New Shift</h2>
-              <button className="modal-close" onClick={() => setShowStartShiftModal(false)}>×</button>
-            </div>
-            
-            <div className="modal-body">
-              <div className="form-group">
-                <label>Shift Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Day Shift, Shift A, Night Shift"
-                  value={newShiftName}
-                  onChange={(e) => setNewShiftName(e.target.value)}
-                  autoFocus
-                />
-              </div>
 
-              <div className="form-group">
-                <label>Initial Warehouse Headcount</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={newWarehouseHeadcount}
-                  onChange={(e) => setNewWarehouseHeadcount(e.target.value)}
-                  min="0"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Initial Production Headcount</label>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={newProductionHeadcount}
-                  onChange={(e) => setNewProductionHeadcount(e.target.value)}
-                  min="0"
-                />
-              </div>
-
-              {error && (
-                <div className="error-message">{error}</div>
-              )}
-            </div>
-
-            <div className="modal-footer">
-              <button 
-                className="btn-cancel" 
-                onClick={() => {
-                  setShowStartShiftModal(false);
-                  setNewShiftName('');
-                  setNewWarehouseHeadcount('');
-                  setNewProductionHeadcount('');
-                  setError(null);
-                }}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn-primary" 
-                onClick={handleStartShift}
-                disabled={startingShift || !newShiftName || !newWarehouseHeadcount || !newProductionHeadcount}
-              >
-                {startingShift ? '⏳ Starting...' : '🟢 Start Shift'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
     </div>

@@ -1332,16 +1332,17 @@ export class DatabaseService implements IDatabaseService {
     const elapsedMs = now.getTime() - startTime.getTime();
     const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
-    // Get latest labor snapshot for current headcount
+    // Get latest labor snapshot for current headcount (use most recent snapshot today)
+    const todayStart = `${today}T00:00:00`;
     const latestSnapshot = this.db.prepare(`
       SELECT * FROM labor_snapshots 
       WHERE timestamp >= ? 
       ORDER BY timestamp DESC 
       LIMIT 1
-    `).get(activeShift.startTime) as any;
+    `).get(todayStart) as any;
 
-    const currentWarehouseHeadcount = latestSnapshot?.shippingReceivingHeadcount || activeShift.startingWarehouseHeadcount;
-    const currentProductionHeadcount = latestSnapshot?.productionHeadcount || activeShift.startingProductionHeadcount;
+    const currentWarehouseHeadcount = latestSnapshot?.shippingReceivingHeadcount || activeShift.startingWarehouseHeadcount || 0;
+    const currentProductionHeadcount = latestSnapshot?.productionHeadcount || activeShift.startingProductionHeadcount || 0;
 
     // Calculate running cost
     const SR_HOURLY_WAGE = 27;
