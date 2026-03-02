@@ -1443,6 +1443,7 @@ export class DatabaseService implements IDatabaseService {
   // Shift Session Management
   async startOrGetShiftSession(shiftNumber: number, shiftName: string, warehouseHeadcount: number, productionHeadcount: number): Promise<any> {
     const today = getLocalISOString().split('T')[0];
+    console.log('🚀 startOrGetShiftSession called:', { today, shiftNumber, shiftName, warehouseHeadcount, productionHeadcount });
     
     // Check if shift already exists today
     const existingResult = await this.pool.query(`
@@ -1451,9 +1452,11 @@ export class DatabaseService implements IDatabaseService {
     `, [today, shiftNumber]);
 
     if (existingResult.rows.length > 0) {
+      console.log('✅ Shift already exists:', existingResult.rows[0]);
       return this.toCamelCase(existingResult.rows[0]);
     }
 
+    console.log('📝 Creating new shift session...');
     // Create new shift session
     const now = getLocalISOString();
     const result = await this.pool.query(`
@@ -1465,11 +1468,13 @@ export class DatabaseService implements IDatabaseService {
       RETURNING *
     `, [today, shiftNumber, shiftName, now, 'active', warehouseHeadcount, productionHeadcount, 0, 0]);
 
+    console.log('✅ Shift created successfully:', result.rows[0]);
     return this.toCamelCase(result.rows[0]);
   }
 
   async getCurrentShiftSession(): Promise<any> {
     const today = getLocalISOString().split('T')[0];
+    console.log('🔍 getCurrentShiftSession called for date:', today);
     
     // Get active shift for today
     const shiftResult = await this.pool.query(`
@@ -1479,11 +1484,18 @@ export class DatabaseService implements IDatabaseService {
       LIMIT 1
     `, [today]);
 
+    console.log('Query result:', {
+      rowCount: shiftResult.rows.length,
+      rows: shiftResult.rows
+    });
+
     if (shiftResult.rows.length === 0) {
+      console.log('❌ No active shift found for today');
       return null;
     }
 
     const activeShift = this.toCamelCase(shiftResult.rows[0]);
+    console.log('✅ Found active shift:', activeShift);
 
     // Calculate elapsed time
     const startTime = new Date(activeShift.startTime);
