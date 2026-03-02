@@ -524,6 +524,33 @@ app.get('/api/labor/shift/current', async (req, res) => {
   }
 });
 
+// Start new shift session
+app.post('/api/labor/shift/start', async (req, res) => {
+  try {
+    const { shiftName, warehouseHeadcount, productionHeadcount } = req.body;
+    
+    if (!shiftName || warehouseHeadcount === undefined || productionHeadcount === undefined) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Determine shift number from name
+    const shiftNumber = shiftName.toLowerCase().includes('2') || 
+                        shiftName.toLowerCase().includes('night') || 
+                        shiftName.toLowerCase().includes('b') ? 2 : 1;
+
+    const shift = await db.startOrGetShiftSession(
+      shiftNumber, 
+      shiftName, 
+      warehouseHeadcount, 
+      productionHeadcount
+    );
+    
+    res.json(shift);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // End shift session
 app.post('/api/labor/shift/:shiftNumber/end', async (req, res) => {
   try {

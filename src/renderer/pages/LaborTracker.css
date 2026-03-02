@@ -213,6 +213,44 @@
   font-size: 24px;
 }
 
+/* Start Shift Section */
+.start-shift-container {
+  text-align: center;
+  padding: 32px;
+  margin-bottom: 20px;
+}
+
+.start-shift-btn {
+  padding: 16px 32px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 2px solid rgba(34, 197, 94, 0.4);
+  border-radius: 12px;
+  color: #22c55e;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 12px;
+}
+
+.start-shift-btn:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.25);
+  border-color: rgba(34, 197, 94, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.3);
+}
+
+.start-shift-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.start-shift-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
 .end-shift-btn {
   padding: 12px 24px;
   background: rgba(239, 68, 68, 0.1);

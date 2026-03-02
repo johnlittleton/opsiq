@@ -56,6 +56,7 @@ export default function LaborTracker() {
   const [currentShift, setCurrentShift] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [endingShift, setEndingShift] = useState(false);
+  const [startingShift, setStartingShift] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -82,6 +83,41 @@ export default function LaborTracker() {
       setCurrentShift(data);
     } catch (err: any) {
       console.error('Error fetching current shift:', err);
+    }
+  };
+
+  const handleStartShift = async () => {
+    const shiftName = prompt('Enter shift name (e.g., "Day Shift", "Shift A"):');
+    if (!shiftName) return;
+
+    const warehouse = prompt('Enter initial warehouse headcount:');
+    if (!warehouse) return;
+
+    const production = prompt('Enter initial production headcount:');
+    if (!production) return;
+
+    setStartingShift(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shiftName,
+          warehouseHeadcount: parseInt(warehouse),
+          productionHeadcount: parseInt(production),
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to start shift');
+      
+      const newShift = await response.json();
+      setCurrentShift(newShift);
+      alert(`${shiftName} started successfully!`);
+    } catch (err: any) {
+      setError(err.message);
+      alert('Failed to start shift: ' + err.message);
+    } finally {
+      setStartingShift(false);
     }
   };
 
@@ -200,6 +236,21 @@ export default function LaborTracker() {
             value={summary.currentTotalHeadcount || 0}
             icon="users"
           />
+        </div>
+      )}
+
+      {/* Start Shift Button - Show when no active shift */}
+      {!currentShift && (
+        <div className="start-shift-container">
+          <button
+            type="button"
+            className="start-shift-btn"
+            onClick={handleStartShift}
+            disabled={startingShift}
+          >
+            {startingShift ? '⏳ Starting Shift...' : '🟢 Start New Shift'}
+          </button>
+          <p className="start-shift-hint">Start a shift to track live labor costs and elapsed time</p>
         </div>
       )}
 
