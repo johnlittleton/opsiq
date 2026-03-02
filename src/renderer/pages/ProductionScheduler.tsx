@@ -436,6 +436,7 @@ export default function ProductionScheduler() {
                     <th>Product</th>
                     <th>Bag</th>
                     <th>Customer</th>
+                    <th>Lead</th>
                     <th>Country</th>
                     <th>Priority</th>
                     <th>Pallets</th>
