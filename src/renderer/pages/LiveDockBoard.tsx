@@ -3,6 +3,7 @@ import { useAppStore } from '../store';
 import { apiClient } from '../services/api';
 import { DockDoorWithCheckin, DoorStatus } from '../../shared/types';
 import { formatDistanceToNow } from 'date-fns';
+import { MessageBanner } from '../components/MessageBanner';
 
 const STATUS_COLORS: Record<DoorStatus, string> = {
   Open: 'status-Open',
@@ -11,6 +12,8 @@ const STATUS_COLORS: Record<DoorStatus, string> = {
   Blocked: 'status-Blocked',
   Waiting: 'status-Waiting',
   Parked: 'status-Parked',
+  Dropped: 'status-Dropped',
+  Offline: 'status-Offline',
 };
 
 const FLASH_THRESHOLD_MINUTES = 15;
@@ -209,6 +212,7 @@ const LiveDockBoard: React.FC = () => {
 
   return (
     <div>
+      <MessageBanner channel="shipping-receiving" />
       <h1 className="page-title">Live Dock Board - 39 Doors</h1>
       <div className="dock-grid">
         {doors.map(door => (

@@ -259,6 +259,16 @@ export class DatabaseService implements IDatabaseService {
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS messages (
+          id SERIAL PRIMARY KEY,
+          channel TEXT NOT NULL,
+          sender_name TEXT NOT NULL,
+          message_text TEXT NOT NULL,
+          priority TEXT NOT NULL DEFAULT 'normal',
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          dismissed BOOLEAN DEFAULT false
+        );
+
         CREATE INDEX IF NOT EXISTS idx_checkins_door ON dock_checkins(door_id);
         CREATE INDEX IF NOT EXISTS idx_checkins_status ON dock_checkins(status);
         CREATE INDEX IF NOT EXISTS idx_checkins_created ON dock_checkins(created_at);
@@ -2609,6 +2619,40 @@ export class DatabaseService implements IDatabaseService {
         walkIn: parseInt(appointmentStats.walk_in) || 0,
       }
     };
+  }
+
+  // ==================== MESSAGES ====================
+  
+  async createMessage(channel: string, senderName: string, messageText: string, priority: string): Promise<any> {
+    const result = await this.pool.query(`
+      INSERT INTO messages (channel, sender_name, message_text, priority, created_at, dismissed)
+      VALUES ($1, $2, $3, $4, NOW(), false)
+      RETURNING *
+    `, [channel, senderName, messageText, priority]);
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getMessages(channel: string, limit: number = 50): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT * FROM messages 
+      WHERE channel = $1 AND dismissed = false
+      ORDER BY created_at DESC 
+      LIMIT $2
+    `, [channel, limit]);
+    return this.toCamelCase(result.rows).reverse(); // Reverse to show oldest first
+  }
+
+  async dismissMessage(id: number): Promise<void> {
+    await this.pool.query(`
+      UPDATE messages SET dismissed = true WHERE id = $1
+    `, [id]);
+  }
+
+  async getLatestMessageId(channel: string): Promise<number> {
+    const result = await this.pool.query(`
+      SELECT MAX(id) as latest_id FROM messages WHERE channel = $1 AND dismissed = false
+    `, [channel]);
+    return parseInt(result.rows[0].latest_id) || 0;
   }
 
   async close() {

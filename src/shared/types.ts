@@ -62,6 +62,19 @@ export interface DockEvent {
   loadEndTime?: string;
 }
 
+export type MessageChannel = 'shipping-receiving' | 'production';
+export type MessagePriority = 'urgent' | 'normal' | 'info';
+
+export interface Message {
+  id: number;
+  channel: MessageChannel;
+  senderName: string;
+  messageText: string;
+  priority: MessagePriority;
+  createdAt: string;
+  dismissed: boolean;
+}
+
 export interface ProductionEntry {
   id: number;
   date: string; // YYYY-MM-DD

@@ -778,6 +778,57 @@ app.post('/api/checkins/seed', async (req, res) => {
   }
 });
 
+// ==================== MESSAGES API ====================
+
+// Get messages for a channel
+app.get('/api/messages/:channel', async (req, res) => {
+  try {
+    const { channel } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const messages = await db.getMessages(channel, limit);
+    res.json(messages);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create new message
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { channel, senderName, messageText, priority } = req.body;
+    const message = await db.createMessage(channel, senderName, messageText, priority || 'normal');
+    
+    // Emit socket event for real-time updates
+    io.emit('new-message', { channel, message });
+    
+    res.json(message);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Dismiss a message
+app.delete('/api/messages/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.dismissMessage(id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get latest message ID for polling
+app.get('/api/messages/:channel/latest', async (req, res) => {
+  try {
+    const { channel } = req.params;
+    const latestId = await db.getLatestMessageId(channel);
+    res.json({ latestId });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Diagnostic endpoint to check for bad data
 app.get('/api/checkins/bad-data', async (req, res) => {
   try {

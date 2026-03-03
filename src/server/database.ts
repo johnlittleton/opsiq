@@ -279,6 +279,16 @@ export class DatabaseService implements IDatabaseService {
         updatedAt TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel TEXT NOT NULL,
+        senderName TEXT NOT NULL,
+        messageText TEXT NOT NULL,
+        priority TEXT NOT NULL DEFAULT 'normal',
+        createdAt TEXT NOT NULL,
+        dismissed INTEGER DEFAULT 0
+      );
+
       CREATE INDEX IF NOT EXISTS idx_labor_timestamp ON labor_snapshots(timestamp);
       CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
       CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
@@ -2511,6 +2521,39 @@ export class DatabaseService implements IDatabaseService {
         walkIn: appointmentStats.walkIn || 0,
       }
     };
+  }
+
+  // ==================== MESSAGES ====================
+  
+  createMessage(channel: string, senderName: string, messageText: string, priority: string): any {
+    const now = new Date().toISOString();
+    const stmt = this.db.prepare(`
+      INSERT INTO messages (channel, senderName, messageText, priority, createdAt, dismissed)
+      VALUES (?, ?, ?, ?, ?, 0)
+    `);
+    const result = stmt.run(channel, senderName, messageText, priority, now);
+    return this.db.prepare('SELECT * FROM messages WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  getMessages(channel: string, limit: number = 50): any[] {
+    const messages = this.db.prepare(`
+      SELECT * FROM messages 
+      WHERE channel = ? AND dismissed = 0
+      ORDER BY createdAt DESC 
+      LIMIT ?
+    `).all(channel, limit);
+    return messages.reverse(); // Reverse to show oldest first
+  }
+
+  dismissMessage(id: number): void {
+    this.db.prepare('UPDATE messages SET dismissed = 1 WHERE id = ?').run(id);
+  }
+
+  getLatestMessageId(channel: string): number {
+    const result = this.db.prepare(`
+      SELECT MAX(id) as latestId FROM messages WHERE channel = ? AND dismissed = 0
+    `).get(channel) as any;
+    return result?.latestId || 0;
   }
 
   close() {

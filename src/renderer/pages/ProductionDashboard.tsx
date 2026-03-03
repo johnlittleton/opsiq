@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import './ProductionDashboard.css';
 import DriverWaitingTicker from '../components/DriverWaitingTicker';
+import { MessageBanner } from '../components/MessageBanner';
 
 const LINES = [
   { id: 1, name: 'Giro Line 1' },
@@ -213,6 +214,7 @@ export default function ProductionDashboard() {
 
   return (
     <div className={dashboardClasses}>
+      {!specificLine && <MessageBanner channel="production" />}
       {specificLine && <DriverWaitingTicker lineFilter={specificLine} />}
       <div className="dashboard-header">
         <button className="back-btn" onClick={() => navigate('/')}>← Home</button>
