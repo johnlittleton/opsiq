@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef, ReactNod
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 const AUTH_STORAGE_KEY = 'opsiq-auth';
+const AUTH_VERSION_KEY = 'opsiq-auth-version';
+const CURRENT_AUTH_VERSION = '2'; // Increment this to force re-login for all users
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -33,6 +35,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // Restore auth from localStorage on mount
   useEffect(() => {
+    // Check auth version - if mismatch, force re-login
+    const storedVersion = localStorage.getItem(AUTH_VERSION_KEY);
+    if (storedVersion !== CURRENT_AUTH_VERSION) {
+      console.log('🔄 Auth version mismatch, clearing old session...');
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.setItem(AUTH_VERSION_KEY, CURRENT_AUTH_VERSION);
+      return;
+    }
+
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     if (stored) {
       try {
