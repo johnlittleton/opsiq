@@ -19,6 +19,18 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
   const [lastSeenMessageId, setLastSeenMessageId] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  
+  // Draggable window state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const bannerRef = useRef<HTMLDivElement>(null);
+  
+  // Dismissed messages tracking (prevents auto-reopen)
+  const [dismissedMessageId, setDismissedMessageId] = useState<number>(() => {
+    const stored = localStorage.getItem(`dismissed-${channel}`);
+    return stored ? parseInt(stored) : 0;
+  });
 
   // Fetch messages
   const fetchMessages = async () => {
@@ -32,15 +44,15 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
         if (data.length > 0) {
           const latestId = data[data.length - 1].id;
           if (latestId > lastSeenMessageId) {
-            const newMessagesCount = data.filter((m: Message) => m.id > lastSeenMessageId).length;
+            const newMessagesCount = data.filter((m: Message) => m.id > lastSeenMessageId && m.id > dismissedMessageId).length;
             
-            // Auto-reopen banner if new message arrives and banner was closed
-            if (!isOpen && newMessagesCount > 0) {
+            // Auto-reopen banner if new message arrives and banner was closed (but not if dismissed)
+            if (!isOpen && newMessagesCount > 0 && latestId > dismissedMessageId) {
               onToggle?.();
               playNotificationSound();
             }
             
-            // Update unread count
+            // Update unread count (only count non-dismissed messages)
             setUnreadCount(newMessagesCount);
             
             // Only update lastSeenMessageId when banner is open
@@ -138,6 +150,54 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (bannerRef.current) {
+      const rect = bannerRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+      setIsDragging(true);
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Attach global mouse handlers for dragging
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
+
+  // Dismiss all messages
+  const handleDismissAll = () => {
+    if (messages.length > 0) {
+      const latestId = messages[messages.length - 1].id;
+      setDismissedMessageId(latestId);
+      localStorage.setItem(`dismissed-${channel}`, latestId.toString());
+      setUnreadCount(0);
+      onToggle?.();
+    }
+  };
+
   return (
     <>
       {/* Notification Sound */}
@@ -145,14 +205,31 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
 
       {/* Message Banner Window */}
       {isOpen && (
-        <div className={`message-banner ${priority}`}>
-          <div className="message-banner__header">
+        <div 
+          ref={bannerRef}
+          className={`message-banner ${priority}`}
+          style={{
+            left: position.x ? `${position.x}px` : undefined,
+            top: position.y ? `${position.y}px` : undefined,
+            right: position.x ? 'auto' : undefined
+          }}
+        >
+          <div 
+            className="message-banner__header"
+            onMouseDown={handleMouseDown}
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+          >
             <h3 className="message-banner__title">
               💬 {channel === 'shipping-receiving' ? 'Shipping & Receiving' : 'Production'} Team Chat
             </h3>
-            <button className="message-banner__close" onClick={onToggle}>
-              ✕
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button className="message-banner__dismiss" onClick={handleDismissAll} title="Dismiss all messages">
+                🔕
+              </button>
+              <button className="message-banner__close" onClick={onToggle}>
+                ✕
+              </button>
+            </div>
           </div>
 
           <div className="message-banner__messages">

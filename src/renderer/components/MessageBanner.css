@@ -44,14 +44,15 @@
   max-width: calc(100vw - 40px);
   background: linear-gradient(135deg, rgba(24, 24, 27, 0.75) 0%, rgba(17, 18, 23, 0.75) 100%);
   backdrop-filter: blur(12px);
-  border: 2px solid rgba(59, 130, 246, 0.3);
+  border: 2px solid rgba(59, 130, 246, 0.5);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   z-index: 10000;
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  animation: slideFromRight 0.3s ease-out;
+  animation: slideFromRight 0.3s ease-out, pulse-border 2s ease-in-out infinite;
+  user-select: none;
 }
 
 @keyframes slideFromRight {
@@ -62,6 +63,17 @@
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-color: rgba(59, 130, 246, 0.5);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    border-color: rgba(59, 130, 246, 0.9);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 30px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4);
   }
 }
 
@@ -80,11 +92,12 @@
   margin: 0;
 }
 
+.message-banner__dismiss,
 .message-banner__close {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
-  font-size: 20px;
+  font-size: 18px;
   width: 32px;
   height: 32px;
   border-radius: 4px;
@@ -95,9 +108,19 @@
   transition: all 0.2s;
 }
 
+.message-banner__dismiss:hover,
 .message-banner__close:hover {
   background: rgba(255, 255, 255, 0.2);
   transform: scale(1.1);
+}
+
+.message-banner__dismiss {
+  font-size: 16px;
+}
+
+.message-banner__dismiss:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* Messages Container */
