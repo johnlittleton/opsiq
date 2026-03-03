@@ -160,15 +160,6 @@ class ApiClient {
     return response.json();
   }
 
-  async getCheckinAuditLog(checkinId: number): Promise<any[]> {
-    const response = await fetch(`${API_BASE}/api/checkins/${checkinId}/audit`);
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch audit log');
-    }
-    return response.json();
-  }
-
   async getDockEvents(filters?: {
     startDate?: string;
     endDate?: string;

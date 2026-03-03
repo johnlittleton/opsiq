@@ -2643,7 +2643,7 @@ export class DatabaseService implements IDatabaseService {
     // Get all active messages for this channel
     const activeMessages = this.db.prepare(`
       SELECT * FROM messages WHERE channel = ? AND sessionId IS NULL
-    `).all(channel);
+    `).all(channel) as any[];
     
     if (activeMessages.length === 0) {
       return { success: false, message: 'No active messages to complete' };
