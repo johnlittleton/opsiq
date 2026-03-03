@@ -33,8 +33,8 @@ const AppContent: React.FC = () => {
     initializeSync();
   }, [initializeSync]);
 
-  const handlePinSuccess = (name: string, role: string) => {
-    login(name, role);
+  const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
+    login(name, role, sessionToken);
   };
 
   // Show PIN entry if not authenticated

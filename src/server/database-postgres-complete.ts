@@ -269,6 +269,16 @@ export class DatabaseService implements IDatabaseService {
           dismissed BOOLEAN DEFAULT false
         );
 
+        CREATE TABLE IF NOT EXISTS sessions (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL,
+          session_token TEXT NOT NULL UNIQUE,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          expires_at TIMESTAMP NOT NULL,
+          last_activity TIMESTAMP NOT NULL DEFAULT NOW(),
+          FOREIGN KEY (user_id) REFERENCES executives(id)
+        );
+
         CREATE INDEX IF NOT EXISTS idx_checkins_door ON dock_checkins(door_id);
         CREATE INDEX IF NOT EXISTS idx_checkins_status ON dock_checkins(status);
         CREATE INDEX IF NOT EXISTS idx_checkins_created ON dock_checkins(created_at);
@@ -2368,6 +2378,55 @@ export class DatabaseService implements IDatabaseService {
   async getExecutives(): Promise<any[]> {
     const result = await this.pool.query('SELECT id, name, is_active, created_at FROM executives ORDER BY name');
     return result.rows.map(row => this.toCamelCase(row));
+  }
+
+  // Session Management
+  async createSession(userId: number): Promise<string> {
+    const sessionToken = require('crypto').randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await this.pool.query(`
+      INSERT INTO sessions (user_id, session_token, expires_at)
+      VALUES ($1, $2, $3)
+    `, [userId, sessionToken, expiresAt]);
+
+    return sessionToken;
+  }
+
+  async validateSession(sessionToken: string): Promise<{ id: number; name: string; role: string } | null> {
+    const result = await this.pool.query(`
+      SELECT e.id, e.name, e.role, s.expires_at
+      FROM sessions s
+      JOIN executives e ON e.id = s.user_id
+      WHERE s.session_token = $1 AND e.is_active = true
+    `, [sessionToken]);
+
+    if (result.rows.length === 0) return null;
+
+    const session = result.rows[0];
+
+    // Check if expired
+    if (new Date(session.expires_at) < new Date()) {
+      await this.pool.query('DELETE FROM sessions WHERE session_token = $1', [sessionToken]);
+      return null;
+    }
+
+    // Update last activity
+    await this.pool.query('UPDATE sessions SET last_activity = NOW() WHERE session_token = $1', [sessionToken]);
+
+    return this.toCamelCase(session);
+  }
+
+  async updateSessionActivity(sessionToken: string): Promise<void> {
+    await this.pool.query('UPDATE sessions SET last_activity = NOW() WHERE session_token = $1', [sessionToken]);
+  }
+
+  async deleteSession(sessionToken: string): Promise<void> {
+    await this.pool.query('DELETE FROM sessions WHERE session_token = $1', [sessionToken]);
+  }
+
+  async cleanupExpiredSessions(): Promise<void> {
+    await this.pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
   }
 
   async seedExecutives(): Promise<any[]> {

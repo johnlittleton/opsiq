@@ -290,6 +290,16 @@ export class DatabaseService implements IDatabaseService {
         dismissed INTEGER DEFAULT 0
       );
 
+      CREATE TABLE IF NOT EXISTS sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        sessionToken TEXT NOT NULL UNIQUE,
+        createdAt TEXT NOT NULL,
+        expiresAt TEXT NOT NULL,
+        lastActivity TEXT NOT NULL,
+        FOREIGN KEY (userId) REFERENCES executives(id)
+      );
+
       CREATE INDEX IF NOT EXISTS idx_labor_timestamp ON labor_snapshots(timestamp);
       CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
       CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
@@ -2286,6 +2296,57 @@ export class DatabaseService implements IDatabaseService {
 
   async getExecutives(): Promise<any[]> {
     return this.db.prepare('SELECT id, name, isActive, createdAt FROM executives ORDER BY name').all();
+  }
+
+  // Session Management
+  async createSession(userId: number): Promise<string> {
+    const sessionToken = require('crypto').randomBytes(32).toString('hex');
+    const now = getLocalISOString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours
+
+    this.db.prepare(`
+      INSERT INTO sessions (userId, sessionToken, createdAt, expiresAt, lastActivity)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(userId, sessionToken, now, expiresAt, now);
+
+    return sessionToken;
+  }
+
+  async validateSession(sessionToken: string): Promise<{ id: number; name: string; role: string } | null> {
+    const result = this.db.prepare(`
+      SELECT e.id, e.name, e.role, s.expiresAt, s.lastActivity
+      FROM sessions s
+      JOIN executives e ON e.id = s.userId
+      WHERE s.sessionToken = ? AND e.isActive = 1
+    `).get(sessionToken) as any;
+
+    if (!result) return null;
+
+    // Check if expired
+    if (new Date(result.expiresAt) < new Date()) {
+      this.db.prepare('DELETE FROM sessions WHERE sessionToken = ?').run(sessionToken);
+      return null;
+    }
+
+    // Update last activity
+    const now = getLocalISOString();
+    this.db.prepare('UPDATE sessions SET lastActivity = ? WHERE sessionToken = ?').run(now, sessionToken);
+
+    return { id: result.id, name: result.name, role: result.role };
+  }
+
+  async updateSessionActivity(sessionToken: string): Promise<void> {
+    const now = getLocalISOString();
+    this.db.prepare('UPDATE sessions SET lastActivity = ? WHERE sessionToken = ?').run(now, sessionToken);
+  }
+
+  async deleteSession(sessionToken: string): Promise<void> {
+    this.db.prepare('DELETE FROM sessions WHERE sessionToken = ?').run(sessionToken);
+  }
+
+  async cleanupExpiredSessions(): Promise<void> {
+    const now = getLocalISOString();
+    this.db.prepare('DELETE FROM sessions WHERE expiresAt < ?').run(now);
   }
 
   async seedExecutives(): Promise<any[]> {

@@ -1,15 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { API_BASE } from '../services/config';
 
 const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
-const AUTH_STORAGE_KEY = 'opsiq-auth';
-const AUTH_VERSION_KEY = 'opsiq-auth-version';
-const CURRENT_AUTH_VERSION = '2'; // Increment this to force re-login for all users
+const SESSION_TOKEN_KEY = 'opsiq-session-token';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   executiveName: string;
   userRole: string;
-  login: (name: string, role: string) => void;
+  login: (name: string, role: string, sessionToken: string) => void;
   logout: () => void;
 }
 
@@ -31,43 +30,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [executiveName, setExecutiveName] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [isValidating, setIsValidating] = useState(true);
 
-  // Restore auth from localStorage on mount
+  // Validate session from Railway on mount
   useEffect(() => {
-    // Check auth version - if mismatch, force re-login
-    const storedVersion = localStorage.getItem(AUTH_VERSION_KEY);
-    if (storedVersion !== CURRENT_AUTH_VERSION) {
-      console.log('🔄 Auth version mismatch, clearing old session...');
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-      localStorage.setItem(AUTH_VERSION_KEY, CURRENT_AUTH_VERSION);
-      return;
-    }
-
-    const stored = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (stored) {
-      try {
-        const { name, role, timestamp } = JSON.parse(stored);
-        // Validate that we have all required fields (old sessions may be missing role)
-        if (!name || !role) {
-          console.log('⚠️ Invalid stored session, clearing...');
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-          return;
+    const validateStoredSession = async () => {
+      const storedToken = localStorage.getItem(SESSION_TOKEN_KEY);
+      if (storedToken) {
+        try {
+          const response = await fetch(`${API_BASE}/api/auth/session`, {
+            headers: { 'Authorization': `Bearer ${storedToken}` }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            setIsAuthenticated(true);
+            setExecutiveName(data.name);
+            setUserRole(data.role);
+            setSessionToken(storedToken);
+            resetInactivityTimer();
+          } else {
+            // Invalid session, clear it
+            localStorage.removeItem(SESSION_TOKEN_KEY);
+          }
+        } catch (error) {
+          console.error('Session validation error:', error);
+          localStorage.removeItem(SESSION_TOKEN_KEY);
         }
-        // Auto-restore if session hasn't expired (24 hours)
-        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
-          setIsAuthenticated(true);
-          setExecutiveName(name);
-          setUserRole(role);
-          resetInactivityTimer();
-        } else {
-          // Expired session, clear it
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-        }
-      } catch (e) {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
       }
-    }
+      setIsValidating(false);
+    };
+
+    validateStoredSession();
   }, []);
 
   const resetInactivityTimer = () => {
@@ -82,26 +78,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }, INACTIVITY_TIMEOUT);
   };
 
-  const login = (name: string, role: string) => {
+  const login = (name: string, role: string, sessionToken: string) => {
     setIsAuthenticated(true);
     setExecutiveName(name);
     setUserRole(role);
+    setSessionToken(sessionToken);
     
-    // Store in localStorage
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-      name,
-      role,
-      timestamp: Date.now()
-    }));
+    // Store session token as pointer to Railway session
+    localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
     
     resetInactivityTimer();
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const token = sessionToken || localStorage.getItem(SESSION_TOKEN_KEY);
+    
+    // Delete session from Railway database
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/auth/logout`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch (error) {
+        console.error('Logout error:', error);
+      }
+    }
+    
     setIsAuthenticated(false);
     setExecutiveName('');
     setUserRole('');
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    setSessionToken(null);
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
@@ -136,7 +144,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, executiveName, userRole, login, logout }}>
-      {children}
+      {isValidating ? <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div> : children}
     </AuthContext.Provider>
   );
 };

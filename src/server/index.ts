@@ -736,10 +736,49 @@ app.post('/api/auth/verify-pin', async (req, res) => {
     const { pin } = req.body;
     const executive = await db.verifyExecutivePin(pin);
     if (executive) {
-      res.json({ success: true, name: executive.name, role: executive.role });
+      // Create session
+      const sessionToken = await db.createSession(executive.id);
+      res.json({ 
+        success: true, 
+        name: executive.name, 
+        role: executive.role,
+        sessionToken 
+      });
     } else {
       res.status(401).json({ success: false, error: 'Invalid PIN' });
     }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Validate session
+app.get('/api/auth/session', async (req, res) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!sessionToken) {
+      return res.status(401).json({ success: false, error: 'No session token' });
+    }
+
+    const user = await db.validateSession(sessionToken);
+    if (user) {
+      res.json({ success: true, name: user.name, role: user.role });
+    } else {
+      res.status(401).json({ success: false, error: 'Invalid or expired session' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Logout
+app.post('/api/auth/logout', async (req, res) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+    if (sessionToken) {
+      await db.deleteSession(sessionToken);
+    }
+    res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
