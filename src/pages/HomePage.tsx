@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../renderer/context/AuthContext';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { executiveName, logout } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
   
@@ -153,6 +155,10 @@ export const HomePage: React.FC = () => {
           )}
         </div>
         <div className="home-page__controls-right">
+          <span className="home-page__user-name">{executiveName}</span>
+          <button className="home-page__logout-button" onClick={logout}>
+            🚪 Logout
+          </button>
           <button className="home-page__window-button" onClick={handleMinimize}>
             −
           </button>

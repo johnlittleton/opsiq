@@ -68,6 +68,32 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.home-page__user-name {
+  color: var(--accent-primary);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.home-page__logout-button {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+
+.home-page__logout-button:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 .home-page__dropdown {
   position: absolute;
   top: 100%;

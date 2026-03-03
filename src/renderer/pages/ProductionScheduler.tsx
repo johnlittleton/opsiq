@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
+import { MessageBanner } from '../components/MessageBanner';
 import './ProductionScheduler.css';
 import DowntimeTracker from '../components/DowntimeTracker';
 
@@ -64,6 +65,8 @@ export default function ProductionScheduler() {
   const [editingWorkOrder, setEditingWorkOrder] = useState<Partial<WorkOrder> | null>(null);
   const [loading, setLoading] = useState(true);
   const [casesInputs, setCasesInputs] = useState<Record<string, number>>({});
+  const [messengerOpen, setMessengerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const selectedDateStr = getLocalDateString(selectedDate);
 
@@ -387,6 +390,12 @@ export default function ProductionScheduler() {
 
   return (
     <div className="production-scheduler">
+      <MessageBanner 
+        channel="production" 
+        isOpen={messengerOpen}
+        onToggle={() => setMessengerOpen(!messengerOpen)}
+        onUnreadCountChange={setUnreadCount}
+      />
       <div className="header-bar">
         <button className="back-btn" onClick={() => navigate('/')}>
           ← Home
