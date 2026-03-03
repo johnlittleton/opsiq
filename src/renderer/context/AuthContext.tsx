@@ -37,6 +37,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (stored) {
       try {
         const { name, role, timestamp } = JSON.parse(stored);
+        // Validate that we have all required fields (old sessions may be missing role)
+        if (!name || !role) {
+          console.log('⚠️ Invalid stored session, clearing...');
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          return;
+        }
         // Auto-restore if session hasn't expired (24 hours)
         if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
           setIsAuthenticated(true);
