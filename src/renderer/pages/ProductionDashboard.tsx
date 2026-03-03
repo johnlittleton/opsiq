@@ -218,7 +218,6 @@ export default function ProductionDashboard() {
     <div className={dashboardClasses}>
       {!specificLine && (
         <MessageBanner 
-          channel="production" 
           isOpen={messengerOpen}
           onToggle={() => setMessengerOpen(!messengerOpen)}
           onUnreadCountChange={setUnreadCount}

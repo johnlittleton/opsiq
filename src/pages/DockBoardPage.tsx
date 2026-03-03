@@ -128,7 +128,6 @@ export const DockBoardPage: React.FC = () => {
   return (
     <div className="dock-board-page">
       <MessageBanner 
-        channel="shipping-receiving" 
         isOpen={messengerOpen}
         onToggle={() => setMessengerOpen(!messengerOpen)}
         onUnreadCountChange={setUnreadCount}

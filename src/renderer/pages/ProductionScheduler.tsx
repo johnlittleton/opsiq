@@ -391,7 +391,6 @@ export default function ProductionScheduler() {
   return (
     <div className="production-scheduler">
       <MessageBanner 
-        channel="production" 
         isOpen={messengerOpen}
         onToggle={() => setMessengerOpen(!messengerOpen)}
         onUnreadCountChange={setUnreadCount}

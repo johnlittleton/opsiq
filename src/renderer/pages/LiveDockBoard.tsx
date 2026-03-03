@@ -215,7 +215,6 @@ const LiveDockBoard: React.FC = () => {
   return (
     <div>
       <MessageBanner 
-        channel="shipping-receiving" 
         isOpen={messengerOpen}
         onToggle={() => setMessengerOpen(!messengerOpen)}
         onUnreadCountChange={setUnreadCount}
