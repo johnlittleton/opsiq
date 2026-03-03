@@ -332,6 +332,7 @@
 /* Input Area */
 .message-banner__input {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -339,7 +340,7 @@
 }
 
 .message-input-name {
-  width: 150px;
+  width: 120px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -355,7 +356,7 @@
 }
 
 .message-input-priority {
-  width: 130px;
+  width: 110px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -372,6 +373,7 @@
 
 .message-input-text {
   flex: 1;
+  min-width: 180px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
