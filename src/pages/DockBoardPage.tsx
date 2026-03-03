@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DockTile, DockStatus } from '../components/docks/DockTile';
 import { TitleBar } from '../components/layout/TitleBar';
 import { EditCheckinModal } from '../components/docks/EditCheckinModal';
+import { MessageBanner } from '../renderer/components/MessageBanner';
 import { useAppStore } from '../renderer/store';
 import { apiClient } from '../renderer/services/api';
 import { DockCheckin } from '../shared/types';
@@ -15,6 +16,8 @@ export const DockBoardPage: React.FC = () => {
   const [, setTick] = useState(0);
   const [editingCheckin, setEditingCheckin] = useState<DockCheckin | null>(null);
   const [parkedTrucks, setParkedTrucks] = useState<DockCheckin[]>([]);
+  const [messengerOpen, setMessengerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   
   // Initialize data sync on mount
   useEffect(() => {
@@ -124,7 +127,23 @@ export const DockBoardPage: React.FC = () => {
 
   return (
     <div className="dock-board-page">
-      <TitleBar showLegend={true} />
+      <MessageBanner 
+        channel="shipping-receiving" 
+        isOpen={messengerOpen}
+        onToggle={() => setMessengerOpen(!messengerOpen)}
+        onUnreadCountChange={setUnreadCount}
+      />
+      <TitleBar showLegend={true}>
+        <button 
+          className="message-chat-btn" 
+          onClick={() => setMessengerOpen(!messengerOpen)}
+        >
+          CHAT
+          {unreadCount > 0 && (
+            <span className="message-badge">{unreadCount}</span>
+          )}
+        </button>
+      </TitleBar>
       
       <div className="dock-board-page__content">
         <div className="dock-board-page__grid">

@@ -220,12 +220,7 @@ const LiveDockBoard: React.FC = () => {
         onToggle={() => setMessengerOpen(!messengerOpen)}
         onUnreadCountChange={setUnreadCount}
       />
-      <div className="dock-board-header" style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        marginBottom: '20px' 
-      }}>
+      <div className="dock-board-header">
         <h1 className="page-title">Live Dock Board - 39 Doors</h1>
         <button 
           className="message-chat-btn" 

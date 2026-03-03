@@ -49,6 +49,22 @@
   box-shadow: 0 0 25px rgba(59, 130, 246, 0.7), 0 0 50px rgba(59, 130, 246, 0.4);
 }
 
+/* Dock Board Header */
+.dock-board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.dock-board-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #f3f6fa;
+}
+
 .dock-board-page__parked-truck {
   --current-glow: var(--glow-parked);
   --current-glow-bright: var(--glow-parked-bright);
