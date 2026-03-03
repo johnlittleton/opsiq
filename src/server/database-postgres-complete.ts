@@ -939,13 +939,13 @@ export class DatabaseService implements IDatabaseService {
           await client.query(`
             UPDATE dock_doors
             SET current_checkin_id = NULL, status = 'Open', status_start_time = $1, updated_at = $2
-            WHERE door_number = $3
+            WHERE door_id = $3
           `, [now, now, oldDoorId]);
         }
 
         // Set new door's current_checkin_id and status
         if (newDoorId !== null) {
-          const doorResult = await client.query('SELECT * FROM dock_doors WHERE door_number = $1', [newDoorId]);
+          const doorResult = await client.query('SELECT * FROM dock_doors WHERE door_id = $1', [newDoorId]);
           if (doorResult.rows.length === 0) {
             throw new Error(`Door ${newDoorId} not found`);
           }
@@ -957,7 +957,7 @@ export class DatabaseService implements IDatabaseService {
           await client.query(`
             UPDATE dock_doors
             SET current_checkin_id = $1, status = $2, status_start_time = $3, updated_at = $4
-            WHERE door_number = $5
+            WHERE door_id = $5
           `, [checkinId, updates.status || current.status, now, now, newDoorId]);
         }
 

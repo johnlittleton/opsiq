@@ -75,6 +75,7 @@
   "build": {
     "appId": "com.slingshot.opsiq",
     "productName": "OpsIQ",
+    "artifactName": "OpsIQ-Installer.${ext}",
     "directories": {
       "output": "release"
     },
