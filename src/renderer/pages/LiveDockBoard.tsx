@@ -205,6 +205,8 @@ const DoorTile: React.FC<{ door: DockDoorWithCheckin }> = ({ door }) => {
 
 const LiveDockBoard: React.FC = () => {
   const { doors, loading } = useAppStore();
+  const [messengerOpen, setMessengerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   if (loading) {
     return <div className="loading">Loading dock board...</div>;
@@ -212,8 +214,29 @@ const LiveDockBoard: React.FC = () => {
 
   return (
     <div>
-      <MessageBanner channel="shipping-receiving" />
-      <h1 className="page-title">Live Dock Board - 39 Doors</h1>
+      <MessageBanner 
+        channel="shipping-receiving" 
+        isOpen={messengerOpen}
+        onToggle={() => setMessengerOpen(!messengerOpen)}
+        onUnreadCountChange={setUnreadCount}
+      />
+      <div className="dock-board-header" style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px' 
+      }}>
+        <h1 className="page-title">Live Dock Board - 39 Doors</h1>
+        <button 
+          className="message-chat-btn" 
+          onClick={() => setMessengerOpen(!messengerOpen)}
+        >
+          CHAT
+          {unreadCount > 0 && (
+            <span className="message-badge">{unreadCount}</span>
+          )}
+        </button>
+      </div>
       <div className="dock-grid">
         {doors.map(door => (
           <DoorTile key={door.doorId} door={door} />

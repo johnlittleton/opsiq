@@ -1,68 +1,66 @@
-/* Message Icon Button (when collapsed) */
-.message-icon-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  font-size: 28px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+/* CHAT Button (neon yellow text) */
+.message-chat-btn {
+  background: transparent;
+  border: 2px solid #fade2a;
+  color: #fade2a;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  transition: all 0.3s ease;
+  text-shadow: 0 0 10px rgba(250, 222, 42, 0.8), 0 0 20px rgba(250, 222, 42, 0.5);
+  transition: all 0.3s;
+  position: relative;
+  letter-spacing: 1px;
 }
 
-.message-icon-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 30px rgba(59, 130, 246, 0.6);
+.message-chat-btn:hover {
+  background: rgba(250, 222, 42, 0.1);
+  box-shadow: 0 0 20px rgba(250, 222, 42, 0.6);
+  transform: translateY(-1px);
 }
 
 .message-badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  top: -8px;
+  right: -8px;
   background: #ef4444;
   color: white;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   padding: 2px 6px;
   border-radius: 10px;
-  min-width: 20px;
+  min-width: 18px;
   text-align: center;
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
 }
 
-/* Message Banner (when expanded) */
+/* Message Banner (translucent upper-right window) */
 .message-banner {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(135deg, rgba(24, 24, 27, 0.98) 0%, rgba(17, 18, 23, 0.98) 100%);
+  top: 20px;
+  right: 20px;
+  width: 450px;
+  max-width: calc(100vw - 40px);
+  background: linear-gradient(135deg, rgba(24, 24, 27, 0.75) 0%, rgba(17, 18, 23, 0.75) 100%);
   backdrop-filter: blur(12px);
-  border-bottom: 2px solid rgba(59, 130, 246, 0.3);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   z-index: 10000;
-  max-height: 60vh;
+  max-height: 70vh;
   display: flex;
   flex-direction: column;
-  animation: slideDown 0.3s ease-out;
+  animation: slideFromRight 0.3s ease-out;
 }
 
-@keyframes slideDown {
+@keyframes slideFromRight {
   from {
-    transform: translateY(-100%);
+    transform: translateX(100%);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
     opacity: 1;
   }
 }

@@ -34,6 +34,8 @@ export default function ProductionDashboard() {
   const [checkins, setCheckins] = useState<any[]>([]);
   const [selectedDate] = useState(getLocalDateString(new Date()));
   const [hasDriverAlerts, setHasDriverAlerts] = useState(false);
+  const [messengerOpen, setMessengerOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -214,13 +216,31 @@ export default function ProductionDashboard() {
 
   return (
     <div className={dashboardClasses}>
-      {!specificLine && <MessageBanner channel="production" />}
+      {!specificLine && (
+        <MessageBanner 
+          channel="production" 
+          isOpen={messengerOpen}
+          onToggle={() => setMessengerOpen(!messengerOpen)}
+          onUnreadCountChange={setUnreadCount}
+        />
+      )}
       {specificLine && <DriverWaitingTicker lineFilter={specificLine} />}
       <div className="dashboard-header">
         <button className="back-btn" onClick={() => navigate('/')}>← Home</button>
         <h1>{pageTitle}</h1>
         <div className="header-controls">
           {!specificLine && <button onClick={() => navigate('/production-scheduler')}>📋 Schedule</button>}
+          {!specificLine && (
+            <button 
+              className="message-chat-btn" 
+              onClick={() => setMessengerOpen(!messengerOpen)}
+            >
+              CHAT
+              {unreadCount > 0 && (
+                <span className="message-badge">{unreadCount}</span>
+              )}
+            </button>
+          )}
           <button onClick={fetchWorkOrders}>🔄 Refresh</button>
         </div>
       </div>

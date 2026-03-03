@@ -5,11 +5,13 @@ import './MessageBanner.css';
 
 interface MessageBannerProps {
   channel: MessageChannel;
+  isOpen?: boolean;
+  onToggle?: () => void;
+  onUnreadCountChange?: (count: number) => void;
 }
 
-export function MessageBanner({ channel }: MessageBannerProps) {
+export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCountChange }: MessageBannerProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
   const [senderName, setSenderName] = useState('');
   const [messageText, setMessageText] = useState('');
   const [priority, setPriority] = useState<MessagePriority>('normal');
@@ -34,7 +36,7 @@ export function MessageBanner({ channel }: MessageBannerProps) {
             
             // Auto-reopen banner if new message arrives and banner was closed
             if (!isOpen && newMessagesCount > 0) {
-              setIsOpen(true);
+              onToggle?.();
               playNotificationSound();
             }
             
@@ -110,9 +112,10 @@ export function MessageBanner({ channel }: MessageBannerProps) {
     }
   }, [isOpen]);
 
-  const handleToggle = () => {
-    setIsOpen(!isOpen);
-  };
+  // Notify parent of unread count changes
+  useEffect(() => {
+    onUnreadCountChange?.(unreadCount);
+  }, [unreadCount, onUnreadCountChange]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -140,24 +143,14 @@ export function MessageBanner({ channel }: MessageBannerProps) {
       {/* Notification Sound */}
       <audio ref={audioRef} src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSt+ze7bfzIIIGi+7eeUSQ0OUqvk8K9gGgU7k9nyzn0vBSiBzvLZiTYIGGS56+mjUhELP6Hg88d0JwU" />
 
-      {/* Message Icon Button */}
-      {!isOpen && (
-        <button className="message-icon-btn" onClick={handleToggle}>
-          💬
-          {unreadCount > 0 && (
-            <span className="message-badge">{unreadCount}</span>
-          )}
-        </button>
-      )}
-
-      {/* Message Banner */}
+      {/* Message Banner Window */}
       {isOpen && (
         <div className={`message-banner ${priority}`}>
           <div className="message-banner__header">
             <h3 className="message-banner__title">
               💬 {channel === 'shipping-receiving' ? 'Shipping & Receiving' : 'Production'} Team Chat
             </h3>
-            <button className="message-banner__close" onClick={handleToggle}>
+            <button className="message-banner__close" onClick={onToggle}>
               ✕
             </button>
           </div>
