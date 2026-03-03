@@ -184,7 +184,7 @@ const DriverCheckIn: React.FC = () => {
 
               <div className="driver-checkin__field">
                 <label className="driver-checkin__label">
-                  Door # {formData.status === 'Parked' ? '(Optional - leave empty if parking)' : '*'}
+                  Door # {formData.status === 'Parked' || formData.status === 'Dropped' ? '(Optional - leave empty if parking)' : '*'}
                 </label>
                 <input
                   type="number"
@@ -192,7 +192,7 @@ const DriverCheckIn: React.FC = () => {
                   value={formData.doorId}
                   onChange={handleChange}
                   className="driver-checkin__input"
-                  placeholder={formData.status === 'Parked' ? 'Leave empty to park' : '1-39'}
+                  placeholder={formData.status === 'Parked' || formData.status === 'Dropped' ? 'Leave empty to park' : '1-39'}
                   min="1"
                   max="39"
                   disabled={submitting}
@@ -212,6 +212,7 @@ const DriverCheckIn: React.FC = () => {
                   <option value="Offload">Offload</option>
                   <option value="Loading">Loading</option>
                   <option value="Parked">Parked</option>
+                  <option value="Dropped">Dropped</option>
                   <option value="Offline">Offline</option>
                 </select>
               </div>

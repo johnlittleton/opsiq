@@ -46,6 +46,18 @@ const statusConfig: Record<DoorStatus, { label: string; bgClass: string; textCla
     textClass: 'text-status-parked',
     glowClass: 'status-glow-parked',
   },
+  Dropped: {
+    label: 'Dropped',
+    bgClass: 'bg-status-dropped/10 border-status-dropped/30',
+    textClass: 'text-status-dropped',
+    glowClass: 'status-glow-dropped',
+  },
+  Offline: {
+    label: 'Offline',
+    bgClass: 'bg-gray-900 border-gray-700',
+    textClass: 'text-gray-400',
+    glowClass: '',
+  },
 };
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({

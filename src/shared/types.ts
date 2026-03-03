@@ -1,6 +1,6 @@
 // Shared type definitions across server and client
 
-export type DoorStatus = 'Open' | 'Offload' | 'Loading' | 'Blocked' | 'Waiting' | 'Parked' | 'Offline';
+export type DoorStatus = 'Open' | 'Offload' | 'Loading' | 'Blocked' | 'Waiting' | 'Parked' | 'Dropped' | 'Offline';
 
 export type InboundOutbound = 'Inbound' | 'Outbound';
 

@@ -290,6 +290,7 @@ const DockHistory: React.FC = () => {
                   <option value="Blocked">Blocked</option>
                   <option value="Waiting">Waiting</option>
                   <option value="Parked">Parked</option>
+                  <option value="Dropped">Dropped</option>
                 </select>
               </div>
             </div>

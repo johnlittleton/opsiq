@@ -38,7 +38,8 @@ export default {
           loading: '#fade2a',   // YELLOW
           blocked: '#1a1a1a',   // BLACK
           waiting: '#b877d9',   // PURPLE
-          parked: '#dc3545',    // RED
+          parked: '#ec4899',    // PINK
+          dropped: '#b877d9',   // PURPLE
         },
       },
       backdropBlur: {

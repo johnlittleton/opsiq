@@ -70,6 +70,14 @@
   box-shadow: var(--glow-parked-shadow);
 }
 
+.dock-tile[data-status="dropped"] {
+  --current-glow: var(--glow-dropped);
+  --current-glow-bright: var(--glow-dropped-bright);
+  --current-glow-shadow: var(--glow-dropped-shadow);
+  box-shadow: var(--glow-dropped-shadow);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
 .dock-tile[data-status="offline"] {
   --current-glow: var(--glow-offline);
   --current-glow-bright: var(--glow-offline-bright);

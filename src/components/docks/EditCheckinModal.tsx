@@ -109,6 +109,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
                 <option value="Loading">Loading</option>
                 <option value="Offload">Offload</option>
                 <option value="Parked">Parked</option>
+                <option value="Dropped">Dropped</option>
                 <option value="Offline">Offline</option>
               </select>
             </div>
@@ -138,7 +139,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
 
           <div className="edit-checkin-modal__row">
             <div className="edit-checkin-modal__field">
-              <label>Door # {formData.status === 'Parked' || formData.status === 'Offline' ? '(Optional)' : ''}</label>
+              <label>Door # {formData.status === 'Parked' || formData.status === 'Dropped' || formData.status === 'Offline' ? '(Optional)' : ''}</label>
               <select
                 value={formData.doorId}
                 onChange={(e) => setFormData({ ...formData, doorId: e.target.value })}

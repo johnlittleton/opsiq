@@ -263,6 +263,7 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
     Blocked: 0,
     Waiting: 0,
     Parked: 0,
+    Dropped: 0,
     Offline: 0,
   };
 

@@ -34,7 +34,8 @@
   --status-loading: #fade2a;
   --status-blocked: #1a1a1a;
   --status-waiting: #b877d9;
-  --status-parked: #dc3545;
+  --status-parked: #ec4899;
+  --status-dropped: #b877d9;
 }
 
 /* Base Styles */
@@ -124,7 +125,12 @@ body {
 }
 
 .status-glow-parked {
-  box-shadow: 0 0 12px rgba(220, 53, 69, 0.4);
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.4);
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.status-glow-dropped {
+  box-shadow: 0 0 12px rgba(184, 119, 217, 0.4);
   animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
