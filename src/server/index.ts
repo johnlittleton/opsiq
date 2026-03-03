@@ -840,18 +840,50 @@ app.get('/api/checkins/date-summary/:date', async (req, res) => {
 app.delete('/api/checkins/cleanup/:threshold', async (req, res) => {
   try {
     const threshold = parseInt(req.params.threshold) || 1000;
-    const deleteResult = await (db as any).pool.query(`
-      DELETE FROM dock_checkins
+    
+    // First, find the IDs to delete
+    const findResult = await (db as any).pool.query(`
+      SELECT id, company, driver_name, pallets, actual_pallets,
+             COALESCE(actual_pallets, pallets) as used_pallets
+      FROM dock_checkins
       WHERE closed_at IS NOT NULL
         AND COALESCE(actual_pallets, pallets) > $1
-      RETURNING id, company, driver_name, pallets, actual_pallets
     `, [threshold]);
+    
+    const idsToDelete = findResult.rows.map((r: any) => r.id);
+    
+    if (idsToDelete.length === 0) {
+      return res.json({ 
+        success: true,
+        deleted: 0,
+        threshold: threshold,
+        message: 'No records found above threshold'
+      });
+    }
+    
+    // Delete related dock_events first (to avoid foreign key constraint violation)
+    await (db as any).pool.query(`
+      DELETE FROM dock_events
+      WHERE checkin_id = ANY($1)
+    `, [idsToDelete]);
+    
+    // Delete related audit logs
+    await (db as any).pool.query(`
+      DELETE FROM checkin_audit_log
+      WHERE checkin_id = ANY($1)
+    `, [idsToDelete]);
+    
+    // Now delete the checkins
+    const deleteResult = await (db as any).pool.query(`
+      DELETE FROM dock_checkins
+      WHERE id = ANY($1)
+    `, [idsToDelete]);
     
     res.json({ 
       success: true,
       deleted: deleteResult.rowCount,
       threshold: threshold,
-      records: deleteResult.rows
+      records: findResult.rows
     });
   } catch (error: any) {
     console.error('Error deleting bad data:', error);
