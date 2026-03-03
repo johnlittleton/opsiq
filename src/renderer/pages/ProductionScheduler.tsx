@@ -416,7 +416,7 @@ export default function ProductionScheduler() {
             className="message-chat-btn" 
             onClick={() => setMessengerOpen(!messengerOpen)}
           >
-            💬 CHAT
+            CHAT
             {unreadCount > 0 && (
               <span className="message-badge">{unreadCount}</span>
             )}
