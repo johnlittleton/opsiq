@@ -1239,6 +1239,16 @@ export class DatabaseService implements IDatabaseService {
   }
 
   getLaborSummary() {
+    // Check if there's an active shift first
+    const today = getLocalISOString().split('T')[0];
+    const activeShift = this.db.prepare(`
+      SELECT id FROM shift_sessions 
+      WHERE date = ? AND status = 'active'
+      LIMIT 1
+    `).get(today);
+    
+    const hasActiveShift = !!activeShift;
+    
     const latest = this.getLatestLaborSnapshot() as any;
     
     if (!latest) {
@@ -1255,7 +1265,6 @@ export class DatabaseService implements IDatabaseService {
     }
 
     // Get today's data
-    const today = getLocalISOString().split('T')[0];
     const todaySnapshots = this.db.prepare(
       'SELECT * FROM labor_snapshots WHERE date(timestamp) = ? ORDER BY timestamp'
     ).all(today) as any[];
@@ -1277,10 +1286,11 @@ export class DatabaseService implements IDatabaseService {
       : 0;
 
     return {
-      currentShippingReceivingHeadcount: latest.shippingReceivingHeadcount,
-      currentProductionHeadcount: latest.productionHeadcount,
-      currentTotalHeadcount: latest.totalHeadcount,
-      currentHourlyLaborCost: latest.totalLaborCost,
+      // If no active shift, show 0 for current headcounts (reset after shift ends)
+      currentShippingReceivingHeadcount: hasActiveShift ? latest.shippingReceivingHeadcount : 0,
+      currentProductionHeadcount: hasActiveShift ? latest.productionHeadcount : 0,
+      currentTotalHeadcount: hasActiveShift ? latest.totalHeadcount : 0,
+      currentHourlyLaborCost: hasActiveShift ? latest.totalLaborCost : 0,
       dailyLaborCost,
       weeklyLaborCost,
       averageShippingReceivingHeadcount: Math.round(avgSR * 10) / 10,

@@ -1403,6 +1403,16 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async getLaborSummary(): Promise<LaborSummary> {
+    // Check if there's an active shift first
+    const today = getLocalISOString().split('T')[0];
+    const activeShiftResult = await this.pool.query(`
+      SELECT id FROM shift_sessions 
+      WHERE date = $1 AND status = 'active'
+      LIMIT 1
+    `, [today]);
+    
+    const hasActiveShift = activeShiftResult.rows.length > 0;
+    
     const latest = await this.getLatestLaborSnapshot();
     
     if (!latest) {
@@ -1419,7 +1429,6 @@ export class DatabaseService implements IDatabaseService {
     }
 
     // Get today's data
-    const today = getLocalISOString().split('T')[0];
     const todayResult = await this.pool.query(
       `SELECT * FROM labor_snapshots 
        WHERE DATE(timestamp) = $1 
@@ -1447,10 +1456,11 @@ export class DatabaseService implements IDatabaseService {
       : 0;
 
     return {
-      currentShippingReceivingHeadcount: latest.shippingReceivingHeadcount,
-      currentProductionHeadcount: latest.productionHeadcount,
-      currentTotalHeadcount: latest.totalHeadcount,
-      currentHourlyLaborCost: latest.totalLaborCost,
+      // If no active shift, show 0 for current headcounts (reset after shift ends)
+      currentShippingReceivingHeadcount: hasActiveShift ? latest.shippingReceivingHeadcount : 0,
+      currentProductionHeadcount: hasActiveShift ? latest.productionHeadcount : 0,
+      currentTotalHeadcount: hasActiveShift ? latest.totalHeadcount : 0,
+      currentHourlyLaborCost: hasActiveShift ? latest.totalLaborCost : 0,
       dailyLaborCost,
       weeklyLaborCost,
       averageShippingReceivingHeadcount: Math.round(avgSR * 10) / 10,
