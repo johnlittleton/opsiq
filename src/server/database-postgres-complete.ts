@@ -383,32 +383,31 @@ export class DatabaseService implements IDatabaseService {
         console.log('✓ Initialized 39 dock doors');
       }
 
-      // Seed executives if empty
-      const execCount = await client.query('SELECT COUNT(*) as count FROM executives');
-      if (execCount.rows[0].count === '0') {
-        const executives = [
-          { name: 'Phil Sr', pin: '14723', role: 'executive' },
-          { name: 'Tyler', pin: '28591', role: 'executive' },
-          { name: 'Phil Jr', pin: '36847', role: 'executive' },
-          { name: 'Julia', pin: '45129', role: 'executive' },
-          { name: 'Michelle', pin: '57263', role: 'executive' },
-          { name: 'Izzy', pin: '69384', role: 'executive' },
-          { name: 'John', pin: '78420', role: 'executive' },
-          { name: 'Ryan', pin: '34090', role: 'executive' },
-          { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
-          { name: 'Sal', pin: '91356', role: 'manager' },
-          { name: 'Jacob', pin: '53782', role: 'manager' },
-          { name: 'Ernie', pin: '67419', role: 'manager' }
-        ];
+      // Seed/update executives (UPSERT to fix roles on existing users)
+      const executives = [
+        { name: 'Phil Sr', pin: '14723', role: 'executive' },
+        { name: 'Tyler', pin: '28591', role: 'executive' },
+        { name: 'Phil Jr', pin: '36847', role: 'executive' },
+        { name: 'Julia', pin: '45129', role: 'executive' },
+        { name: 'Michelle', pin: '57263', role: 'executive' },
+        { name: 'Izzy', pin: '69384', role: 'executive' },
+        { name: 'John', pin: '78420', role: 'executive' },
+        { name: 'Ryan', pin: '34090', role: 'executive' },
+        { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
+        { name: 'Sal', pin: '91356', role: 'manager' },
+        { name: 'Jacob', pin: '53782', role: 'manager' },
+        { name: 'Ernie', pin: '67419', role: 'manager' }
+      ];
 
-        for (const exec of executives) {
-          await client.query(`
-            INSERT INTO executives (name, pin, role, is_active)
-            VALUES ($1, $2, $3, true)
-          `, [exec.name, exec.pin, exec.role]);
-        }
-        console.log('✓ Initialized 12 users with PINs (8 executives + 4 managers)');
+      for (const exec of executives) {
+        await client.query(`
+          INSERT INTO executives (name, pin, role, is_active)
+          VALUES ($1, $2, $3, true)
+          ON CONFLICT (name) 
+          DO UPDATE SET pin = $2, role = $3, is_active = true
+        `, [exec.name, exec.pin, exec.role]);
       }
+      console.log('✓ Synced 12 users with PINs (8 executives + 4 managers)');
 
       // Seed production dock statuses if empty
       const prodDockCount = await client.query('SELECT COUNT(*) as count FROM production_dock_statuses');
