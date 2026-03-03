@@ -777,6 +777,88 @@ app.post('/api/checkins/seed', async (req, res) => {
   }
 });
 
+// Diagnostic endpoint to check for bad data
+app.get('/api/checkins/bad-data', async (req, res) => {
+  try {
+    const query = `
+      SELECT 
+        id,
+        DATE(closed_at) as date,
+        inbound_outbound,
+        company,
+        driver_name,
+        pallets as expected_pallets,
+        actual_pallets,
+        COALESCE(actual_pallets, pallets) as used_pallets
+      FROM dock_checkins
+      WHERE closed_at IS NOT NULL
+        AND COALESCE(actual_pallets, pallets) > 1000
+      ORDER BY used_pallets DESC
+      LIMIT 50
+    `;
+    const result = await (db as any).pool.query(query);
+    res.json({ 
+      count: result.rows.length, 
+      records: result.rows,
+      message: `Found ${result.rows.length} check-ins with >1000 pallets` 
+    });
+  } catch (error: any) {
+    console.error('Error checking bad data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Check specific date summary
+app.get('/api/checkins/date-summary/:date', async (req, res) => {
+  try {
+    const targetDate = req.params.date;
+    const query = `
+      SELECT 
+        DATE(closed_at) as date,
+        COUNT(*) as checkin_count,
+        SUM(COALESCE(actual_pallets, pallets)) as total_pallets,
+        AVG(COALESCE(actual_pallets, pallets)) as avg_pallets,
+        MAX(COALESCE(actual_pallets, pallets)) as max_pallets,
+        MIN(COALESCE(actual_pallets, pallets)) as min_pallets
+      FROM dock_checkins
+      WHERE DATE(closed_at) = $1
+        AND closed_at IS NOT NULL
+      GROUP BY DATE(closed_at)
+    `;
+    const result = await (db as any).pool.query(query, [targetDate]);
+    res.json({ 
+      date: targetDate,
+      summary: result.rows[0] || null
+    });
+  } catch (error: any) {
+    console.error('Error checking date summary:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete bad data (checkins with unrealistic pallet counts)
+app.delete('/api/checkins/cleanup/:threshold', async (req, res) => {
+  try {
+    const threshold = parseInt(req.params.threshold) || 1000;
+    const deleteResult = await (db as any).pool.query(`
+      DELETE FROM dock_checkins
+      WHERE closed_at IS NOT NULL
+        AND COALESCE(actual_pallets, pallets) > $1
+      RETURNING id, company, driver_name, pallets, actual_pallets
+    `, [threshold]);
+    
+    res.json({ 
+      success: true,
+      deleted: deleteResult.rowCount,
+      threshold: threshold,
+      records: deleteResult.rows
+    });
+  } catch (error: any) {
+    console.error('Error deleting bad data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Production Dock Statuses
 app.get('/api/production/dock-statuses', async (req, res) => {
   try {
