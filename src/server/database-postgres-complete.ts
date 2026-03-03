@@ -355,6 +355,11 @@ export class DatabaseService implements IDatabaseService {
         ALTER TABLE appointments ADD COLUMN IF NOT EXISTS carrier TEXT;
       `);
 
+      // Migration: Add role column to executives
+      await client.query(`
+        ALTER TABLE executives ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'manager';
+      `);
+
       // Seed dock doors if empty
       const doorCount = await client.query('SELECT COUNT(*) as count FROM dock_doors');
       if (doorCount.rows[0].count === '0') {
@@ -372,23 +377,27 @@ export class DatabaseService implements IDatabaseService {
       const execCount = await client.query('SELECT COUNT(*) as count FROM executives');
       if (execCount.rows[0].count === '0') {
         const executives = [
-          { name: 'Phil Sr', pin: '14723' },
-          { name: 'Tyler', pin: '28591' },
-          { name: 'Phil Jr', pin: '36847' },
-          { name: 'Julia', pin: '45129' },
-          { name: 'Michelle', pin: '57263' },
-          { name: 'Izzy', pin: '69384' },
-          { name: 'John', pin: '78420' },
-          { name: 'Ryan', pin: '34090' }
+          { name: 'Phil Sr', pin: '14723', role: 'executive' },
+          { name: 'Tyler', pin: '28591', role: 'executive' },
+          { name: 'Phil Jr', pin: '36847', role: 'executive' },
+          { name: 'Julia', pin: '45129', role: 'executive' },
+          { name: 'Michelle', pin: '57263', role: 'executive' },
+          { name: 'Izzy', pin: '69384', role: 'executive' },
+          { name: 'John', pin: '78420', role: 'executive' },
+          { name: 'Ryan', pin: '34090', role: 'executive' },
+          { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
+          { name: 'Sal', pin: '91356', role: 'manager' },
+          { name: 'Jacob', pin: '53782', role: 'manager' },
+          { name: 'Ernie', pin: '67419', role: 'manager' }
         ];
 
         for (const exec of executives) {
           await client.query(`
-            INSERT INTO executives (name, pin, is_active)
-            VALUES ($1, $2, true)
-          `, [exec.name, exec.pin]);
+            INSERT INTO executives (name, pin, role, is_active)
+            VALUES ($1, $2, $3, true)
+          `, [exec.name, exec.pin, exec.role]);
         }
-        console.log('✓ Initialized 8 executives with PINs');
+        console.log('✓ Initialized 12 users with PINs (8 executives + 4 managers)');
       }
 
       // Seed production dock statuses if empty
@@ -2348,9 +2357,9 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Executive Authentication
-  async verifyExecutivePin(pin: string): Promise<{ id: number; name: string } | null> {
+  async verifyExecutivePin(pin: string): Promise<{ id: number; name: string; role: string } | null> {
     const result = await this.pool.query(
-      'SELECT id, name FROM executives WHERE pin = $1 AND is_active = true',
+      'SELECT id, name, role FROM executives WHERE pin = $1 AND is_active = true',
       [pin]
     );
     return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
@@ -2366,24 +2375,28 @@ export class DatabaseService implements IDatabaseService {
     await this.pool.query('DELETE FROM executives');
     
     const executives = [
-      { name: 'Phil Sr', pin: '14723' },
-      { name: 'Tyler', pin: '28591' },
-      { name: 'Phil Jr', pin: '36847' },
-      { name: 'Julia', pin: '45129' },
-      { name: 'Michelle', pin: '57263' },
-      { name: 'Izzy', pin: '69384' },
-      { name: 'John', pin: '78420' },
-      { name: 'Ryan', pin: '34090' }
+      { name: 'Phil Sr', pin: '14723', role: 'executive' },
+      { name: 'Tyler', pin: '28591', role: 'executive' },
+      { name: 'Phil Jr', pin: '36847', role: 'executive' },
+      { name: 'Julia', pin: '45129', role: 'executive' },
+      { name: 'Michelle', pin: '57263', role: 'executive' },
+      { name: 'Izzy', pin: '69384', role: 'executive' },
+      { name: 'John', pin: '78420', role: 'executive' },
+      { name: 'Ryan', pin: '34090', role: 'executive' },
+      { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
+      { name: 'Sal', pin: '91356', role: 'manager' },
+      { name: 'Jacob', pin: '53782', role: 'manager' },
+      { name: 'Ernie', pin: '67419', role: 'manager' }
     ];
 
     for (const exec of executives) {
       await this.pool.query(`
-        INSERT INTO executives (name, pin, is_active)
-        VALUES ($1, $2, true)
-      `, [exec.name, exec.pin]);
+        INSERT INTO executives (name, pin, role, is_active)
+        VALUES ($1, $2, $3, true)
+      `, [exec.name, exec.pin, exec.role]);
     }
     
-    console.log('✓ Force-seeded 8 executives');
+    console.log('✓ Force-seeded 12 users (8 executives + 4 managers)');
     return await this.getExecutives();
   }
 

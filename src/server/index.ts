@@ -736,7 +736,7 @@ app.post('/api/auth/verify-pin', async (req, res) => {
     const { pin } = req.body;
     const executive = await db.verifyExecutivePin(pin);
     if (executive) {
-      res.json({ success: true, name: executive.name });
+      res.json({ success: true, name: executive.name, role: executive.role });
     } else {
       res.status(401).json({ success: false, error: 'Invalid PIN' });
     }

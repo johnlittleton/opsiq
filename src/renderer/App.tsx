@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { useAppStore } from './store';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import PinEntry from './components/PinEntry';
 import { HomePage } from '../pages/HomePage';
 import { DockBoardPage } from '../pages/DockBoardPage';
 import LiveDockBoard from './pages/LiveDockBoard';
@@ -24,17 +25,26 @@ import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { isAuthenticated, login } = useAuth();
   const initializeSync = useAppStore(state => state.initializeSync);
 
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
 
+  const handlePinSuccess = (name: string, role: string) => {
+    login(name, role);
+  };
+
+  // Show PIN entry if not authenticated
+  if (!isAuthenticated) {
+    return <PinEntry onSuccess={handlePinSuccess} />;
+  }
+
   return (
-    <AuthProvider>
-      <Router>
-        <Routes>
+    <Router>
+      <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/dockboard" element={<DockBoardPage />} />
@@ -60,6 +70,13 @@ const App: React.FC = () => {
         <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 };

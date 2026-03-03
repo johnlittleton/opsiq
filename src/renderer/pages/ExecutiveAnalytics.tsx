@@ -4,7 +4,6 @@ import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { GlassPanel } from '../components';
 import { useAuth } from '../context/AuthContext';
-import PinEntry from '../components/PinEntry';
 import {
   BarChart,
   Bar,
@@ -33,7 +32,7 @@ interface AnalyticsData {
 
 const ExecutiveAnalytics: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, executiveName, login, logout } = useAuth();
+  const { executiveName, userRole, logout } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -50,16 +49,10 @@ const ExecutiveAnalytics: React.FC = () => {
     endDate: getLocalDateString(new Date()),
   });
 
-  // Handle successful PIN entry
-  const handlePinSuccess = (name: string) => {
-    login(name);
-  };
-
   // Load analytics data
   useEffect(() => {
-    if (!isAuthenticated) return;
     loadAnalytics();
-  }, [dateRange, isAuthenticated]);
+  }, [dateRange]);
 
   const loadAnalytics = async () => {
     try {
@@ -90,9 +83,19 @@ const ExecutiveAnalytics: React.FC = () => {
     setDateRange({ startDate: today, endDate: today });
   };
 
-  // Show PIN entry if not authenticated
-  if (!isAuthenticated) {
-    return <PinEntry onSuccess={handlePinSuccess} />;
+  // Check if user is executive
+  if (userRole !== 'executive') {
+    return (
+      <div className="executive-analytics" style={{ backgroundColor: '#1a1a2e' }}>
+        <TitleBar showLegend={false} />
+        <div className="analytics-container">
+          <div className="loading" style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
+            ⛔ Access Denied<br/>
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>This analytics view is restricted to executive users.</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {

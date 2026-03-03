@@ -5,7 +5,6 @@ import { TitleBar } from '../../components/layout/TitleBar';
 import { GlassPanel, StatPanel } from '../components';
 import { ExecutiveMetrics } from '../../shared/types';
 import { useAuth } from '../context/AuthContext';
-import PinEntry from '../components/PinEntry';
 import './ExecutiveDashboard.css';
 
 interface CurrentShift {
@@ -24,7 +23,7 @@ interface CurrentShift {
 const ExecutiveDashboard: React.FC = () => {
   console.log('ExecutiveDashboard component rendering...');
   const navigate = useNavigate();
-  const { isAuthenticated, executiveName, login, logout } = useAuth();
+  const { executiveName, userRole, logout } = useAuth();
   const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
@@ -46,17 +45,11 @@ const ExecutiveDashboard: React.FC = () => {
     endDate: getLocalDateString(new Date()),
   });
 
-  // Handle successful PIN entry
-  const handlePinSuccess = (name: string) => {
-    login(name);
-  };
-
   // Load metrics
   useEffect(() => {
-    if (!isAuthenticated) return;
     console.log('ExecutiveDashboard useEffect triggered, loading metrics...');
     loadMetrics();
-  }, [dateRange, isAuthenticated]);
+  }, [dateRange]);
 
   const loadMetrics = async () => {
     try {
@@ -145,8 +138,6 @@ const ExecutiveDashboard: React.FC = () => {
 
   // Auto-update shift every minute (without reloading all metrics)
   useEffect(() => {
-    if (!isAuthenticated) return;
-    
     // Initial fetch for shift only (metrics already loaded by dateRange useEffect)
     fetchCurrentShift();
     
@@ -157,11 +148,21 @@ const ExecutiveDashboard: React.FC = () => {
     
     // Cleanup
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, []);
 
-  // Show PIN entry if not authenticated
-  if (!isAuthenticated) {
-    return <PinEntry onSuccess={handlePinSuccess} />;
+  // Check if user is executive
+  if (userRole !== 'executive') {
+    return (
+      <div className="executive-dashboard" style={{ backgroundColor: '#1a1a2e' }}>
+        <TitleBar showLegend={false} />
+        <div className="executive-dashboard__container">
+          <div style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
+            ⛔ Access Denied<br/>
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>This dashboard is restricted to executive users.</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {

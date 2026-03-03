@@ -4,7 +4,6 @@ import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { GlassPanel, StatPanel } from '../components';
 import { useAuth } from '../context/AuthContext';
-import PinEntry from '../components/PinEntry';
 import './ProductionCosting.css';
 
 interface CostingData {
@@ -60,7 +59,7 @@ interface CostingData {
 
 const ProductionCosting: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, executiveName, login, logout } = useAuth();
+  const { executiveName, userRole, logout } = useAuth();
   const [costingData, setCostingData] = useState<CostingData | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -77,16 +76,10 @@ const ProductionCosting: React.FC = () => {
     endDate: getLocalDateString(new Date()),
   });
 
-  // Handle successful PIN entry
-  const handlePinSuccess = (name: string) => {
-    login(name);
-  };
-
   // Load costing data
   useEffect(() => {
-    if (!isAuthenticated) return;
     loadCostingData();
-  }, [dateRange, isAuthenticated]);
+  }, [dateRange]);
 
   const loadCostingData = async () => {
     try {
@@ -148,12 +141,17 @@ const ProductionCosting: React.FC = () => {
     });
   };
 
-  // If not authenticated, show PIN entry
-  if (!isAuthenticated) {
+  // Check if user is executive
+  if (userRole !== 'executive') {
     return (
       <div className="production-costing-page">
         <TitleBar />
-        <PinEntry onSuccess={handlePinSuccess} />
+        <div className="production-costing-container">
+          <div style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
+            ⛔ Access Denied<br/>
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>Production Costing is restricted to executive users.</span>
+          </div>
+        </div>
       </div>
     );
   }

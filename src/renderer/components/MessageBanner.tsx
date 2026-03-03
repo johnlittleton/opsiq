@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Message, MessageChannel, MessagePriority } from '../../shared/types';
 import { API_BASE } from '../services/config';
+import { useAuth } from '../context/AuthContext';
 import './MessageBanner.css';
 
 interface MessageBannerProps {
@@ -11,6 +12,7 @@ interface MessageBannerProps {
 }
 
 export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCountChange }: MessageBannerProps) {
+  const { executiveName } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [senderName, setSenderName] = useState('');
   const [messageText, setMessageText] = useState('');
@@ -31,6 +33,13 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
     const stored = localStorage.getItem(`dismissed-${channel}`);
     return stored ? parseInt(stored) : 0;
   });
+
+  // Auto-fill sender name from authenticated user
+  useEffect(() => {
+    if (executiveName && !senderName) {
+      setSenderName(executiveName);
+    }
+  }, [executiveName]);
 
   // Fetch messages
   const fetchMessages = async () => {
@@ -236,16 +245,19 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
             {messages.length === 0 ? (
               <div className="message-banner__empty">No messages yet. Start the conversation!</div>
             ) : (
-              messages.map((msg) => (
-                <div key={msg.id} className={`message-item priority-${msg.priority}`}>
-                  <div className="message-header">
-                    <span className="message-priority">{getPriorityIcon(msg.priority)}</span>
-                    <span className="message-sender">{msg.senderName}</span>
-                    <span className="message-time">{formatTime(msg.createdAt)}</span>
+              messages.map((msg) => {
+                const isOwnMessage = msg.senderName === executiveName;
+                return (
+                  <div key={msg.id} className={`message-item priority-${msg.priority} ${isOwnMessage ? 'message-item--own' : ''}`}>
+                    <div className="message-header">
+                      <span className="message-priority">{getPriorityIcon(msg.priority)}</span>
+                      <span className="message-sender">{isOwnMessage ? 'You' : msg.senderName}</span>
+                      <span className="message-time">{formatTime(msg.createdAt)}</span>
+                    </div>
+                    <div className="message-text">{msg.messageText}</div>
                   </div>
-                  <div className="message-text">{msg.messageText}</div>
-                </div>
-              ))
+                );
+              })
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -257,6 +269,12 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
               value={senderName}
               onChange={(e) => setSenderName(e.target.value)}
               className="message-input-name"
+              readOnly
+              style={{
+                backgroundColor: 'rgba(59, 130, 246, 0.05)',
+                cursor: 'not-allowed',
+                opacity: 0.9
+              }}
             />
             <select
               value={priority}

@@ -3,7 +3,7 @@ import { API_BASE } from '../services/config';
 import './PinEntry.css';
 
 interface PinEntryProps {
-  onSuccess: (executiveName: string) => void;
+  onSuccess: (executiveName: string, userRole: string) => void;
 }
 
 export default function PinEntry({ onSuccess }: PinEntryProps) {
@@ -43,7 +43,7 @@ export default function PinEntry({ onSuccess }: PinEntryProps) {
       const data = await response.json();
 
       if (data.success) {
-        onSuccess(data.name);
+        onSuccess(data.name, data.role);
       } else {
         setError('Invalid PIN');
         setPin('');
@@ -67,7 +67,7 @@ export default function PinEntry({ onSuccess }: PinEntryProps) {
     <div className="pin-entry-overlay">
       <div className="pin-entry-modal">
         <div className="pin-entry-header">
-          <h2>Executive Dashboard</h2>
+          <h2>OpsIQ Login</h2>
           <p>Enter your 5-digit PIN</p>
         </div>
 

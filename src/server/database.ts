@@ -274,6 +274,7 @@ export class DatabaseService implements IDatabaseService {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
         pin TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'manager',
         isActive INTEGER DEFAULT 1,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
@@ -448,29 +449,33 @@ export class DatabaseService implements IDatabaseService {
     if (execCount.count === 0) {
       const now = getLocalISOString();
       const executives = [
-        { name: 'Phil Sr', pin: '14723' },
-        { name: 'Tyler', pin: '28591' },
-        { name: 'Phil Jr', pin: '36847' },
-        { name: 'Julia', pin: '45129' },
-        { name: 'Michelle', pin: '57263' },
-        { name: 'Izzy', pin: '69384' },
-        { name: 'John', pin: '78420' },
-        { name: 'Ryan', pin: '34090' }
+        { name: 'Phil Sr', pin: '14723', role: 'executive' },
+        { name: 'Tyler', pin: '28591', role: 'executive' },
+        { name: 'Phil Jr', pin: '36847', role: 'executive' },
+        { name: 'Julia', pin: '45129', role: 'executive' },
+        { name: 'Michelle', pin: '57263', role: 'executive' },
+        { name: 'Izzy', pin: '69384', role: 'executive' },
+        { name: 'John', pin: '78420', role: 'executive' },
+        { name: 'Ryan', pin: '34090', role: 'executive' },
+        { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
+        { name: 'Sal', pin: '91356', role: 'manager' },
+        { name: 'Jacob', pin: '53782', role: 'manager' },
+        { name: 'Ernie', pin: '67419', role: 'manager' }
       ];
 
       const insertExec = this.db.prepare(`
-        INSERT INTO executives (name, pin, isActive, createdAt, updatedAt)
-        VALUES (?, ?, 1, ?, ?)
+        INSERT INTO executives (name, pin, role, isActive, createdAt, updatedAt)
+        VALUES (?, ?, ?, 1, ?, ?)
       `);
 
       const insertExecs = this.db.transaction(() => {
         for (const exec of executives) {
-          insertExec.run(exec.name, exec.pin, now, now);
+          insertExec.run(exec.name, exec.pin, exec.role, now, now);
         }
       });
 
       insertExecs();
-      console.log('✓ Initialized 7 executives with PINs');
+      console.log('✓ Initialized 12 users with PINs (8 executives + 4 managers)');
     }
   }
 
@@ -2274,8 +2279,8 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Executive Authentication
-  async verifyExecutivePin(pin: string): Promise<{ id: number; name: string } | null> {
-    const exec = this.db.prepare('SELECT id, name FROM executives WHERE pin = ? AND isActive = 1').get(pin) as any;
+  async verifyExecutivePin(pin: string): Promise<{ id: number; name: string; role: string } | null> {
+    const exec = this.db.prepare('SELECT id, name, role FROM executives WHERE pin = ? AND isActive = 1').get(pin) as any;
     return exec || null;
   }
 
@@ -2289,23 +2294,27 @@ export class DatabaseService implements IDatabaseService {
     
     const now = getLocalISOString();
     const executives = [
-      { name: 'Phil Sr', pin: '14723' },
-      { name: 'Tyler', pin: '28591' },
-      { name: 'Phil Jr', pin: '36847' },
-      { name: 'Julia', pin: '45129' },
-      { name: 'Michelle', pin: '57263' },
-      { name: 'Izzy', pin: '69384' },
-      { name: 'John', pin: '78420' },
-      { name: 'Ryan', pin: '34090' }
+      { name: 'Phil Sr', pin: '14723', role: 'executive' },
+      { name: 'Tyler', pin: '28591', role: 'executive' },
+      { name: 'Phil Jr', pin: '36847', role: 'executive' },
+      { name: 'Julia', pin: '45129', role: 'executive' },
+      { name: 'Michelle', pin: '57263', role: 'executive' },
+      { name: 'Izzy', pin: '69384', role: 'executive' },
+      { name: 'John', pin: '78420', role: 'executive' },
+      { name: 'Ryan', pin: '34090', role: 'executive' },
+      { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
+      { name: 'Sal', pin: '91356', role: 'manager' },
+      { name: 'Jacob', pin: '53782', role: 'manager' },
+      { name: 'Ernie', pin: '67419', role: 'manager' }
     ];
 
     const insert = this.db.prepare(`
-      INSERT INTO executives (name, pin, isActive, createdAt, updatedAt)
-      VALUES (?, ?, 1, ?, ?)
+      INSERT INTO executives (name, pin, role, isActive, createdAt, updatedAt)
+      VALUES (?, ?, ?, 1, ?, ?)
     `);
 
     for (const exec of executives) {
-      insert.run(exec.name, exec.pin, now, now);
+      insert.run(exec.name, exec.pin, exec.role, now, now);
     }
     
     console.log('✓ Force-seeded 8 executives');

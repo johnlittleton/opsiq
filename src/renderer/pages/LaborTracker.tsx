@@ -4,7 +4,6 @@ import { GlassPanel, StatPanel } from '../components';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { API_BASE } from '../services/config';
 import { useAuth } from '../context/AuthContext';
-import PinEntry from '../components/PinEntry';
 import './LaborTracker.css';
 
 const SR_HOURLY_WAGE = 27; // Warehouse
@@ -49,7 +48,7 @@ interface CurrentShift {
 
 export default function LaborTracker() {
   const navigate = useNavigate();
-  const { isAuthenticated, executiveName, login, logout } = useAuth();
+  const { executiveName, userRole, logout } = useAuth();
   const [shippingHeadcount, setShippingHeadcount] = useState('');
   const [productionHeadcount, setProductionHeadcount] = useState('');
   const [warehouseOvertimeHours, setWarehouseOvertimeHours] = useState('');
@@ -73,21 +72,14 @@ export default function LaborTracker() {
   const [error, setError] = useState<string | null>(null);
   const [endingShift, setEndingShift] = useState(false);
 
-  // Handle successful PIN entry
-  const handlePinSuccess = (name: string) => {
-    login(name);
-  };
-
   useEffect(() => {
-    if (!isAuthenticated) return;
-    
     fetchSummary();
     fetchCurrentShift();
     
     // Poll for current shift every 30 seconds
     const interval = setInterval(fetchCurrentShift, 30000);
     return () => clearInterval(interval);
-  }, [isAuthenticated]);
+  }, []);
 
   // Auto-fill recordedBy with authenticated executive's name
   useEffect(() => {
@@ -246,9 +238,19 @@ export default function LaborTracker() {
 
   const preview = calculatePreview();
 
-  // Show PIN entry if not authenticated
-  if (!isAuthenticated) {
-    return <PinEntry onSuccess={handlePinSuccess} />;
+  // Check if user is executive
+  if (userRole !== 'executive') {
+    return (
+      <div className="labor-tracker">
+        <TitleBar showLegend={false} />
+        <div className="labor-tracker__container">
+          <div style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
+            ⛔ Access Denied<br/>
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>Labor Tracker is restricted to executive users.</span>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
