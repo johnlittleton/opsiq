@@ -412,6 +412,15 @@ export default function ProductionScheduler() {
             }}
           />
           <DowntimeTracker />
+          <button 
+            className="message-chat-btn" 
+            onClick={() => setMessengerOpen(!messengerOpen)}
+          >
+            💬 CHAT
+            {unreadCount > 0 && (
+              <span className="message-badge">{unreadCount}</span>
+            )}
+          </button>
           <button onClick={() => navigate('/production-dashboard')}>
             📊 Dashboard
           </button>
