@@ -868,6 +868,50 @@ app.get('/api/messages/:channel/latest', async (req, res) => {
   }
 });
 
+// Complete/archive a chat
+app.post('/api/messages/:channel/complete', async (req, res) => {
+  try {
+    const { channel } = req.params;
+    const { completedBy } = req.body;
+    
+    if (!completedBy) {
+      return res.status(400).json({ error: 'completedBy is required' });
+    }
+    
+    const result = await db.completeChat(channel, completedBy);
+    
+    // Emit socket event to notify all users chat was completed
+    io.emit('chat-completed', { channel, ...result });
+    
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get chat history
+app.get('/api/messages/:channel/history', async (req, res) => {
+  try {
+    const { channel } = req.params;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const history = await db.getChatHistory(channel, limit);
+    res.json(history);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get messages from a completed chat session
+app.get('/api/messages/session/:sessionId', async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const messages = await db.getChatSessionMessages(sessionId);
+    res.json(messages);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Diagnostic endpoint to check for bad data
 app.get('/api/checkins/bad-data', async (req, res) => {
   try {

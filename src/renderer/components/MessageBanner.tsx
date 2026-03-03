@@ -207,6 +207,35 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
     }
   };
 
+  // Complete/archive chat
+  const handleCompleteChat = async () => {
+    if (messages.length === 0) {
+      alert('No messages to complete');
+      return;
+    }
+
+    const confirm = window.confirm(`Complete this chat? ${messages.length} messages will be archived.`);
+    if (!confirm) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/messages/${channel}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completedBy: executiveName })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setMessages([]);
+        setLastSeenMessageId(0);
+        alert(`✅ Chat completed! ${result.messageCount} messages archived.`);
+      }
+    } catch (error) {
+      console.error('Error completing chat:', error);
+      alert('Failed to complete chat');
+    }
+  };
+
   return (
     <>
       {/* Notification Sound */}
@@ -232,6 +261,14 @@ export function MessageBanner({ channel, isOpen = false, onToggle, onUnreadCount
               💬 {channel === 'shipping-receiving' ? 'Shipping & Receiving' : 'Production'} Team Chat
             </h3>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                className="message-banner__complete" 
+                onClick={handleCompleteChat} 
+                title="Complete and archive this chat"
+                disabled={messages.length === 0}
+              >
+                ✅
+              </button>
               <button className="message-banner__dismiss" onClick={handleDismissAll} title="Dismiss all messages">
                 🔕
               </button>

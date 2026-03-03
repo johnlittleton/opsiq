@@ -266,7 +266,17 @@ export class DatabaseService implements IDatabaseService {
           message_text TEXT NOT NULL,
           priority TEXT NOT NULL DEFAULT 'normal',
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-          dismissed BOOLEAN DEFAULT false
+          dismissed BOOLEAN DEFAULT false,
+          session_id INTEGER REFERENCES chat_sessions(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id SERIAL PRIMARY KEY,
+          channel TEXT NOT NULL,
+          started_at TIMESTAMP NOT NULL,
+          completed_at TIMESTAMP NOT NULL,
+          completed_by TEXT NOT NULL,
+          message_count INTEGER NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -368,6 +378,11 @@ export class DatabaseService implements IDatabaseService {
       // Migration: Add role column to executives
       await client.query(`
         ALTER TABLE executives ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'manager';
+      `);
+
+      // Migration: Add session_id column to messages
+      await client.query(`
+        ALTER TABLE messages ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES chat_sessions(id);
       `);
 
       // Seed dock doors if empty
@@ -2706,7 +2721,7 @@ export class DatabaseService implements IDatabaseService {
   async getMessages(channel: string, limit: number = 50): Promise<any[]> {
     const result = await this.pool.query(`
       SELECT * FROM messages 
-      WHERE channel = $1 AND dismissed = false
+      WHERE channel = $1 AND dismissed = false AND session_id IS NULL
       ORDER BY created_at DESC 
       LIMIT $2
     `, [channel, limit]);
@@ -2721,9 +2736,79 @@ export class DatabaseService implements IDatabaseService {
 
   async getLatestMessageId(channel: string): Promise<number> {
     const result = await this.pool.query(`
-      SELECT MAX(id) as latest_id FROM messages WHERE channel = $1 AND dismissed = false
+      SELECT MAX(id) as latest_id FROM messages WHERE channel = $1 AND dismissed = false AND session_id IS NULL
     `, [channel]);
     return parseInt(result.rows[0].latest_id) || 0;
+  }
+
+  async completeChat(channel: string, completedBy: string): Promise<any> {
+    const client = await this.pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Get all active messages for this channel
+      const activeMessages = await client.query(`
+        SELECT * FROM messages WHERE channel = $1 AND session_id IS NULL
+        ORDER BY created_at ASC
+      `, [channel]);
+      
+      if (activeMessages.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return { success: false, message: 'No active messages to complete' };
+      }
+      
+      // Find the earliest message timestamp
+      const startedAt = activeMessages.rows[0]?.created_at || new Date();
+      
+      // Create chat session
+      const sessionResult = await client.query(`
+        INSERT INTO chat_sessions (channel, started_at, completed_at, completed_by, message_count)
+        VALUES ($1, $2, NOW(), $3, $4)
+        RETURNING id
+      `, [channel, startedAt, completedBy, activeMessages.rows.length]);
+      
+      const sessionId = sessionResult.rows[0].id;
+      
+      // Move all active messages to this session
+      await client.query(`
+        UPDATE messages SET session_id = $1 WHERE channel = $2 AND session_id IS NULL
+      `, [sessionId, channel]);
+      
+      await client.query('COMMIT');
+      
+      return { 
+        success: true, 
+        sessionId, 
+        messageCount: activeMessages.rows.length,
+        startedAt,
+        completedAt: new Date()
+      };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getChatHistory(channel: string, limit: number = 10): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT * FROM chat_sessions 
+      WHERE channel = $1 
+      ORDER BY completed_at DESC 
+      LIMIT $2
+    `, [channel, limit]);
+    return this.toCamelCase(result.rows);
+  }
+
+  async getChatSessionMessages(sessionId: number): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT * FROM messages 
+      WHERE session_id = $1 
+      ORDER BY created_at ASC
+    `, [sessionId]);
+    return this.toCamelCase(result.rows);
   }
 
   async close() {

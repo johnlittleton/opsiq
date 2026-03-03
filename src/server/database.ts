@@ -280,6 +280,15 @@ export class DatabaseService implements IDatabaseService {
         updatedAt TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel TEXT NOT NULL,
+        startedAt TEXT NOT NULL,
+        completedAt TEXT NOT NULL,
+        completedBy TEXT NOT NULL,
+        messageCount INTEGER NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         channel TEXT NOT NULL,
@@ -287,7 +296,9 @@ export class DatabaseService implements IDatabaseService {
         messageText TEXT NOT NULL,
         priority TEXT NOT NULL DEFAULT 'normal',
         createdAt TEXT NOT NULL,
-        dismissed INTEGER DEFAULT 0
+        dismissed INTEGER DEFAULT 0,
+        sessionId INTEGER,
+        FOREIGN KEY (sessionId) REFERENCES chat_sessions(id)
       );
 
       CREATE TABLE IF NOT EXISTS sessions (
@@ -2608,7 +2619,7 @@ export class DatabaseService implements IDatabaseService {
   getMessages(channel: string, limit: number = 50): any[] {
     const messages = this.db.prepare(`
       SELECT * FROM messages 
-      WHERE channel = ? AND dismissed = 0
+      WHERE channel = ? AND dismissed = 0 AND sessionId IS NULL
       ORDER BY createdAt DESC 
       LIMIT ?
     `).all(channel, limit);
@@ -2621,9 +2632,63 @@ export class DatabaseService implements IDatabaseService {
 
   getLatestMessageId(channel: string): number {
     const result = this.db.prepare(`
-      SELECT MAX(id) as latestId FROM messages WHERE channel = ? AND dismissed = 0
+      SELECT MAX(id) as latestId FROM messages WHERE channel = ? AND dismissed = 0 AND sessionId IS NULL
     `).get(channel) as any;
     return result?.latestId || 0;
+  }
+
+  completeChat(channel: string, completedBy: string): any {
+    const now = getLocalISOString();
+    
+    // Get all active messages for this channel
+    const activeMessages = this.db.prepare(`
+      SELECT * FROM messages WHERE channel = ? AND sessionId IS NULL
+    `).all(channel);
+    
+    if (activeMessages.length === 0) {
+      return { success: false, message: 'No active messages to complete' };
+    }
+    
+    // Find the earliest message timestamp
+    const startedAt = activeMessages[0]?.createdAt || now;
+    
+    // Create chat session
+    const sessionResult = this.db.prepare(`
+      INSERT INTO chat_sessions (channel, startedAt, completedAt, completedBy, messageCount)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(channel, startedAt, now, completedBy, activeMessages.length);
+    
+    const sessionId = sessionResult.lastInsertRowid;
+    
+    // Move all active messages to this session
+    this.db.prepare(`
+      UPDATE messages SET sessionId = ? WHERE channel = ? AND sessionId IS NULL
+    `).run(sessionId, channel);
+    
+    return { 
+      success: true, 
+      sessionId, 
+      messageCount: activeMessages.length,
+      startedAt,
+      completedAt: now
+    };
+  }
+
+  getChatHistory(channel: string, limit: number = 10): any[] {
+    return this.db.prepare(`
+      SELECT * FROM chat_sessions 
+      WHERE channel = ? 
+      ORDER BY completedAt DESC 
+      LIMIT ?
+    `).all(channel, limit);
+  }
+
+  getChatSessionMessages(sessionId: number): any[] {
+    return this.db.prepare(`
+      SELECT * FROM messages 
+      WHERE sessionId = ? 
+      ORDER BY createdAt ASC
+    `).all(sessionId);
   }
 
   close() {
