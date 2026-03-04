@@ -4,67 +4,137 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 50%, #0f1419 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(8px);
 }
 
-.pin-entry-modal {
-  background: #232837;
-  border-radius: 16px;
-  padding: 40px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-  max-width: 450px;
-  width: 90%;
-  border: 2px solid #2a3142;
-}
-
-.pin-entry-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.pin-entry-header h2 {
-  margin: 0 0 8px 0;
-  color: #7ffb7f;
-  font-size: 1.8rem;
-  font-weight: 600;
-}
-
-.pin-entry-header p {
-  margin: 0;
-  color: #a0aec0;
-  font-size: 1rem;
-}
-
-.pin-entry-body {
+.pin-entry-splash {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  justify-content: center;
+  gap: 48px;
+}
+
+/* OpsIQ Logo Section - Top Center */
+.splash-logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.splash-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeInScale 0.8s ease-out;
+}
+
+.opsiq-logo-image {
+  height: 320px;
+  width: auto;
+  filter: drop-shadow(0 0 50px rgba(127, 251, 127, 0.5));
+  animation: glow 2s ease-in-out infinite alternate;
+  object-fit: contain;
+}
+
+.splash-logo-text {
+  font-size: 5rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin: 0;
+  background: linear-gradient(135deg, #7ffb7f 0%, #4ade80 50%, #22c55e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 40px rgba(127, 251, 127, 0.3);
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    filter: drop-shadow(0 0 20px rgba(127, 251, 127, 0.4));
+  }
+  to {
+    filter: drop-shadow(0 0 40px rgba(127, 251, 127, 0.8));
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* PIN Entry Section - Directly under logo */
+.splash-pin-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: rgba(35, 40, 55, 0.85);
+  backdrop-filter: blur(12px);
+  padding: 20px 32px;
+  border-radius: 12px;
+  border: 2px solid rgba(127, 251, 127, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: fadeIn 1s ease-out 0.3s backwards;
+  margin-top: 8px;
+  min-width: 320px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.splash-subtitle {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
 }
 
 .pin-input {
-  width: 100%;
-  padding: 16px 24px;
-  font-size: 2rem;
+  width: 200px;
+  padding: 10px 20px;
+  font-size: 1.6rem;
   text-align: center;
-  background: #181c24;
-  border: 2px solid #2a3142;
-  border-radius: 12px;
-  color: #f3f6fa;
-  letter-spacing: 12px;
+  background: rgba(24, 28, 36, 0.95);
+  border: 2px solid rgba(127, 251, 127, 0.4);
+  border-radius: 10px;
+  color: #7ffb7f;
+  letter-spacing: 14px;
   transition: all 0.3s ease;
   font-family: 'Courier New', monospace;
+  font-weight: 600;
 }
 
 .pin-input:focus {
   outline: none;
   border-color: #7ffb7f;
-  box-shadow: 0 0 0 3px rgba(127, 251, 127, 0.1);
+  box-shadow: 0 0 0 3px rgba(127, 251, 127, 0.2),
+              0 0 20px rgba(127, 251, 127, 0.4);
+  background: rgba(24, 28, 36, 0.95);
 }
 
 .pin-input.error {
@@ -79,45 +149,70 @@
 
 .pin-dots {
   display: flex;
-  gap: 16px;
-  margin: 8px 0;
+  gap: 12px;
+  margin: 2px 0;
 }
 
 .pin-dot {
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #2a3142;
+  background: #3a4052;
+  border: 2px solid #5a6072;
   transition: all 0.2s ease;
 }
 
 .pin-dot.filled {
   background: #7ffb7f;
-  box-shadow: 0 0 8px rgba(127, 251, 127, 0.5);
+  border-color: #7ffb7f;
+  box-shadow: 0 0 10px rgba(127, 251, 127, 0.6);
 }
 
 .pin-error {
   color: #dc3545;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
   text-align: center;
 }
 
 .pin-verifying {
   color: #7ffb7f;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
-.pin-entry-footer {
-  margin-top: 32px;
+/* Powered By Section - Bottom Right Corner */
+.splash-powered-by {
+  position: absolute;
+  bottom: 56px;
+  right: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: fadeIn 1.2s ease-out 0.6s backwards;
+}
+
+.powered-by-text {
+  margin: 0;
+  color: #a0aec0;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
   text-align: center;
 }
 
-.pin-hint {
-  margin: 0;
-  color: #6c757d;
-  font-size: 0.85rem;
+.atlas-logo {
+  height: 240px;
+  width: auto;
+  filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.5));
+  transition: transform 0.3s ease;
+  object-fit: contain;
+}
+
+.atlas-logo:hover {
+  transform: scale(1.05);
 }
 
 @keyframes shake {

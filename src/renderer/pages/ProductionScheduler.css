@@ -1051,6 +1051,8 @@
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+  max-height: calc(100vh - 200px);
+  overflow: auto;
 }
 
 .calendar-header {

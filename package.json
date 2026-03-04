@@ -96,8 +96,9 @@
       "allowToChangeInstallationDirectory": true
     },
     "publish": {
-      "provider": "generic",
-      "url": "https://opsiq-production.up.railway.app/updates"
+      "provider": "github",
+      "owner": "johnlittleton",
+      "repo": "opsiq"
     }
   }
 }

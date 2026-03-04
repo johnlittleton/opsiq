@@ -319,11 +319,11 @@ const DockHistory: React.FC = () => {
                   <th>P/U # / S/O #</th>
                   <th>Type</th>
                   <th>Pallets</th>
-                  <th>Start Time</th>
-                  <th>End Time</th>
+                  <th title="When forklift driver started loading/offloading">Start Time</th>
+                  <th title="When forklift driver finished loading/offloading">End Time</th>
                   <th>Old Status</th>
                   <th>New Status</th>
-                  <th>Elapsed Time</th>
+                  <th title="Time door was in Old Status">Elapsed Time</th>
                   <th>Updated By</th>
                   <th>Note</th>
                 </tr>

@@ -101,5 +101,142 @@
 }
 
 .data-table thead th {
+  padding: 14px 12px;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #7ffb7f;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
   border-bottom: 2px solid rgba(59, 130, 246, 0.4);
 }
+
+.data-table tbody td {
+  padding: 12px 12px;
+  text-align: left;
+  font-size: 0.9rem;
+  color: #f3f6fa;
+  border-bottom: 1px solid rgba(42, 49, 66, 0.4);
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  transition: background 0.2s;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Status badge styling */
+.door-status {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.status-Open {
+  background: rgba(46, 204, 113, 0.2);
+  color: #2ecc71;
+  border: 1px solid #2ecc71;
+}
+
+.status-Waiting {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  border: 1px solid #ffc107;
+}
+
+.status-Parked {
+  background: rgba(156, 39, 176, 0.2);
+  color: #9c27b0;
+  border: 1px solid #9c27b0;
+}
+
+.status-Loading {
+  background: rgba(33, 150, 243, 0.2);
+  color: #2196f3;
+  border: 1px solid #2196f3;
+}
+
+.status-Offload {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  border: 1px solid #ff9800;
+}
+
+/* Card styling */
+.card {
+  background: #232837;
+  border: 1px solid #2a3142;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.card-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #7ffb7f;
+  margin: 0 0 20px 0;
+}
+
+/* Form styling */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.form-input {
+  padding: 10px 14px;
+  background: #181c24;
+  border: 1px solid #2a3142;
+  border-radius: 8px;
+  color: #f3f6fa;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.1);
+}
+
+/* Back button */
+.back-button {
+  padding: 10px 20px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background: #357abd;
+  transform: translateY(-1px);
+}
+
+/* Loading state */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #888;
+  font-size: 1.2rem;
+}
+

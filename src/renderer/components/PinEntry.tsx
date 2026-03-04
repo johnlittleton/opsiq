@@ -2,6 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { API_BASE } from '../services/config';
 import './PinEntry.css';
 
+// Import logos - Vite will bundle these
+import opsiqLogo from '../../../assets/opsiq-logo.png';
+import atlasLogo from '../../../assets/atlas-logo.png';
+
 interface PinEntryProps {
   onSuccess: (executiveName: string, userRole: string) => void;
 }
@@ -65,13 +69,22 @@ export default function PinEntry({ onSuccess }: PinEntryProps) {
 
   return (
     <div className="pin-entry-overlay">
-      <div className="pin-entry-modal">
-        <div className="pin-entry-header">
-          <h2>OpsIQ Login</h2>
-          <p>Enter your 5-digit PIN</p>
+      <div className="pin-entry-splash">
+        {/* OpsIQ Logo at Top */}
+        <div className="splash-logo-container">
+          <div className="splash-logo">
+            <img 
+              src={opsiqLogo} 
+              alt="OpsIQ" 
+              className="opsiq-logo-image"
+            />
+          </div>
         </div>
 
-        <div className="pin-entry-body">
+        {/* PIN Entry Section - Directly underneath logo */}
+        <div className="splash-pin-section">
+          <p className="splash-subtitle">Enter your 5-digit PIN</p>
+          
           <input
             ref={inputRef}
             type="password"
@@ -95,8 +108,14 @@ export default function PinEntry({ onSuccess }: PinEntryProps) {
           {isVerifying && <div className="pin-verifying">Verifying...</div>}
         </div>
 
-        <div className="pin-entry-footer">
-          <p className="pin-hint">Please contact IT if you need assistance</p>
+        {/* Powered By - Bottom Right */}
+        <div className="splash-powered-by">
+          <p className="powered-by-text">Powered by</p>
+          <img 
+            src={atlasLogo} 
+            alt="ATLAS ARCHITECTURE" 
+            className="atlas-logo"
+          />
         </div>
       </div>
     </div>
