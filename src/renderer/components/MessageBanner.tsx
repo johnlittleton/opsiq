@@ -356,7 +356,55 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
   // Complete/archive chat for current channel
   const handleCompleteChat = async () => {
     if (activeChannel === 'all') {
-      alert('Please select a specific channel to complete');
+      // Complete both channels when on All Departments view
+      const totalMessages = channelStates['production'].messages.length + channelStates['shipping-receiving'].messages.length;
+      if (totalMessages === 0) {
+        alert('No messages to complete');
+        return;
+      }
+
+      const confirm = window.confirm(`Complete ALL department chats? ${totalMessages} messages will be archived.`);
+      if (!confirm) return;
+
+      try {
+        // Complete both channels
+        await Promise.all([
+          fetch(`${API_BASE}/api/messages/production/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completedBy: executiveName })
+          }),
+          fetch(`${API_BASE}/api/messages/shipping-receiving/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ completedBy: executiveName })
+          })
+        ]);
+
+        // Clear both channels
+        setChannelStates(prev => ({
+          ...prev,
+          'production': {
+            ...prev['production'],
+            messages: [],
+            lastSeenId: 0,
+            unreadCount: 0
+          },
+          'shipping-receiving': {
+            ...prev['shipping-receiving'],
+            messages: [],
+            lastSeenId: 0,
+            unreadCount: 0
+          }
+        }));
+
+        localStorage.setItem('lastSeen-production', '0');
+        localStorage.setItem('lastSeen-shipping-receiving', '0');
+        alert(`✅ All chats completed! ${totalMessages} messages archived.`);
+      } catch (error) {
+        console.error('Error completing chats:', error);
+        alert('Failed to complete chats');
+      }
       return;
     }
 
@@ -434,7 +482,6 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
                 className="message-banner__complete" 
                 onClick={handleCompleteChat} 
                 title="Complete and archive this chat"
-                disabled={activeChannel === 'all' || getDisplayMessages().length === 0}
               >
                 ✅
               </button>

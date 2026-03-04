@@ -169,6 +169,13 @@ const ProductionCosting: React.FC = () => {
           </div>
           <div className="header-actions">
             <button className="back-btn" onClick={() => navigate('/executive')}>← Back to Dashboard</button>
+            <button className="print-page-btn" onClick={() => {
+              if (window.electron?.printPage) {
+                window.electron.printPage();
+              } else {
+                window.print();
+              }
+            }}>🖨️ Print</button>
             <button className="logout-btn" onClick={logout}>Logout</button>
           </div>
         </div>

@@ -201,6 +201,13 @@ const ExecutiveAnalytics: React.FC = () => {
                 />
               </div>
             </div>
+            <button className="print-page-btn" onClick={() => {
+              if (window.electron?.printPage) {
+                window.electron.printPage();
+              } else {
+                window.print();
+              }
+            }}>🖨️ Print</button>
             <button className="today-btn" onClick={setToday}>📅 Today</button>
             <button className="back-btn" onClick={() => navigate('/executive')}>← Back</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>

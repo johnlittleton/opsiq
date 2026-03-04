@@ -15,4 +15,6 @@ contextBridge.exposeInMainWorld('electron', {
   toggleAlwaysOnTop: () => ipcRenderer.send('window-toggle-always-on-top'),
   showTouchKeyboard: () => ipcRenderer.send('show-touch-keyboard'),
   hideTouchKeyboard: () => ipcRenderer.send('hide-touch-keyboard'),
+  printPage: () => ipcRenderer.invoke('print-to-pdf'),
+  printHTML: (html: string) => ipcRenderer.invoke('print-to-pdf', html),
 });

@@ -23,18 +23,21 @@
 }
 
 .back-btn {
-  background: #4a90e2;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.9rem;
+  background: none !important;
+  color: #16a085 !important;
+  border: 3px solid #16a085 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
 }
 
 .back-btn:hover {
-  background: #357abd;
+  background: #16a085 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .header-controls {
@@ -43,15 +46,169 @@
   align-items: center;
 }
 
-.header-controls input[type="date"],
-.header-controls button {
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: 1px solid #444;
-  background: #232837;
+.header-controls input[type="date"] {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 3px solid #7ffb7f;
+  background: #181c24;
   color: #f3f6fa;
   cursor: pointer;
   font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* Message/Chat Button - Yellow like image */
+.message-chat-btn {
+  background: none !important;
+  color: #f1c40f !important;
+  border: 3px solid #f1c40f !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  position: relative !important;
+  transition: all 0.2s !important;
+}
+
+.message-chat-btn:hover {
+  background: #f1c40f !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+.message-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #e74c3c;
+  color: white;
+  border-radius: 50%;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* View Toggle Buttons */
+.view-toggle-group {
+  display: flex;
+  gap: 6px;
+}
+
+.view-toggle-btn {
+  padding: 6px 12px !important;
+  border: 3px solid #9b59b6 !important;
+  background: none !important;
+  color: #9b59b6 !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+  border-radius: 12px !important;
+}
+
+.view-toggle-btn.active {
+  background: none !important;
+  color: #9b59b6 !important;
+  border-color: #9b59b6 !important;
+  box-shadow: 0 0 0 2px rgba(155, 89, 182, 0.3) !important;
+}
+
+.view-toggle-btn:hover:not(.active) {
+  background: rgba(155, 89, 182, 0.2) !important;
+}
+
+/* Print Page Button */
+.print-page-btn {
+  background: none !important;
+  color: #95a5a6 !important;
+  border: 3px solid #95a5a6 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.print-page-btn:hover {
+  background: #95a5a6 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Dashboard Button */
+.dashboard-btn {
+  background: none !important;
+  color: #16a085 !important;
+  border: 3px solid #16a085 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.dashboard-btn:hover {
+  background: #16a085 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* WO History Button */
+.history-btn {
+  background: none !important;
+  color: #e67e22 !important;
+  border: 3px solid #e67e22 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.history-btn:hover {
+  background: #e67e22 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Downtime Button */
+.downtime-history-btn {
+  background: none !important;
+  color: #e74c3c !important;
+  border: 3px solid #e74c3c !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.downtime-history-btn:hover {
+  background: #e74c3c !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Add Work Order Button */
+.add-wo-btn {
+  background: none !important;
+  color: #2ecc71 !important;
+  border: 3px solid #2ecc71 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.add-wo-btn:hover {
+  background: #2ecc71 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 /* Work Order Sections */
@@ -167,30 +324,39 @@
 }
 
 .btn-small.start-btn {
-  background: #4a90e2;
-  color: white;
+  background: none;
+  border: 3px solid #2ecc71;
+  color: #2ecc71;
 }
 
 .btn-small.start-btn:hover {
-  background: #357abd;
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .btn-small.go-btn {
-  background: #28a745;
-  color: white;
+  background: none;
+  border: 3px solid #2ecc71;
+  color: #2ecc71;
 }
 
 .btn-small.go-btn:hover {
-  background: #218838;
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .btn-small.done-btn {
-  background: #6c757d;
-  color: white;
+  background: none;
+  border: 3px solid #95a5a6;
+  color: #95a5a6;
 }
 
 .btn-small.done-btn:hover {
-  background: #5a6268;
+  background: #95a5a6;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 /* Compact Input */
@@ -574,17 +740,19 @@
 
 .go-btn {
   padding: 6px 20px;
-  background: #4a90e2;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-weight: 600;
+  background: none;
+  border: 3px solid #2ecc71;
+  border-radius: 12px;
+  color: #2ecc71;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .go-btn:hover {
-  background: #357abd;
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .status-badge-active {
@@ -666,29 +834,31 @@
 .start-btn, .complete-btn {
   flex: 1;
   padding: 6px;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
+  background: none;
+  border: 3px solid #2ecc71;
+  border-radius: 12px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-}
-
-.start-btn {
-  background: linear-gradient(90deg, #43ea6b, #1fa463);
-  color: white;
+  color: #2ecc71;
 }
 
 .start-btn:hover {
-  transform: scale(1.05);
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .complete-btn {
-  background: linear-gradient(90deg, #6c4cff, #4b2fd6);
-  color: white;
+  background: none;
+  border: 3px solid #2ecc71;
+  color: #2ecc71;
 }
 
 .complete-btn:hover {
-  transform: scale(1.05);
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .completion-badge {
@@ -835,29 +1005,36 @@
 
 .cancel-btn, .save-btn {
   padding: 10px 24px;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
+  border: 3px solid;
+  border-radius: 12px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
+  font-size: 0.95rem;
 }
 
 .cancel-btn {
-  background: #6c757d;
-  color: white;
+  background: none;
+  color: #95a5a6;
+  border-color: #95a5a6;
 }
 
 .cancel-btn:hover {
-  background: #5a6268;
+  background: #95a5a6;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .save-btn {
-  background: #2ecc40;
-  color: white;
+  background: none;
+  color: #2ecc71;
+  border-color: #2ecc71;
 }
 
 .save-btn:hover {
-  background: #27ae60;
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .loading {
@@ -867,4 +1044,271 @@
   min-height: 400px;
   font-size: 1.2rem;
   color: #888;
+}
+/* View Toggle */
+/* Calendar View */
+.calendar-view {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: #232837;
+  border-radius: 8px;
+  border: 1px solid #2a3142;
+}
+
+.calendar-header h2 {
+  margin: 0;
+  font-size: 1.8rem;
+  color: #7ffb7f;
+}
+
+.calendar-header button {
+  background: #4a90e2;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.calendar-header button:hover {
+  background: #357abd;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  background: #232837;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #2a3142;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: bold;
+  padding: 10px;
+  background: #2a3142;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #7ffb7f;
+}
+
+.calendar-day {
+  min-height: 100px;
+  padding: 8px;
+  background: #181c24;
+  border: 2px solid #2a3142;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.calendar-day:hover {
+  border-color: #4a90e2;
+  transform: translateY(-2px);
+}
+
+.calendar-day.empty {
+  background: #0f1217;
+  cursor: default;
+  border: 1px dashed #1a1f2a;
+}
+
+.calendar-day.empty:hover {
+  transform: none;
+  border-color: #1a1f2a;
+}
+
+.calendar-day.today {
+  border-color: #ffc107;
+  background: rgba(255, 193, 7, 0.05);
+}
+
+.calendar-day.selected {
+  border-color: #7ffb7f;
+  background: rgba(127, 251, 127, 0.05);
+}
+
+.calendar-day.has-orders {
+  background: rgba(74, 144, 226, 0.08);
+}
+
+.calendar-day-number {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 6px;
+  color: #f3f6fa;
+}
+
+.calendar-day-orders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calendar-wo-item {
+  font-size: 0.7rem;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendar-wo-item.status-scheduled {
+  background: rgba(74, 144, 226, 0.3);
+  color: #4a90e2;
+  border: 1px solid #4a90e2;
+}
+
+.calendar-wo-item.status-active {
+  background: rgba(40, 167, 69, 0.3);
+  color: #28a745;
+  border: 1px solid #28a745;
+  font-weight: bold;
+}
+
+.calendar-wo-item.status-completed {
+  background: rgba(108, 117, 125, 0.3);
+  color: #6c757d;
+  border: 1px solid #6c757d;
+}
+
+.calendar-wo-item:hover {
+  transform: scale(1.05);
+  filter: brightness(1.2);
+}
+
+.calendar-wo-more {
+  font-size: 0.65rem;
+  color: #888;
+  text-align: center;
+  padding: 2px;
+  font-style: italic;
+}
+
+/* Modal Footer Layout */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #2a3142;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal-footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-footer-right {
+  display: flex;
+  gap: 12px;
+}
+
+.duplicate-btn {
+  padding: 10px 20px;
+  background: none;
+  color: #3498db;
+  border: 3px solid #3498db;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.duplicate-btn:hover {
+  background: #3498db;
+  color: #000;
+  transform: translateY(-1px);
+}
+
+.delete-btn {
+  padding: 10px 20px;
+  background: none;
+  color: #e74c3c;
+  border: 3px solid #e74c3c;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.delete-btn:hover {
+  background: #e74c3c;
+  color: #000;
+  transform: translateY(-1px);
+}
+
+.print-wo-btn {
+  padding: 10px 20px;
+  background: none;
+  color: #9b59b6;
+  border: 3px solid #9b59b6;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.print-wo-btn:hover {
+  background: #9b59b6;
+  color: #000;
+  transform: translateY(-1px);
+}
+
+/* Print Styles */
+@media print {
+  .header-bar,
+  .message-chat-btn,
+  .modal-footer,
+  .wo-actions,
+  button {
+    display: none !important;
+  }
+  
+  .production-scheduler {
+    background: white;
+    color: black;
+  }
+  
+  .calendar-view,
+  .work-order-sections {
+    padding: 0;
+  }
+  
+  .wo-table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  
+  .wo-table th,
+  .wo-table td {
+    border: 1px solid #000;
+    padding: 8px;
+    color: black;
+  }
+  
+  .calendar-day {
+    border: 1px solid #000;
+    page-break-inside: avoid;
+  }
 }

@@ -446,6 +446,11 @@ app.delete('/api/appointments/:id', async (req, res) => {
   }
 });
 
+// ==================== AUTO-UPDATER ENDPOINTS ====================
+
+// Serve update files for electron-updater
+app.use('/updates', express.static(path.join(__dirname, '../../updates')));
+
 // ==================== SOCKET.IO ====================
 
 io.on('connection', (socket) => {
@@ -624,8 +629,10 @@ app.get('/api/production/work-orders', async (req, res) => {
   console.log('📥 GET /api/production/work-orders called');
   try {
     const date = req.query.date as string | undefined;
-    console.log('  Date filter:', date);
-    const workOrders = await db.getWorkOrders(date);
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    console.log('  Date filter:', { date, startDate, endDate });
+    const workOrders = await db.getWorkOrders(date, startDate, endDate);
     console.log('  Found', workOrders.length, 'work orders');
     res.json(workOrders);
   } catch (error: any) {
@@ -677,6 +684,16 @@ app.put('/api/production/work-orders/:id', async (req, res) => {
 
 app.delete('/api/production/work-orders/:id', async (req, res) => {
   try {
+    // Authorization check - only specific executives can delete
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+    if (sessionToken) {
+      const user = await db.validateSession(sessionToken);
+      const authorizedUsers = ['John', 'Ryan', 'Izzy', 'Julia'];
+      if (!user || !authorizedUsers.includes(user.name)) {
+        return res.status(403).json({ error: 'Unauthorized to delete work orders' });
+      }
+    }
+    
     const success = await db.deleteWorkOrder(req.params.id);
     if (success) {
       io.emit('workorder:deleted', req.params.id);

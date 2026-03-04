@@ -2040,9 +2040,12 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Work Orders
-  async getWorkOrders(date?: string): Promise<any[]> {
+  async getWorkOrders(date?: string, startDate?: string, endDate?: string): Promise<any[]> {
     if (date) {
       return this.db.prepare('SELECT * FROM work_orders WHERE date = ? ORDER BY line, slot').all(date);
+    }
+    if (startDate && endDate) {
+      return this.db.prepare('SELECT * FROM work_orders WHERE date >= ? AND date <= ? ORDER BY date, line, slot').all(startDate, endDate);
     }
     return this.db.prepare('SELECT * FROM work_orders ORDER BY line, slot').all();
   }

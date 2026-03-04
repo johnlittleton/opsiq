@@ -92,9 +92,21 @@ const AppointmentHistory: React.FC = () => {
       <div className="appointment-history__content">
         <div className="appointment-history__header">
           <h1 className="appointment-history__title">Appointment History</h1>
-          <button onClick={() => navigate('/')} className="appointment-history__back-btn">
-            ← Back to Home
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => {
+                if (window.electron && window.electron.printPage) {
+                  window.electron.printPage();
+                }
+              }} 
+              className="print-page-btn"
+            >
+              🖨️ Print
+            </button>
+            <button onClick={() => navigate('/')} className="appointment-history__back-btn">
+              ← Back to Home
+            </button>
+          </div>
         </div>
 
         <div className="appointment-history__filters">

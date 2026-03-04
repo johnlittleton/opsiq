@@ -1,4 +1,5 @@
 import { app, BrowserWindow, screen, ipcMain } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
@@ -195,6 +196,49 @@ function createWindow() {
   return mainWindow;
 }
 
+// ==================== AUTO-UPDATER ====================
+
+// Configure auto-updater
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for updates...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info.version);
+});
+
+autoUpdater.on('update-not-available', () => {
+  console.log('App is up to date');
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  console.log(`Download progress: ${Math.round(progressObj.percent)}%`);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded, will install on quit');
+  // Notify user
+  const windows = BrowserWindow.getAllWindows();
+  if (windows.length > 0) {
+    windows[0].webContents.executeJavaScript(`
+      if (confirm('New version ${info.version} downloaded. Restart now to update?')) {
+        require('electron').ipcRenderer.send('restart-app');
+      }
+    `);
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Auto-updater error:', err);
+});
+
+ipcMain.on('restart-app', () => {
+  autoUpdater.quitAndInstall();
+});
+
 // ==================== APP LIFECYCLE ====================
 
 app.whenReady().then(() => {
@@ -203,6 +247,13 @@ app.whenReady().then(() => {
   console.log('Screen argument:', getScreenArgument() || 'none');
   
   createWindow();
+  
+  // Check for updates 5 seconds after startup
+  setTimeout(() => {
+    if (process.env.NODE_ENV !== 'development') {
+      autoUpdater.checkForUpdates();
+    }
+  }, 5000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -270,5 +321,77 @@ ipcMain.on('hide-touch-keyboard', () => {
     exec('taskkill /IM TabTip.exe /F', (error) => {
       // Ignore errors - keyboard might not be open
     });
+  }
+});
+
+// ==================== PRINT HANDLING ====================
+
+ipcMain.handle('print-to-pdf', async (event, htmlContent?: string) => {
+  let webContents = event.sender;
+  let tempWindow: BrowserWindow | null = null;
+  
+  try {
+    // If HTML content is provided, create a temporary window with that content
+    if (htmlContent) {
+      tempWindow = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
+        }
+      });
+      
+      await tempWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+      webContents = tempWindow.webContents;
+      
+      // Wait for content to fully render
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    
+    const data = await webContents.printToPDF({
+      printBackground: true,
+      landscape: false,
+      pageSize: 'Letter',
+      margins: {
+        top: 0.4,
+        bottom: 0.4,
+        left: 0.4,
+        right: 0.4
+      }
+    });
+    
+    // Create a temporary file path
+    const pdfPath = path.join(app.getPath('temp'), `opsiq-print-${Date.now()}.pdf`);
+    fs.writeFileSync(pdfPath, data);
+    
+    // Close temp window if created
+    if (tempWindow) {
+      tempWindow.close();
+    }
+    
+    // Open the PDF in the default viewer (which will have print preview)
+    exec(`"${pdfPath}"`, (error) => {
+      if (error) {
+        console.error('Failed to open PDF:', error);
+      }
+      // Clean up after 60 seconds (give time to print)
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(pdfPath)) {
+            fs.unlinkSync(pdfPath);
+          }
+        } catch (err) {
+          // Ignore cleanup errors
+        }
+      }, 60000);
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    if (tempWindow) {
+      tempWindow.close();
+    }
+    console.error('PDF generation failed:', error);
+    return { success: false, error: error.message };
   }
 });

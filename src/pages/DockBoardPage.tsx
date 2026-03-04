@@ -4,6 +4,7 @@ import { DockTile, DockStatus } from '../components/docks/DockTile';
 import { TitleBar } from '../components/layout/TitleBar';
 import { EditCheckinModal } from '../components/docks/EditCheckinModal';
 import { MessageBanner } from '../renderer/components/MessageBanner';
+import { ChatTicker } from '../renderer/components/ChatTicker';
 import { useAppStore } from '../renderer/store';
 import { apiClient } from '../renderer/services/api';
 import { DockCheckin } from '../shared/types';
@@ -187,6 +188,8 @@ export const DockBoardPage: React.FC = () => {
           onSave={handleSaveEdit}
         />
       )}
+      
+      <ChatTicker onTickerClick={() => setMessengerOpen(true)} />
     </div>
   );
 };

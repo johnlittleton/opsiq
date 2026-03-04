@@ -37,99 +37,124 @@
 }
 
 .today-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #3498db !important;
+  border: 3px solid #3498db !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
   white-space: nowrap;
   height: fit-content;
 }
 
 .today-btn:hover {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-  transform: translateY(-1px);
+  background: #3498db !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .today-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
 }
 
 .analytics-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #9b59b6 !important;
+  border: 3px solid #9b59b6 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
   white-space: nowrap;
   height: fit-content;
 }
 
 .analytics-btn:hover {
-  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
-  transform: translateY(-1px);
+  background: #9b59b6 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .analytics-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
 }
 
 .costing-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #2ecc71 !important;
+  border: 3px solid #2ecc71 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
   white-space: nowrap;
   height: fit-content;
 }
 
 .costing-btn:hover {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-  transform: translateY(-1px);
+  background: #2ecc71 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .costing-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
 }
 
 .logout-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #e74c3c !important;
+  border: 3px solid #e74c3c !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
   white-space: nowrap;
   height: fit-content;
 }
 
 .logout-btn:hover {
-  background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
-  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
-  transform: translateY(-1px);
+  background: #e74c3c !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .logout-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
+}
+
+/* Print Button - Gray */
+.print-page-btn {
+  background: none !important;
+  color: #95a5a6 !important;
+  border: 3px solid #95a5a6 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+  white-space: nowrap;
+  height: fit-content;
+}
+
+.print-page-btn:hover {
+  background: #95a5a6 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+.print-page-btn:active {
+  transform: translateY(0) !important;
 }
 
 .date-selector {

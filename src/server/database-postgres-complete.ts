@@ -2101,13 +2101,16 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Work Orders
-  async getWorkOrders(date?: string): Promise<any[]> {
+  async getWorkOrders(date?: string, startDate?: string, endDate?: string): Promise<any[]> {
     let query = 'SELECT * FROM work_orders ORDER BY line, slot';
     let params: any[] = [];
     
     if (date) {
       query = 'SELECT * FROM work_orders WHERE date = $1 ORDER BY line, slot';
       params = [date];
+    } else if (startDate && endDate) {
+      query = 'SELECT * FROM work_orders WHERE date >= $1 AND date <= $2 ORDER BY date, line, slot';
+      params = [startDate, endDate];
     }
     
     const result = await this.pool.query(query, params);

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { MessageBanner } from '../components/MessageBanner';
+import { ChatTicker } from '../components/ChatTicker';
+import { useAuth } from '../context/AuthContext';
 import './ProductionScheduler.css';
 import DowntimeTracker from '../components/DowntimeTracker';
 
@@ -50,6 +52,7 @@ interface WorkOrder {
 
 export default function ProductionScheduler() {
   const navigate = useNavigate();
+  const { executiveName, sessionToken } = useAuth();
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
@@ -59,14 +62,17 @@ export default function ProductionScheduler() {
     return `${year}-${month}-${day}`;
   };
   
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [monthWorkOrders, setMonthWorkOrders] = useState<WorkOrder[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [editingWorkOrder, setEditingWorkOrder] = useState<Partial<WorkOrder> | null>(null);
   const [loading, setLoading] = useState(true);
   const [casesInputs, setCasesInputs] = useState<Record<string, number>>({});
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedCalendarWO, setSelectedCalendarWO] = useState<WorkOrder | null>(null);
 
   const selectedDateStr = getLocalDateString(selectedDate);
 
@@ -76,6 +82,13 @@ export default function ProductionScheduler() {
     const interval = setInterval(fetchWorkOrders, 2000);
     return () => clearInterval(interval);
   }, [selectedDate]);
+
+  // Fetch work orders for entire month (for calendar view)
+  useEffect(() => {
+    if (viewMode === 'calendar') {
+      fetchMonthWorkOrders();
+    }
+  }, [selectedDate, viewMode]);
 
   // Force re-render every second for live timer display
   const [, setTick] = useState(0);
@@ -106,6 +119,27 @@ export default function ProductionScheduler() {
       console.error('Failed to fetch work orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMonthWorkOrders = async () => {
+    try {
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth();
+      const startDate = new Date(year, month, 1);
+      const endDate = new Date(year, month + 1, 0);
+      
+      const startDateStr = getLocalDateString(startDate);
+      const endDateStr = getLocalDateString(endDate);
+      
+      // Fetch all work orders for the month
+      const response = await fetch(`${API_BASE}/api/production/work-orders?startDate=${startDateStr}&endDate=${endDateStr}`);
+      if (response.ok) {
+        const data = await response.json();
+        setMonthWorkOrders(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch month work orders:', error);
     }
   };
 
@@ -388,6 +422,262 @@ export default function ProductionScheduler() {
 
   const getLineName = (lineId: number) => LINES.find(l => l.id === lineId)?.name || `Line ${lineId}`;
 
+  // Calendar view helpers
+  const getDaysInMonth = () => {
+    const year = selectedDate.getFullYear();
+    const month = selectedDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+    
+    return { daysInMonth, startDayOfWeek, firstDay };
+  };
+
+  const getWorkOrdersForDate = (date: Date) => {
+    const dateStr = getLocalDateString(date);
+    return monthWorkOrders.filter(wo => wo.date === dateStr);
+  };
+
+  const openWorkOrderModal = (wo: WorkOrder) => {
+    setSelectedCalendarWO(wo);
+    setEditingWorkOrder({ ...wo });
+    setShowModal(true);
+  };
+
+  const duplicateWorkOrder = () => {
+    if (!editingWorkOrder) return;
+    // Clone all fields but clear the ID so user can enter new SO#
+    const duplicated = {
+      ...editingWorkOrder,
+      id: '',
+      status: 'Scheduled',
+      completedCases: 0,
+      startTimestamp: undefined,
+      elapsedMs: 0,
+      isPaused: false
+    };
+    setEditingWorkOrder(duplicated);
+  };
+
+  const deleteWorkOrder = async () => {
+    if (!editingWorkOrder?.id) return;
+    
+    // Check authorization - only John, Ryan, Izzy, Julia can delete
+    const authorizedUsers = ['John', 'Ryan', 'Izzy', 'Julia'];
+    if (!authorizedUsers.includes(executiveName)) {
+      alert('You do not have permission to delete work orders.');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete Work Order ${editingWorkOrder.id}?`)) {
+      return;
+    }
+
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionToken) {
+        headers['Authorization'] = `Bearer ${sessionToken}`;
+      }
+      
+      const response = await fetch(`${API_BASE}/api/production/work-orders/${editingWorkOrder.id}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (response.ok) {
+        await fetchWorkOrders();
+        if (viewMode === 'calendar') {
+          await fetchMonthWorkOrders();
+        }
+        closeModal();
+      } else {
+        const error = await response.text();
+        alert('Failed to delete work order: ' + error);
+      }
+    } catch (error) {
+      console.error('Error deleting work order:', error);
+      alert('Error deleting work order: ' + error);
+    }
+  };
+
+  const printWorkOrder = () => {
+    if (!editingWorkOrder) return;
+    
+    const wo = editingWorkOrder;
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Work Order ${wo.id || 'New'}</title>
+        <style>
+          @page { margin: 0.5in; }
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .wo-header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 20px; }
+          .wo-header h1 { margin: 0; font-size: 28px; }
+          .wo-header .so-number { font-size: 24px; color: #333; margin-top: 10px; }
+          .wo-section { margin-bottom: 20px; }
+          .wo-section-title { font-size: 18px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; }
+          .wo-row { display: flex; padding: 8px 0; border-bottom: 1px solid #ddd; }
+          .wo-label { font-weight: bold; width: 150px; }
+          .wo-value { flex: 1; }
+          .lots-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+          .lot-box { border: 1px solid #ddd; padding: 10px; }
+          .priority-${(wo.priority || 'Normal').toLowerCase()} { 
+            display: inline-block; 
+            padding: 4px 12px; 
+            border-radius: 4px; 
+            font-weight: bold;
+            ${wo.priority === 'High' ? 'background: #fee; color: #c00;' : wo.priority === 'Low' ? 'background: #efe; color: #060;' : 'background: #eef; color: #006;'}
+          }
+        </style>
+      </head>
+      <body>
+        <div class="wo-header">
+          <h1>🏭 PRODUCTION WORK ORDER</h1>
+          <div class="so-number">Sales Order #${wo.id || 'TBD'}</div>
+        </div>
+        
+        <div class="wo-section">
+          <div class="wo-section-title">Product Information</div>
+          <div class="wo-row"><div class="wo-label">Product:</div><div class="wo-value">${wo.product || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Bag Size:</div><div class="wo-value">${wo.bagSize || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Country of Origin:</div><div class="wo-value">${wo.countryOfOrigin || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Target Cases:</div><div class="wo-value">${wo.targetCases || 0}</div></div>
+        </div>
+
+        <div class="wo-section">
+          <div class="wo-section-title">Customer & Logistics</div>
+          <div class="wo-row"><div class="wo-label">Customer:</div><div class="wo-value">${wo.customer || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Lead:</div><div class="wo-value">${wo.lead || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Pallets:</div><div class="wo-value">${wo.numPallets || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Priority:</div><div class="wo-value"><span class="priority-${(wo.priority || 'Normal').toLowerCase()}">${wo.priority || 'Normal'}</span></div></div>
+        </div>
+
+        <div class="wo-section">
+          <div class="wo-section-title">Production Details</div>
+          <div class="wo-row"><div class="wo-label">Line:</div><div class="wo-value">${getLineName(wo.line || 0)}</div></div>
+          <div class="wo-row"><div class="wo-label">Date:</div><div class="wo-value">${wo.date || selectedDateStr}</div></div>
+          <div class="wo-row"><div class="wo-label">Labor Required:</div><div class="wo-value">${wo.labor || 'N/A'}</div></div>
+        </div>
+
+        <div class="wo-section">
+          <div class="wo-section-title">Lot Numbers</div>
+          <div class="lots-grid">
+            <div class="lot-box"><strong>Lot 1:</strong> ${wo.lot1 || 'N/A'}</div>
+            <div class="lot-box"><strong>Lot 2:</strong> ${wo.lot2 || 'N/A'}</div>
+            <div class="lot-box"><strong>Lot 3:</strong> ${wo.lot3 || 'N/A'}</div>
+            <div class="lot-box"><strong>Lot 4:</strong> ${wo.lot4 || 'N/A'}</div>
+          </div>
+        </div>
+
+        <div class="wo-section">
+          <div class="wo-section-title">Notes</div>
+          <div style="padding: 10px; background: #f9f9f9; min-height: 60px;">
+            ${wo.notes || 'No notes'}
+          </div>
+        </div>
+
+        <div style="margin-top: 40px; text-align: center; color: #666; font-size: 12px;">
+          Generated: ${new Date().toLocaleString()}
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Use Electron PDF if available, otherwise fallback to popup
+    if (window.electron?.printHTML) {
+      window.electron.printHTML(htmlContent);
+    } else {
+      // Fallback for browser environment
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!printWindow) return;
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
+
+  const renderCalendarView = () => {
+    const { daysInMonth, startDayOfWeek, firstDay } = getDaysInMonth();
+    const days = [];
+    
+    // Month/Year header
+    const monthYear = selectedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    // Add empty cells for days before the 1st
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+    }
+    
+    // Add cells for each day of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(firstDay.getFullYear(), firstDay.getMonth(), day);
+      const dateStr = getLocalDateString(date);
+      const dayWorkOrders = getWorkOrdersForDate(date);
+      const isToday = dateStr === getLocalDateString(new Date());
+      const isSelected = dateStr === selectedDateStr;
+      
+      days.push(
+        <div 
+          key={day} 
+          className={`calendar-day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${dayWorkOrders.length > 0 ? 'has-orders' : ''}`}
+          onClick={() => {
+            setSelectedDate(date);
+            setViewMode('list');
+          }}
+        >
+          <div className="calendar-day-number">{day}</div>
+          <div className="calendar-day-orders">
+            {dayWorkOrders.slice(0, 3).map(wo => (
+              <div 
+                key={wo.id} 
+                className={`calendar-wo-item status-${wo.status.toLowerCase()}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openWorkOrderModal(wo);
+                }}
+                title={`SO #${wo.id} - ${wo.customer || 'N/A'} - ${wo.product || 'N/A'}`}
+              >
+                SO #{wo.id}
+              </div>
+            ))}
+            {dayWorkOrders.length > 3 && (
+              <div className="calendar-wo-more">+{dayWorkOrders.length - 3} more</div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="calendar-view">
+        <div className="calendar-header">
+          <button onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1))}>
+            ← Prev
+          </button>
+          <h2>{monthYear}</h2>
+          <button onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 1))}>
+            Next →
+          </button>
+        </div>
+        <div className="calendar-grid">
+          <div className="calendar-day-header">Sun</div>
+          <div className="calendar-day-header">Mon</div>
+          <div className="calendar-day-header">Tue</div>
+          <div className="calendar-day-header">Wed</div>
+          <div className="calendar-day-header">Thu</div>
+          <div className="calendar-day-header">Fri</div>
+          <div className="calendar-day-header">Sat</div>
+          {days}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="production-scheduler">
       <MessageBanner 
@@ -401,6 +691,20 @@ export default function ProductionScheduler() {
         </button>
         <h1>Production Scheduler</h1>
         <div className="header-controls">
+          <div className="view-toggle-group">
+            <button 
+              className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              📋 List
+            </button>
+            <button 
+              className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+              onClick={() => setViewMode('calendar')}
+            >
+              📅 Calendar
+            </button>
+          </div>
           <input
             type="date"
             value={selectedDateStr}
@@ -410,6 +714,15 @@ export default function ProductionScheduler() {
               setSelectedDate(new Date(year, month - 1, day));
             }}
           />
+          <button className="print-page-btn" onClick={() => {
+            if (window.electron?.printPage) {
+              window.electron.printPage();
+            } else {
+              window.print();
+            }
+          }}>
+            🖨️ Print Page
+          </button>
           <DowntimeTracker />
           <button 
             className="message-chat-btn" 
@@ -420,16 +733,16 @@ export default function ProductionScheduler() {
               <span className="message-badge">{unreadCount}</span>
             )}
           </button>
-          <button onClick={() => navigate('/production-dashboard')}>
+          <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
             📊 Dashboard
           </button>
-          <button onClick={() => navigate('/work-order-history')}>
+          <button className="history-btn" onClick={() => navigate('/work-order-history')}>
             📋 WO History
           </button>
-          <button onClick={() => navigate('/downtime-history')}>
+          <button className="downtime-history-btn" onClick={() => navigate('/downtime-history')}>
             ⏱️ Downtime
           </button>
-          <button onClick={() => openModal(1, 0)}>
+          <button className="add-wo-btn" onClick={() => openModal(1, 0)}>
             ➕ Add Work Order
           </button>
         </div>
@@ -437,6 +750,8 @@ export default function ProductionScheduler() {
 
       {loading ? (
         <div className="loading">Loading...</div>
+      ) : viewMode === 'calendar' ? (
+        renderCalendarView()
       ) : (
         <div className="work-order-sections">
           {/* ACTIVE WORK ORDERS */}
@@ -629,7 +944,6 @@ export default function ProductionScheduler() {
                     placeholder="Enter SO number..."
                     value={editingWorkOrder.id || ''}
                     onChange={(e) => setEditingWorkOrder({ ...editingWorkOrder, id: e.target.value })}
-                    disabled={!!editingWorkOrder.id && editingWorkOrder.status !== 'Scheduled'}
                   />
                 </div>
               </div>
@@ -784,12 +1098,33 @@ export default function ProductionScheduler() {
             </div>
 
             <div className="modal-footer">
-              <button className="cancel-btn" onClick={closeModal}>Cancel</button>
-              <button className="save-btn" onClick={saveWorkOrder}>Save</button>
+              <div className="modal-footer-left">
+                {editingWorkOrder.id && (
+                  <>
+                    <button className="duplicate-btn" onClick={duplicateWorkOrder} title="Create a copy of this work order">
+                      📋 Duplicate
+                    </button>
+                    {['John', 'Ryan', 'Izzy', 'Julia'].includes(executiveName) && (
+                      <button className="delete-btn" onClick={deleteWorkOrder} title="Delete this work order (authorized users only)">
+                        🗑️ Delete
+                      </button>
+                    )}
+                    <button className="print-wo-btn" onClick={printWorkOrder} title="Print work order document">
+                      🖨️ Print WO
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="modal-footer-right">
+                <button className="cancel-btn" onClick={closeModal}>Cancel</button>
+                <button className="save-btn" onClick={saveWorkOrder}>Save</button>
+              </div>
             </div>
           </div>
         </div>
       )}
+      
+      <ChatTicker onTickerClick={() => setMessengerOpen(true)} />
     </div>
   );
 }

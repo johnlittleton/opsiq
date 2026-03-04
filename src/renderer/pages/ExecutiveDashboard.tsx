@@ -221,6 +221,13 @@ const ExecutiveDashboard: React.FC = () => {
                 />
               </div>
             </div>
+            <button className="print-page-btn" onClick={() => {
+              if (window.electron?.printPage) {
+                window.electron.printPage();
+              } else {
+                window.print();
+              }
+            }}>🖨️ Print</button>
             <button className="today-btn" onClick={setToday}>📅 Today</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>

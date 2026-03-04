@@ -176,21 +176,98 @@
 
 .header-controls {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
-.header-controls button, .back-btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  background: #4a90e2;
+/* Back Button - Teal */
+.back-btn {
+  background: none !important;
+  color: #16a085 !important;
+  border: 3px solid #16a085 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.back-btn:hover {
+  background: #16a085 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Schedule Button - Green */
+.schedule-btn {
+  background: none !important;
+  color: #2ecc71 !important;
+  border: 3px solid #2ecc71 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.schedule-btn:hover {
+  background: #2ecc71 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Message/Chat Button - Yellow */
+.message-chat-btn {
+  background: none !important;
+  color: #f1c40f !important;
+  border: 3px solid #f1c40f !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  position: relative !important;
+  transition: all 0.2s !important;
+}
+
+.message-chat-btn:hover {
+  background: #f1c40f !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+.message-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #e74c3c;
   color: white;
-  cursor: pointer;
-  font-weight: 600;
+  border-radius: 50%;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
 }
 
-.header-controls button:hover, .back-btn:hover {
-  background: #357abd;
+/* Refresh Button - Blue */
+.refresh-btn {
+  background: none !important;
+  color: #3498db !important;
+  border: 3px solid #3498db !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.refresh-btn:hover {
+  background: #3498db !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .lines-grid {

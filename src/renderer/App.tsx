@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PinEntry from './components/PinEntry';
@@ -25,50 +25,68 @@ import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 
-const AppContent: React.FC = () => {
+// Public routes that don't require authentication (display dashboards for TVs/monitors)
+const PUBLIC_ROUTES = [
+  '/production-dashboard',
+  '/dashboard',
+  '/dockboard-old',
+  '/production',
+  '/shipping'
+];
+
+const AppRoutes: React.FC = () => {
+  const location = useLocation();
   const { isAuthenticated, login } = useAuth();
+  const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+
+  const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
+    login(name, role, sessionToken);
+  };
+
+  // Show PIN entry only for protected routes when not authenticated
+  if (!isAuthenticated && !isPublicRoute) {
+    return <PinEntry onSuccess={handlePinSuccess} />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/home" element={<HomePage />} />
+      <Route path="/dockboard" element={<DockBoardPage />} />
+      <Route path="/dockboard-old" element={<LiveDockBoard />} />
+      <Route path="/checkin" element={<DriverCheckIn />} />
+      <Route path="/active-drivers" element={<ActiveDrivers />} />
+      <Route path="/scheduler" element={<Scheduler />} />
+      <Route path="/history" element={<DockHistory />} />
+      <Route path="/checkin-history" element={<CheckInHistory />} />
+      <Route path="/appointment-history" element={<AppointmentHistory />} />
+      <Route path="/production" element={<ProductionKPI />} />
+      <Route path="/shipping" element={<ShippingReceivingKPI />} />
+      <Route path="/executive" element={<ExecutiveDashboard />} />
+      <Route path="/executive-analytics" element={<ExecutiveAnalytics />} />
+      <Route path="/production-costing" element={<ProductionCosting />} />
+      <Route path="/labor-tracker" element={<LaborTracker />} />
+      <Route path="/labor-history" element={<LaborHistory />} />
+      <Route path="/production-scheduler" element={<ProductionScheduler />} />
+      <Route path="/production-dashboard" element={<ProductionDashboard />} />
+      <Route path="/dashboard" element={<ProductionDashboard />} />
+      <Route path="/work-order-history" element={<WorkOrderHistory />} />
+      <Route path="/downtime-history" element={<DowntimeHistory />} />
+      <Route path="/settings" element={<Settings />} />
+    </Routes>
+  );
+};
+
+const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
 
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
 
-  const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
-    login(name, role, sessionToken);
-  };
-
-  // Show PIN entry if not authenticated
-  if (!isAuthenticated) {
-    return <PinEntry onSuccess={handlePinSuccess} />;
-  }
-
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/dockboard" element={<DockBoardPage />} />
-        <Route path="/dockboard-old" element={<LiveDockBoard />} />
-        <Route path="/checkin" element={<DriverCheckIn />} />
-        <Route path="/active-drivers" element={<ActiveDrivers />} />
-        <Route path="/scheduler" element={<Scheduler />} />
-        <Route path="/history" element={<DockHistory />} />
-        <Route path="/checkin-history" element={<CheckInHistory />} />
-        <Route path="/appointment-history" element={<AppointmentHistory />} />
-        <Route path="/production" element={<ProductionKPI />} />
-        <Route path="/shipping" element={<ShippingReceivingKPI />} />
-        <Route path="/executive" element={<ExecutiveDashboard />} />
-        <Route path="/executive-analytics" element={<ExecutiveAnalytics />} />
-        <Route path="/production-costing" element={<ProductionCosting />} />
-        <Route path="/labor-tracker" element={<LaborTracker />} />
-        <Route path="/labor-history" element={<LaborHistory />} />
-        <Route path="/production-scheduler" element={<ProductionScheduler />} />
-        <Route path="/production-dashboard" element={<ProductionDashboard />} />
-        <Route path="/dashboard" element={<ProductionDashboard />} />
-        <Route path="/work-order-history" element={<WorkOrderHistory />} />
-        <Route path="/downtime-history" element={<DowntimeHistory />} />
-        <Route path="/settings" element={<Settings />} />
-      </Routes>
+      <AppRoutes />
     </Router>
   );
 };

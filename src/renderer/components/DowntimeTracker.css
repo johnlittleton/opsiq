@@ -3,25 +3,24 @@
 }
 
 .btn-downtime {
-  padding: 10px 18px;
-  background: linear-gradient(135deg, #f57c00 0%, #ef6c00 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  padding: 6px 12px !important;
+  background: none !important;
+  color: #e67e22 !important;
+  border: 3px solid #e67e22 !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  transition: all 0.2s !important;
 }
 
 .btn-downtime:hover {
-  background: linear-gradient(135deg, #fb8c00 0%, #f57c00 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  background: #e67e22 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .active-downtimes {
@@ -87,20 +86,21 @@
 
 .btn-end-downtime {
   padding: 6px 12px;
-  background: #28a745;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  background: none;
+  color: #2ecc71;
+  border: 3px solid #2ecc71;
+  border-radius: 12px;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
 }
 
 .btn-end-downtime:hover {
-  background: #218838;
-  transform: scale(1.05);
+  background: #2ecc71;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .downtime-modal {
@@ -151,29 +151,35 @@
 
 .modal-actions button {
   padding: 10px 24px;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
+  background: none;
+  border: 3px solid #95a5a6;
+  color: #95a5a6;
+  border-radius: 12px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .modal-actions button:first-child {
-  background: #3a4152;
-  color: #f3f6fa;
+  background: none;
+  color: #95a5a6;
+  border: 3px solid #95a5a6;
 }
 
 .modal-actions button:first-child:hover {
-  background: #4a5162;
+  background: #95a5a6;
+  color: #000;
+  transform: translateY(-1px);
 }
 
 .modal-actions .btn-primary {
-  background: linear-gradient(135deg, #f57c00 0%, #ef6c00 100%);
-  color: white;
+  background: none;
+  color: #e67e22;
+  border: 3px solid #e67e22;
 }
 
 .modal-actions .btn-primary:hover {
-  background: linear-gradient(135deg, #fb8c00 0%, #f57c00 100%);
+  background: #e67e22;
+  color: #000;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }

@@ -13,6 +13,8 @@ export interface IElectron {
   toggleAlwaysOnTop?: () => void;
   showTouchKeyboard?: () => void;
   hideTouchKeyboard?: () => void;
+  printPage?: () => Promise<{ success: boolean; error?: string }>;
+  printHTML?: (html: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {

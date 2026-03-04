@@ -30,28 +30,92 @@
   color: var(--text-muted);
 }
 
+/* Today Button - Blue */
+.today-btn {
+  background: none !important;
+  color: #3498db !important;
+  border: 3px solid #3498db !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+  white-space: nowrap;
+  height: fit-content;
+}
+
+.today-btn:hover {
+  background: #3498db !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Back Button - Teal */
 .back-btn {
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #64748b 0%, #475569 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #16a085 !important;
+  border: 3px solid #16a085 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
   white-space: nowrap;
   height: fit-content;
 }
 
 .back-btn:hover {
-  background: linear-gradient(135deg, #475569 0%, #334155 100%);
-  box-shadow: 0 4px 12px rgba(100, 116, 139, 0.3);
-  transform: translateY(-1px);
+  background: #16a085 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .back-btn:active {
-  transform: translateY(0);
+  transform: translateY(0) !important;
+}
+
+/* Logout Button - Red */
+.logout-btn {
+  background: none !important;
+  color: #e74c3c !important;
+  border: 3px solid #e74c3c !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+  white-space: nowrap;
+  height: fit-content;
+}
+
+.logout-btn:hover {
+  background: #e74c3c !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Print Button - Gray */
+.print-page-btn {
+  background: none !important;
+  color: #95a5a6 !important;
+  border: 3px solid #95a5a6 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+  white-space: nowrap;
+  height: fit-content;
+}
+
+.print-page-btn:hover {
+  background: #95a5a6 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .charts-grid {

@@ -1,13 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { API_BASE } from '../services/config';
 
-const INACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
 const SESSION_TOKEN_KEY = 'opsiq-session-token';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   executiveName: string;
   userRole: string;
+  sessionToken: string | null;
   login: (name: string, role: string, sessionToken: string) => void;
   logout: () => void;
 }
@@ -31,7 +31,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [executiveName, setExecutiveName] = useState('');
   const [userRole, setUserRole] = useState('');
   const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [isValidating, setIsValidating] = useState(true);
 
   // Validate session from Railway on mount
@@ -50,7 +49,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setExecutiveName(data.name);
             setUserRole(data.role);
             setSessionToken(storedToken);
-            resetInactivityTimer();
           } else {
             // Invalid session, clear it
             localStorage.removeItem(SESSION_TOKEN_KEY);
@@ -66,18 +64,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     validateStoredSession();
   }, []);
 
-  const resetInactivityTimer = () => {
-    // Clear existing timer
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-    }
-
-    // Set new timer for 15 minutes
-    inactivityTimerRef.current = setTimeout(() => {
-      logout();
-    }, INACTIVITY_TIMEOUT);
-  };
-
   const login = (name: string, role: string, sessionToken: string) => {
     setIsAuthenticated(true);
     setExecutiveName(name);
@@ -86,8 +72,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     // Store session token as pointer to Railway session
     localStorage.setItem(SESSION_TOKEN_KEY, sessionToken);
-    
-    resetInactivityTimer();
   };
 
   const logout = async () => {
@@ -110,40 +94,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUserRole('');
     setSessionToken(null);
     localStorage.removeItem(SESSION_TOKEN_KEY);
-    
-    if (inactivityTimerRef.current) {
-      clearTimeout(inactivityTimerRef.current);
-      inactivityTimerRef.current = null;
-    }
   };
 
-  // Track user activity globally to reset inactivity timer
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const handleActivity = () => {
-      resetInactivityTimer();
-    };
-
-    // Listen for user activity across the entire app
-    window.addEventListener('mousemove', handleActivity);
-    window.addEventListener('keypress', handleActivity);
-    window.addEventListener('click', handleActivity);
-    window.addEventListener('scroll', handleActivity);
-
-    return () => {
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keypress', handleActivity);
-      window.removeEventListener('click', handleActivity);
-      window.removeEventListener('scroll', handleActivity);
-      if (inactivityTimerRef.current) {
-        clearTimeout(inactivityTimerRef.current);
-      }
-    };
-  }, [isAuthenticated]);
-
   return (
-    <AuthContext.Provider value={{ isAuthenticated, executiveName, userRole, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, executiveName, userRole, sessionToken, login, logout }}>
       {isValidating ? <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div> : children}
     </AuthContext.Provider>
   );

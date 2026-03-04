@@ -4,6 +4,7 @@ import { API_BASE } from '../services/config';
 import './ProductionDashboard.css';
 import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { MessageBanner } from '../components/MessageBanner';
+import { ChatTicker } from '../components/ChatTicker';
 
 const LINES = [
   { id: 1, name: 'Giro Line 1' },
@@ -228,7 +229,7 @@ export default function ProductionDashboard() {
         <button className="back-btn" onClick={() => navigate('/')}>← Home</button>
         <h1>{pageTitle}</h1>
         <div className="header-controls">
-          {!specificLine && <button onClick={() => navigate('/production-scheduler')}>📋 Schedule</button>}
+          {!specificLine && <button className="schedule-btn" onClick={() => navigate('/production-scheduler')}>📋 Schedule</button>}
           {!specificLine && (
             <button 
               className="message-chat-btn" 
@@ -240,7 +241,7 @@ export default function ProductionDashboard() {
               )}
             </button>
           )}
-          <button onClick={fetchWorkOrders}>🔄 Refresh</button>
+          <button className="refresh-btn" onClick={fetchWorkOrders}>🔄 Refresh</button>
         </div>
       </div>
 
@@ -346,6 +347,8 @@ export default function ProductionDashboard() {
           );
         })}
       </div>
+      
+      <ChatTicker onTickerClick={() => setMessengerOpen(true)} />
     </div>
   );
 }

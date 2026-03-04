@@ -44,7 +44,7 @@
   max-width: calc(100vw - 40px);
   background: linear-gradient(135deg, rgba(24, 24, 27, 0.75) 0%, rgba(17, 18, 23, 0.75) 100%);
   backdrop-filter: blur(12px);
-  border: 2px solid rgba(59, 130, 246, 0.5);
+  border: 3px solid rgba(16, 185, 129, 0.8);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   z-index: 10000;
@@ -68,12 +68,17 @@
 
 @keyframes pulse-border {
   0%, 100% {
-    border-color: rgba(59, 130, 246, 0.5);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.3);
+    border-color: rgba(16, 185, 129, 0.7);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 
+                0 0 30px rgba(16, 185, 129, 0.8), 
+                0 0 50px rgba(16, 185, 129, 0.6);
   }
   50% {
-    border-color: rgba(59, 130, 246, 0.9);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 30px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4);
+    border-color: rgba(16, 185, 129, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 
+                0 0 50px rgba(16, 185, 129, 1), 
+                0 0 80px rgba(16, 185, 129, 0.8),
+                0 0 100px rgba(16, 185, 129, 0.6);
   }
 }
 

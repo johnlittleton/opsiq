@@ -46,37 +46,58 @@
 }
 
 .back-btn {
-  padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #16a085 !important;
+  border: 3px solid #16a085 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
 }
 
 .back-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: #16a085 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 .logout-btn {
-  padding: 6px 12px;
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
-  color: #f87171;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #e74c3c !important;
+  border: 3px solid #e74c3c !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
 }
 
 .logout-btn:hover {
-  background: rgba(239, 68, 68, 0.3);
-  border-color: rgba(239, 68, 68, 0.5);
+  background: #e74c3c !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Print Button - Gray */
+.print-page-btn {
+  background: none !important;
+  color: #95a5a6 !important;
+  border: 3px solid #95a5a6 !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.print-page-btn:hover {
+  background: #95a5a6 !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 /* Date Controls */
@@ -123,20 +144,21 @@
 }
 
 .quick-btn {
-  padding: 6px 12px;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border: none;
-  border-radius: 6px;
-  color: white;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+  background: none !important;
+  color: #3498db !important;
+  border: 3px solid #3498db !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
 }
 
 .quick-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  background: #3498db !important;
+  color: #000 !important;
+  transform: translateY(-1px) !important;
 }
 
 /* KPI Row */
