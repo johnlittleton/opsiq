@@ -49,6 +49,7 @@ interface WorkOrder {
   startTimestamp?: number;
   elapsedMs?: number;
   isPaused?: boolean;
+  planned_run_rate?: number;
 }
 
 export default function ProductionScheduler() {
@@ -76,9 +77,14 @@ export default function ProductionScheduler() {
   const [selectedCalendarWO, setSelectedCalendarWO] = useState<WorkOrder | null>(null);
 
   const selectedDateStr = getLocalDateString(selectedDate);
+  const getPlannedRunRate = (wo: WorkOrder): number | null => {
+    const runRate = Number(wo.plannedRunRate ?? wo.planned_run_rate);
+    return runRate > 0 ? runRate : null;
+  };
+
   const getRunRateLabel = (wo: WorkOrder, includeDefault = false) => {
-    const runRate = Number(wo.plannedRunRate);
-    if (runRate > 0) {
+    const runRate = getPlannedRunRate(wo);
+    if (runRate !== null) {
       return `${runRate}/min`;
     }
     return includeDefault ? '45/min (default)' : '-';
@@ -109,7 +115,11 @@ export default function ProductionScheduler() {
     try {
       const response = await fetch(`${API_BASE}/api/production/work-orders?date=${selectedDateStr}`);
       if (response.ok) {
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = rawData.map((wo: any) => ({
+          ...wo,
+          plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
+        }));
         setWorkOrders(data);
         // Only initialize casesInputs for NEW work orders, preserve existing user input
         setCasesInputs(prev => {
@@ -143,7 +153,11 @@ export default function ProductionScheduler() {
       // Fetch all work orders for the month
       const response = await fetch(`${API_BASE}/api/production/work-orders?startDate=${startDateStr}&endDate=${endDateStr}`);
       if (response.ok) {
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = rawData.map((wo: any) => ({
+          ...wo,
+          plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
+        }));
         setMonthWorkOrders(data);
       }
     } catch (error) {
@@ -433,7 +447,7 @@ export default function ProductionScheduler() {
         <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
         <div className="product"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
         <div className="bag-size"><b>Bag Size:</b> {wo.bagSize || 'N/A'}</div>
-        <div className="pallets"><b>Run Rate:</b> {getRunRateLabel(wo, true)}</div>
+        <div className="pallets"><b>Run Rate:</b> {getRunRateLabel(wo, false)}</div>
         <div className="labor"><b>Labor:</b> {wo.labor || ''}</div>
         <div className="priority-bar">
           <b>Priority:</b> <span className={`priority-badge priority-${(wo.priority || 'Normal').toLowerCase()}`}>{wo.priority || 'Normal'}</span>
@@ -880,7 +894,7 @@ export default function ProductionScheduler() {
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{getRunRateLabel(wo, true)}</td>
+                      <td>{getRunRateLabel(wo, false)}</td>
                       <td>{wo.labor || '-'}</td>
                       <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}

@@ -54,7 +54,11 @@ export default function ProductionDashboard() {
     try {
       const response = await fetch(`${API_BASE}/api/production/work-orders?date=${selectedDate}`);
       if (response.ok) {
-        const data = await response.json();
+        const rawData = await response.json();
+        const data = rawData.map((wo: any) => ({
+          ...wo,
+          plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
+        }));
         console.log('📊 Fetched work orders:', data.length, 'orders');
         console.log('   Active orders:', data.filter((wo: any) => wo.status === 'Active').map((wo: any) => ({ id: wo.id, line: wo.line, status: wo.status })));
         setWorkOrders(data);
@@ -372,7 +376,7 @@ export default function ProductionDashboard() {
                   <div className="metrics-section">
                     <div className="metric-row">
                       <div className="metric">
-                        <span className="metric-label">Required Rate:</span>
+                        <span className="metric-label">Planned Rate:</span>
                         <span className="metric-value required-rate">{calculateRequiredRate(wo)} bags/min</span>
                       </div>
                       <div className="metric">
@@ -382,7 +386,7 @@ export default function ProductionDashboard() {
                     </div>
                     <div className="metric-row">
                       <div className="metric">
-                        <span className="metric-label">Required Rate (Cases):</span>
+                        <span className="metric-label">Planned Rate (Cases):</span>
                         <span className="metric-value required-rate">{calculateRequiredRateCases(wo)} cases/min</span>
                       </div>
                       <div className="metric">
