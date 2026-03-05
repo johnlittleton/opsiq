@@ -87,7 +87,7 @@ export default function ProductionScheduler() {
     if (runRate !== null) {
       return `${runRate}/min`;
     }
-    return includeDefault ? '45/min (default)' : '-';
+    return includeDefault ? '- (set in WO form)' : '-';
   };
 
   const getPlannedBagsPerMinute = (wo: WorkOrder): number | null => {
@@ -207,6 +207,12 @@ export default function ProductionScheduler() {
 
     // Check if this is an existing work order (has an id from the database)
     const isExisting = editingWorkOrder.id && workOrders.some(wo => wo.id === editingWorkOrder.id);
+    const plannedRate = Number(editingWorkOrder.plannedRunRate);
+
+    if (!Number.isFinite(plannedRate) || plannedRate <= 0) {
+      alert('Planned Run Rate (bags/min) is required and must be greater than 0.');
+      return;
+    }
     
     const woData = {
       ...editingWorkOrder,
@@ -215,7 +221,8 @@ export default function ProductionScheduler() {
       slot: editingWorkOrder.slot,
       date: selectedDateStr,
       status: editingWorkOrder.status || 'Scheduled',
-      planned_run_rate: editingWorkOrder.plannedRunRate
+      plannedRunRate: plannedRate,
+      planned_run_rate: plannedRate
     };
 
     try {
@@ -251,6 +258,11 @@ export default function ProductionScheduler() {
     const wo = workOrders.find(w => w.id === id);
     if (!wo) {
       console.error('Work order not found:', id);
+      return;
+    }
+
+    if (getPlannedRunRate(wo) === null) {
+      alert('Please edit this work order and enter Planned Run Rate (bags/min) before starting.');
       return;
     }
 
@@ -303,23 +315,59 @@ export default function ProductionScheduler() {
   };
 
   const updateCompletedCases = async (id: string, completedCases: number) => {
-    console.log('Updating completed cases:', id, completedCases);
+    const normalizedCompletedCases = Number.isFinite(completedCases)
+      ? Math.max(0, Math.round(completedCases))
+      : 0;
+    const previousWorkOrder = workOrders.find(wo => wo.id === id);
+    const previousCompletedCases = previousWorkOrder?.completedCases ?? 0;
+
+    console.log('Updating completed cases:', id, normalizedCompletedCases);
+
+    setWorkOrders(prev => prev.map(wo => (
+      wo.id === id ? { ...wo, completedCases: normalizedCompletedCases } : wo
+    )));
+    setCasesInputs(prev => ({ ...prev, [id]: normalizedCompletedCases }));
+
     try {
       const response = await fetch(`${API_BASE}/api/production/work-orders/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completedCases })
+        body: JSON.stringify({ completedCases: normalizedCompletedCases })
       });
       
       if (response.ok) {
         console.log('Completed cases updated successfully');
-        await fetchWorkOrders();
+        const updatedWorkOrder = await response.json().catch(() => null);
+        if (updatedWorkOrder) {
+          setWorkOrders(prev => prev.map(wo => (
+            wo.id === id
+              ? {
+                  ...wo,
+                  ...updatedWorkOrder,
+                  plannedRunRate: updatedWorkOrder.plannedRunRate ?? updatedWorkOrder.planned_run_rate ?? wo.plannedRunRate
+                }
+              : wo
+          )));
+        }
+        fetchWorkOrders();
       } else {
+        setWorkOrders(prev => prev.map(wo => (
+          wo.id === id ? { ...wo, completedCases: previousCompletedCases } : wo
+        )));
+        setCasesInputs(prev => ({ ...prev, [id]: previousCompletedCases }));
+
         const error = await response.text();
         console.error('Failed to update completed cases:', error);
+        alert('Failed to update completed cases: ' + error);
       }
     } catch (error) {
+      setWorkOrders(prev => prev.map(wo => (
+        wo.id === id ? { ...wo, completedCases: previousCompletedCases } : wo
+      )));
+      setCasesInputs(prev => ({ ...prev, [id]: previousCompletedCases }));
+
       console.error('Error updating completed cases:', error);
+      alert('Error updating completed cases: ' + error);
     }
   };
 
@@ -989,7 +1037,7 @@ export default function ProductionScheduler() {
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{wo.plannedRunRate ? `${wo.plannedRunRate}/min` : '-'}</td>
+                      <td>{getRunRateLabel(wo)}</td>
                       <td>{wo.labor || '-'}</td>
                       <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
@@ -1151,7 +1199,7 @@ export default function ProductionScheduler() {
                     type="number"
                     step="0.1"
                     min="0"
-                    value={editingWorkOrder.plannedRunRate || ''}
+                    value={editingWorkOrder.plannedRunRate ?? ''}
                     onChange={(e) => {
                       const value = e.target.value;
                       setEditingWorkOrder({
