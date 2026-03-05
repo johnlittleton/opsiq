@@ -143,11 +143,26 @@ export default function ProductionDashboard() {
     return match ? parseInt(match[1], 10) : 1;
   };
 
+  const getPlannedCases = (wo: any): number => {
+    return Number(wo?.targetCases) > 0 ? Number(wo.targetCases) : 0;
+  };
+
+  const getPlannedRunRate = (wo: any): number | null => {
+    const runRate = Number(wo?.plannedRunRate ?? wo?.planned_run_rate ?? wo?.plannedrate);
+    return runRate > 0 ? runRate : null;
+  };
+
+  const getRequiredBagsPerMinute = (wo: any): number | null => {
+    const plannedRunRate = getPlannedRunRate(wo);
+    return plannedRunRate !== null ? plannedRunRate : null;
+  };
+
   const calculateRequiredRateCases = (wo: any) => {
-    if (!wo || !wo.targetCases || !wo.startTimestamp) return '--';
-    // Calculate cases per minute needed to complete target in 8 hours
-    const targetMinutes = 480; // 8 hours
-    return (wo.targetCases / targetMinutes).toFixed(1);
+    if (!wo) return '--';
+    const requiredBagsPerMinute = getRequiredBagsPerMinute(wo);
+    if (requiredBagsPerMinute === null) return '--';
+    const bagsPerCase = getBagsPerCase(wo);
+    return (requiredBagsPerMinute / bagsPerCase).toFixed(1);
   };
 
   const calculateCurrentRateCases = (wo: any) => {
@@ -159,12 +174,10 @@ export default function ProductionDashboard() {
   };
 
   const calculateRequiredRate = (wo: any) => {
-    if (!wo || !wo.targetCases || !wo.startTimestamp) return '--';
-    // Calculate bags per minute needed to complete target in 8 hours
-    const targetMinutes = 480; // 8 hours
-    const casesPerMin = wo.targetCases / targetMinutes;
-    const bagsPerCase = getBagsPerCase(wo);
-    return Math.round(casesPerMin * bagsPerCase);
+    if (!wo) return '--';
+    const requiredBagsPerMinute = getRequiredBagsPerMinute(wo);
+    if (requiredBagsPerMinute === null) return '--';
+    return requiredBagsPerMinute.toFixed(1);
   };
 
   const calculateCurrentRate = (wo: any) => {
@@ -249,8 +262,10 @@ export default function ProductionDashboard() {
         {displayLines.map(line => {
           const wo = getActiveWorkOrder(line.id);
           const status = getLineStatus(line.id);
-          const progress = wo && wo.targetCases ? 
-            Math.round(((wo.completedCases || 0) / wo.targetCases) * 100) : 0;
+          const plannedCases = getPlannedCases(wo);
+          const progress = wo && plannedCases > 0
+            ? Math.round(((wo.completedCases || 0) / plannedCases) * 100)
+            : 0;
           const hasAlert = !specificLine && hasDriverAlertForLine(line.id);
 
           return (
@@ -271,6 +286,7 @@ export default function ProductionDashboard() {
                   <div className="detail"><b>Country:</b> {wo.countryOfOrigin || 'N/A'}</div>
                   <div className="detail"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
                   <div className="detail"><b>Bag Size:</b> {wo.bagSize || 'N/A'}</div>
+                  <div className="detail"><b>Planned Cases:</b> {plannedCases}</div>
                   <div className="detail"><b>Pallets:</b> {wo.numPallets || ''}</div>
                   <div className="detail"><b>Labor:</b> {wo.labor || ''}</div>
                   <div className="detail priority-bar">
@@ -291,7 +307,7 @@ export default function ProductionDashboard() {
 
                   <div className="progress-section">
                     <div className="progress-label">
-                      <span>Target Cases: {wo.targetCases || 0}</span>
+                      <span>Planned Cases: {plannedCases}</span>
                       <span>Completed: {wo.completedCases || 0}</span>
                     </div>
                     <div className="progress-bar">

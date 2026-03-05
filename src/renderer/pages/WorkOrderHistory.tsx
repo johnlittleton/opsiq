@@ -7,6 +7,8 @@ export default function WorkOrderHistory() {
   const navigate = useNavigate();
   const [workOrders, setWorkOrders] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -38,11 +40,8 @@ export default function WorkOrderHistory() {
     ].some(field => String(field || '').toLowerCase().includes(q));
   });
 
-  const handleDelete = async (id: string) => {
-    if (!confirm(`Are you sure you want to delete work order #${id}? This cannot be undone.`)) {
-      return;
-    }
-
+  const deleteWorkOrder = async (id: string) => {
+    setIsDeleting(true);
     try {
       const token = localStorage.getItem('sessionToken');
       const response = await fetch(`${API_BASE}/api/production/work-orders/${id}`, {
@@ -53,6 +52,7 @@ export default function WorkOrderHistory() {
       });
 
       if (response.ok) {
+        setPendingDeleteId(null);
         await fetchWorkOrders();
       } else {
         const error = await response.json();
@@ -61,7 +61,18 @@ export default function WorkOrderHistory() {
     } catch (error) {
       console.error('Error deleting work order:', error);
       alert('Failed to delete work order');
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setPendingDeleteId(id);
+  };
+
+  const handleCancelDelete = () => {
+    if (isDeleting) return;
+    setPendingDeleteId(null);
   };
 
   const handlePrint = () => {
@@ -124,7 +135,7 @@ export default function WorkOrderHistory() {
               <th>Product</th>
               <th>Customer</th>
               <th>Bag Size</th>
-              <th>Pallets</th>
+              <th>Run Rate</th>
               <th>Target</th>
               <th>Completed</th>
               <th>Elapsed</th>
@@ -143,7 +154,7 @@ export default function WorkOrderHistory() {
                 <td>${wo.product || '-'}</td>
                 <td>${wo.customer || '-'}</td>
                 <td>${wo.bagSize || '-'}</td>
-                <td>${wo.numPallets || '-'}</td>
+                <td>${wo.plannedRunRate ? `${wo.plannedRunRate}/min` : '-'}</td>
                 <td>${wo.targetCases || '-'}</td>
                 <td>${wo.completedCases || '-'}</td>
                 <td>${wo.elapsedDisplay || '-'}</td>
@@ -206,7 +217,7 @@ export default function WorkOrderHistory() {
               <th>Product</th>
               <th>Customer</th>
               <th>Bag Size</th>
-              <th>Pallets</th>
+              <th>Run Rate</th>
               <th>Target Cases</th>
               <th>Completed</th>
               <th>Elapsed Time</th>
@@ -226,7 +237,7 @@ export default function WorkOrderHistory() {
                 <td>{wo.product || '-'}</td>
                 <td>{wo.customer || '-'}</td>
                 <td>{wo.bagSize || '-'}</td>
-                <td>{wo.numPallets || '-'}</td>
+                <td>{wo.plannedRunRate ? `${wo.plannedRunRate}/min` : '-'}</td>
                 <td>{wo.targetCases || '-'}</td>
                 <td>{wo.completedCases || '-'}</td>
                 <td>{wo.elapsedDisplay || '-'}</td>
@@ -237,7 +248,7 @@ export default function WorkOrderHistory() {
                 <td>
                   <button 
                     className="delete-btn"
-                    onClick={() => handleDelete(wo.id)}
+                    onClick={() => handleDeleteClick(wo.id)}
                     title="Delete work order"
                   >
                     🗑️
@@ -253,6 +264,28 @@ export default function WorkOrderHistory() {
           </div>
         )}
       </div>
+
+      {pendingDeleteId && (
+        <div className="confirm-overlay" onClick={handleCancelDelete}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Work Order</h3>
+            <p>Are you sure you want to delete work order #{pendingDeleteId}?</p>
+            <p className="confirm-warning">This cannot be undone.</p>
+            <div className="confirm-actions">
+              <button className="confirm-cancel-btn" onClick={handleCancelDelete} disabled={isDeleting}>
+                Cancel
+              </button>
+              <button
+                className="confirm-delete-btn"
+                onClick={() => deleteWorkOrder(pendingDeleteId)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

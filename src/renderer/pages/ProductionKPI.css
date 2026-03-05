@@ -1,0 +1,23 @@
+.production-kpi-content {
+  height: calc(100vh - 72px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.production-kpi-table-scroll {
+  overflow: scroll !important;
+  height: 320px;
+  max-height: 320px;
+  width: 100%;
+}
+
+.production-kpi-table {
+  min-width: 1200px;
+}
+
+.production-kpi-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #1e2432;
+}

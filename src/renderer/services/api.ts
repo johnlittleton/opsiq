@@ -262,6 +262,487 @@ class ApiClient {
     return response.json();
   }
 
+  async getProductionSchedulerKPI(startDate?: string, endDate?: string, line?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    if (line) params.append('line', line.toString());
+
+    try {
+      const response = await fetch(`${API_BASE}/api/kpi/production-scheduler?${params}`);
+      if (!response.ok) {
+        throw new Error(`Scheduler KPI endpoint unavailable (${response.status})`);
+      }
+
+      try {
+        return await response.json();
+      } catch {
+        throw new Error('Scheduler KPI endpoint returned non-JSON response');
+      }
+    } catch {
+      return this.buildProductionSchedulerKpiFallback(startDate, endDate, line);
+    }
+  }
+
+  private parseBagsPerCase(bagSize?: string | null): number {
+    if (!bagSize) return 1;
+    const match = bagSize.match(/^(\d+)/);
+    return match ? parseInt(match[1], 10) : 1;
+  }
+
+  private async buildProductionSchedulerKpiFallback(startDate?: string, endDate?: string, line?: number): Promise<any> {
+    const today = new Date();
+    const localDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const start = startDate || localDate(today);
+    const end = endDate || localDate(today);
+
+    const woParams = new URLSearchParams();
+    woParams.append('startDate', start);
+    woParams.append('endDate', end);
+
+    const laborParams = new URLSearchParams();
+    laborParams.append('startDate', `${start}T00:00:00`);
+    laborParams.append('endDate', `${end}T23:59:59`);
+
+    const [workOrdersResponse, laborResponse] = await Promise.all([
+      fetch(`${API_BASE}/api/production/work-orders?${woParams}`),
+      fetch(`${API_BASE}/api/labor/snapshots?${laborParams}`),
+    ]);
+
+    if (!workOrdersResponse.ok) {
+      throw new Error('Failed to fetch fallback work orders');
+    }
+
+    const workOrdersRaw = await workOrdersResponse.json();
+    const workOrders = this.ensureArray<any>(workOrdersRaw)
+      .filter((wo) => wo.status === 'Completed' && (wo.completedCases || 0) > 0)
+      .filter((wo) => (line ? wo.line === line : true));
+
+    const laborSnapshots = laborResponse.ok ? this.ensureArray<any>(await laborResponse.json()) : [];
+    const laborWithHeadcount = laborSnapshots.filter((snapshot) => (snapshot.productionHeadcount || 0) > 0);
+
+    const totalProductionLaborCost = laborWithHeadcount.reduce((sum, snapshot) => sum + (snapshot.productionLaborCost || 0), 0);
+    const totalProductionHeadcount = laborWithHeadcount.reduce((sum, snapshot) => sum + (snapshot.productionHeadcount || 0), 0);
+    const averageProductionWage = totalProductionHeadcount > 0
+      ? totalProductionLaborCost / totalProductionHeadcount
+      : 24.5;
+
+    const safeRate = (numerator: number, denominator: number) => denominator > 0 ? numerator / denominator : 0;
+
+    const byLine: Record<number, any> = {};
+    const byDate: Record<string, any> = {};
+
+    let totalCases = 0;
+    let totalBags = 0;
+    let totalMinutes = 0;
+    let totalLaborHours = 0;
+    let workersSum = 0;
+    let workersCount = 0;
+
+    workOrders.forEach((wo) => {
+      const cases = wo.completedCases || 0;
+      const bags = cases * this.parseBagsPerCase(wo.bagSize);
+      const minutes = (wo.elapsedMs || 0) / (1000 * 60);
+      const hours = minutes / 60;
+      const workers = wo.labor || 0;
+      const laborHours = workers * hours;
+      const laborCost = laborHours * averageProductionWage;
+
+      totalCases += cases;
+      totalBags += bags;
+      totalMinutes += minutes;
+      totalLaborHours += laborHours;
+
+      if (workers > 0) {
+        workersSum += workers;
+        workersCount += 1;
+      }
+
+      if (!byLine[wo.line]) {
+        byLine[wo.line] = {
+          lineNumber: wo.line,
+          totalCases: 0,
+          totalBags: 0,
+          totalMinutes: 0,
+          totalLaborHours: 0,
+          laborCost: 0,
+          workersSum: 0,
+          workersCount: 0,
+        };
+      }
+
+      byLine[wo.line].totalCases += cases;
+      byLine[wo.line].totalBags += bags;
+      byLine[wo.line].totalMinutes += minutes;
+      byLine[wo.line].totalLaborHours += laborHours;
+      byLine[wo.line].laborCost += laborCost;
+      if (workers > 0) {
+        byLine[wo.line].workersSum += workers;
+        byLine[wo.line].workersCount += 1;
+      }
+
+      const dateKey = wo.date;
+      if (!byDate[dateKey]) {
+        byDate[dateKey] = {
+          date: dateKey,
+          totalCases: 0,
+          totalBags: 0,
+          totalMinutes: 0,
+          totalLaborHours: 0,
+          laborCost: 0,
+          workersSum: 0,
+          workersCount: 0,
+        };
+      }
+
+      byDate[dateKey].totalCases += cases;
+      byDate[dateKey].totalBags += bags;
+      byDate[dateKey].totalMinutes += minutes;
+      byDate[dateKey].totalLaborHours += laborHours;
+      byDate[dateKey].laborCost += laborCost;
+      if (workers > 0) {
+        byDate[dateKey].workersSum += workers;
+        byDate[dateKey].workersCount += 1;
+      }
+    });
+
+    const lines = Object.values(byLine)
+      .map((lineMetrics: any) => {
+        const avgWorkers = safeRate(lineMetrics.workersSum, lineMetrics.workersCount);
+        const totalHours = lineMetrics.totalMinutes / 60;
+        return {
+          lineNumber: lineMetrics.lineNumber,
+          totalCases: lineMetrics.totalCases,
+          totalBags: lineMetrics.totalBags,
+          totalMinutes: Math.round(lineMetrics.totalMinutes),
+          totalLaborHours: Math.round(lineMetrics.totalLaborHours * 100) / 100,
+          laborCost: Math.round(lineMetrics.laborCost * 100) / 100,
+          casesPerHour: Math.round(safeRate(lineMetrics.totalCases, totalHours) * 100) / 100,
+          casesPerMinute: Math.round(safeRate(lineMetrics.totalCases, lineMetrics.totalMinutes) * 100) / 100,
+          casesPerPerson: Math.round(safeRate(lineMetrics.totalCases, avgWorkers) * 100) / 100,
+          bagsPerHour: Math.round(safeRate(lineMetrics.totalBags, totalHours) * 100) / 100,
+          bagsPerMinute: Math.round(safeRate(lineMetrics.totalBags, lineMetrics.totalMinutes) * 100) / 100,
+          bagsPerPerson: Math.round(safeRate(lineMetrics.totalBags, avgWorkers) * 100) / 100,
+        };
+      })
+      .sort((a, b) => a.lineNumber - b.lineNumber);
+
+    const history = Object.values(byDate)
+      .map((dayMetrics: any) => {
+        const avgWorkers = safeRate(dayMetrics.workersSum, dayMetrics.workersCount);
+        const totalHours = dayMetrics.totalMinutes / 60;
+        return {
+          date: dayMetrics.date,
+          totalCases: dayMetrics.totalCases,
+          totalBags: dayMetrics.totalBags,
+          totalMinutes: Math.round(dayMetrics.totalMinutes),
+          totalLaborHours: Math.round(dayMetrics.totalLaborHours * 100) / 100,
+          laborCost: Math.round(dayMetrics.laborCost * 100) / 100,
+          casesPerHour: Math.round(safeRate(dayMetrics.totalCases, totalHours) * 100) / 100,
+          casesPerMinute: Math.round(safeRate(dayMetrics.totalCases, dayMetrics.totalMinutes) * 100) / 100,
+          casesPerPerson: Math.round(safeRate(dayMetrics.totalCases, avgWorkers) * 100) / 100,
+          bagsPerHour: Math.round(safeRate(dayMetrics.totalBags, totalHours) * 100) / 100,
+          bagsPerMinute: Math.round(safeRate(dayMetrics.totalBags, dayMetrics.totalMinutes) * 100) / 100,
+          bagsPerPerson: Math.round(safeRate(dayMetrics.totalBags, avgWorkers) * 100) / 100,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const avgWorkers = safeRate(workersSum, workersCount);
+    const totalHours = totalMinutes / 60;
+
+    return {
+      dateRange: { start, end },
+      source: 'client-fallback-work-orders-labor-snapshots',
+      averageProductionWage: Math.round(averageProductionWage * 100) / 100,
+      totals: {
+        totalWorkOrders: workOrders.length,
+        totalCases,
+        totalBags,
+        totalMinutes: Math.round(totalMinutes),
+        totalLaborHours: Math.round(totalLaborHours * 100) / 100,
+        totalLaborCost: Math.round((totalLaborHours * averageProductionWage) * 100) / 100,
+        casesPerHour: Math.round(safeRate(totalCases, totalHours) * 100) / 100,
+        casesPerMinute: Math.round(safeRate(totalCases, totalMinutes) * 100) / 100,
+        casesPerPerson: Math.round(safeRate(totalCases, avgWorkers) * 100) / 100,
+        bagsPerHour: Math.round(safeRate(totalBags, totalHours) * 100) / 100,
+        bagsPerMinute: Math.round(safeRate(totalBags, totalMinutes) * 100) / 100,
+        bagsPerPerson: Math.round(safeRate(totalBags, avgWorkers) * 100) / 100,
+      },
+      byLine: lines,
+      history,
+    };
+  }
+
+  async getProductionLaborPlanner(options: {
+    startDate?: string;
+    endDate?: string;
+    scheduleType?: '5-8' | '4-10';
+    line?: number;
+  }): Promise<any> {
+    const params = new URLSearchParams();
+    if (options.startDate) params.append('startDate', options.startDate);
+    if (options.endDate) params.append('endDate', options.endDate);
+    if (options.scheduleType) params.append('scheduleType', options.scheduleType);
+    if (options.line) params.append('line', options.line.toString());
+
+    try {
+      const response = await fetch(`${API_BASE}/api/production/labor-planner?${params}`);
+      if (!response.ok) {
+        throw new Error(`Labor planner endpoint unavailable (${response.status})`);
+      }
+
+      try {
+        return await response.json();
+      } catch {
+        throw new Error('Labor planner endpoint returned non-JSON response');
+      }
+    } catch {
+      return this.buildProductionLaborPlannerFallback(options);
+    }
+  }
+
+  private async buildProductionLaborPlannerFallback(options: {
+    startDate?: string;
+    endDate?: string;
+    scheduleType?: '5-8' | '4-10';
+    line?: number;
+  }): Promise<any> {
+    const scheduleType = options.scheduleType || '5-8';
+    const today = new Date();
+    const localDate = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const start = options.startDate || localDate(today);
+    const end = options.endDate || localDate(today);
+
+    const params = new URLSearchParams();
+    params.append('startDate', start);
+    params.append('endDate', end);
+
+    const response = await fetch(`${API_BASE}/api/production/work-orders?${params}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch work orders for labor planner');
+    }
+
+    const workOrdersRaw = await response.json();
+    const workOrders = this.ensureArray<any>(workOrdersRaw)
+      .filter((wo) => !!wo.date)
+      .filter((wo) => (options.line ? wo.line === options.line : true));
+
+    const plannerConfig = {
+      scheduleType,
+      shiftHours: scheduleType === '4-10' ? 10 : 8,
+      breaksPerShiftMinutes: 20,
+      lunchMinutes: 30,
+      lineCrewCount: 9,
+      forkliftPerLine: 1,
+      leadCountPerLine: 1,
+      leadAssistantCountPerLine: 1,
+      leadEarlyStartHours: 0.5,
+      slotHours: 2,
+      defaultBagsPerMinute: 45,
+      shiftStartTime: '07:00 AM',
+      shiftEndTime: scheduleType === '4-10' ? '05:30 PM' : '03:30 PM',
+      leadStartTime: '06:30 AM',
+    };
+
+    const safeRate = (numerator: number, denominator: number) => (denominator > 0 ? numerator / denominator : 0);
+    const getTeamAssignment = (dayOfWeek: number, shiftsRunning: number) => {
+      if (shiftsRunning <= 0) return 'Off';
+
+      if (scheduleType === '4-10') {
+        if (dayOfWeek === 3 && shiftsRunning > 1) return 'A + B';
+        if (dayOfWeek >= 1 && dayOfWeek <= 2) return 'A Team';
+        if (dayOfWeek >= 4 && dayOfWeek <= 6) return 'B Team';
+      }
+
+      return 'A Team';
+    };
+
+    const byDate: any[] = [];
+    let totalRequiredHours = 0;
+    let totalAvailableHours = 0;
+    let totalOvertimeHours = 0;
+    let saturdayRequired = false;
+    let totalWorkOrders = 0;
+    let peakHeadcountPerShift = 0;
+    let peakTotalHeadcountNeeded = 0;
+
+    const cursor = new Date(`${start}T00:00:00`);
+    const endDateObj = new Date(`${end}T00:00:00`);
+
+    while (cursor <= endDateObj) {
+      const dateKey = localDate(cursor);
+      const dayOfWeek = cursor.getDay();
+      const dayOrders = workOrders.filter((wo) => wo.date === dateKey);
+      const activeLines = [...new Set(dayOrders.map((wo) => wo.line))];
+
+      const is5x8Workday = dayOfWeek >= 1 && dayOfWeek <= 5;
+      const teamMultiplier = scheduleType === '4-10'
+        ? (dayOfWeek === 3 ? 2 : 1)
+        : (is5x8Workday ? 1 : 0);
+
+      const netProductiveShiftHours = Math.max(
+        0,
+        plannerConfig.shiftHours - ((plannerConfig.breaksPerShiftMinutes + plannerConfig.lunchMinutes) / 60)
+      );
+
+      const lineCapacityHours =
+        (plannerConfig.lineCrewCount * netProductiveShiftHours) +
+        ((plannerConfig.leadCountPerLine + plannerConfig.leadAssistantCountPerLine) * plannerConfig.leadEarlyStartHours) +
+        (plannerConfig.forkliftPerLine * netProductiveShiftHours);
+
+      const availableHours = activeLines.length * lineCapacityHours * teamMultiplier;
+      const lineCrewPerLinePerShift = plannerConfig.lineCrewCount;
+      const forkliftPerLinePerShift = plannerConfig.forkliftPerLine;
+      const headcountPerLinePerShift = lineCrewPerLinePerShift + forkliftPerLinePerShift;
+      const totalDepartmentHeadcountPerShift = activeLines.length * headcountPerLinePerShift;
+      const totalDepartmentHeadcountNeeded = totalDepartmentHeadcountPerShift * teamMultiplier;
+
+      let requiredHours = 0;
+      let requiredCases = 0;
+      let requiredBags = 0;
+
+      dayOrders.forEach((wo) => {
+        const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
+        const targetCases = wo.targetCases || wo.completedCases || 0;
+        const totalBags = targetCases * bagsPerCase;
+        const runRate = Number(wo.plannedRunRate) > 0 ? Number(wo.plannedRunRate) : plannerConfig.defaultBagsPerMinute;
+        const productivityMinutes = safeRate(totalBags, runRate);
+        const productivityHours = productivityMinutes / 60;
+        const runtimeHours = Math.max(plannerConfig.slotHours, productivityHours);
+
+        const lineLaborHours = runtimeHours * plannerConfig.lineCrewCount;
+        const forkliftHours = runtimeHours * plannerConfig.forkliftPerLine;
+        const totalOrderHours = lineLaborHours + forkliftHours;
+
+        requiredHours += totalOrderHours;
+        requiredCases += targetCases;
+        requiredBags += totalBags;
+      });
+
+      const overtimeHours = Math.max(0, requiredHours - availableHours);
+      const requiresSaturday = scheduleType === '5-8' && dayOfWeek === 6 && requiredHours > 0;
+
+      if (requiresSaturday) saturdayRequired = true;
+
+      totalRequiredHours += requiredHours;
+      totalAvailableHours += availableHours;
+      totalOvertimeHours += overtimeHours;
+      totalWorkOrders += dayOrders.length;
+      peakHeadcountPerShift = Math.max(peakHeadcountPerShift, totalDepartmentHeadcountPerShift);
+      peakTotalHeadcountNeeded = Math.max(peakTotalHeadcountNeeded, totalDepartmentHeadcountNeeded);
+
+      byDate.push({
+        date: dateKey,
+        dayOfWeek,
+        shiftsRunning: teamMultiplier,
+        teamAssignment: getTeamAssignment(dayOfWeek, teamMultiplier),
+        shiftStartTime: plannerConfig.shiftStartTime,
+        shiftEndTime: plannerConfig.shiftEndTime,
+        workOrders: dayOrders.length,
+        activeLines: activeLines.length,
+        lineCrewPerLinePerShift,
+        forkliftPerLinePerShift,
+        headcountPerLinePerShift,
+        totalDepartmentHeadcountPerShift,
+        totalDepartmentHeadcountNeeded,
+        requiredHours: Math.round(requiredHours * 100) / 100,
+        availableHours: Math.round(availableHours * 100) / 100,
+        overtimeHours: Math.round(overtimeHours * 100) / 100,
+        requiresOvertime: overtimeHours > 0,
+        requiresSaturday,
+        requiredCases,
+        requiredBags,
+      });
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return {
+      dateRange: { start, end },
+      plannerConfig,
+      summary: {
+        totalWorkOrders,
+        totalRequiredHours: Math.round(totalRequiredHours * 100) / 100,
+        totalAvailableHours: Math.round(totalAvailableHours * 100) / 100,
+        totalOvertimeHours: Math.round(totalOvertimeHours * 100) / 100,
+        utilizationPct: Math.round(safeRate(totalRequiredHours, totalAvailableHours) * 10000) / 100,
+        saturdayRequired,
+        scheduleType,
+        shiftStartTime: plannerConfig.shiftStartTime,
+        shiftEndTime: plannerConfig.shiftEndTime,
+        lineCrewPerLinePerShift: plannerConfig.lineCrewCount,
+        forkliftPerLinePerShift: plannerConfig.forkliftPerLine,
+        headcountPerLinePerShift: plannerConfig.lineCrewCount + plannerConfig.forkliftPerLine,
+        peakHeadcountPerShift,
+        peakTotalHeadcountNeeded,
+      },
+      byDate,
+    };
+  }
+
+  async saveProductionLaborPlannerHistory(data: {
+    scheduleType: '5-8' | '4-10';
+    startDate: string;
+    endDate: string;
+    lineFilter?: number;
+    planPayload: any;
+    createdBy?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/production/labor-planner/history`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      let message = 'Failed to save labor planner history';
+      try {
+        const error = await response.json();
+        message = error.error || message;
+      } catch {
+        message = 'Labor planner history endpoint is not deployed on backend yet';
+      }
+      throw new Error(message);
+    }
+
+    try {
+      return await response.json();
+    } catch {
+      throw new Error('Labor planner history endpoint returned non-JSON response');
+    }
+  }
+
+  async getProductionLaborPlannerHistory(options?: {
+    limit?: number;
+    scheduleType?: '5-8' | '4-10';
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.scheduleType) params.append('scheduleType', options.scheduleType);
+
+    const response = await fetch(`${API_BASE}/api/production/labor-planner/history?${params}`);
+    if (!response.ok) return [];
+    try {
+      const data = await response.json();
+      return this.ensureArray(data);
+    } catch {
+      return [];
+    }
+  }
+
   // Appointments API
   async getAppointments(filters?: {
     startDate?: string;

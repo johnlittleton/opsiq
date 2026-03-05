@@ -1,0 +1,80 @@
+.labor-planner-filters {
+  overflow-x: auto;
+}
+
+.labor-planner-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.labor-planner-refresh {
+  height: fit-content;
+}
+
+.labor-planner-summary {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.labor-planner-summary .kpi-card {
+  min-height: 88px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #232837;
+  border: 1px solid #2a3142;
+}
+
+.labor-planner-summary .kpi-label {
+  font-size: 0.85rem !important;
+  line-height: 1.2;
+  color: #b9c2d0;
+  margin-bottom: 6px;
+}
+
+.labor-planner-summary .kpi-value {
+  font-size: 1.5rem !important;
+  line-height: 1.25;
+  font-weight: 700;
+  color: #f3f6fa;
+}
+
+.labor-planner-table-card {
+  overflow: visible;
+}
+
+.labor-planner-table-scroll {
+  overflow: auto !important;
+  width: 100%;
+  height: 360px;
+  max-height: 360px;
+}
+
+.labor-planner-table {
+  min-width: 1700px;
+}
+
+.labor-planner-table th,
+.labor-planner-table td {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.labor-planner-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #1e2432;
+}
+
+@media (max-width: 1100px) {
+  .labor-planner-summary {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) !important;
+  }
+
+  .labor-planner-summary .kpi-value {
+    font-size: 1.2rem !important;
+  }
+}

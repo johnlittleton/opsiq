@@ -71,8 +71,7 @@ export default function DowntimeTracker() {
         body: JSON.stringify({
           line,
           reason,
-          notes,
-          startTime: new Date().toISOString()
+          notes
         })
       });
 
@@ -81,9 +80,13 @@ export default function DowntimeTracker() {
         setReason('');
         setNotes('');
         fetchActiveDowntimes();
+      } else {
+        const error = await response.json().catch(() => ({ error: 'Failed to start downtime' }));
+        alert(error.error || 'Failed to start downtime');
       }
     } catch (error) {
       console.error('Failed to start downtime:', error);
+      alert('Failed to start downtime');
     }
   };
 
@@ -99,11 +102,13 @@ export default function DowntimeTracker() {
         console.log('Downtime ended successfully:', result);
         fetchActiveDowntimes();
       } else {
-        const error = await response.json();
+        const error = await response.json().catch(() => ({ error: 'Failed to end downtime' }));
         console.error('Failed to end downtime:', error);
+        alert(error.error || 'Failed to end downtime');
       }
     } catch (error) {
       console.error('Failed to end downtime:', error);
+      alert('Failed to end downtime');
     }
   };
 

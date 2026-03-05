@@ -31,6 +31,8 @@ function getLocalISOString(date: Date = new Date()): string {
 export class DatabaseService implements IDatabaseService {
   private pool: Pool;
 
+  private readonly DEFAULT_PROD_HOURLY_WAGE = 24.5;
+
   constructor() {
     // Railway provides DATABASE_URL automatically when Postgres addon is added
     const connectionString = process.env.DATABASE_URL;
@@ -191,6 +193,7 @@ export class DatabaseService implements IDatabaseService {
           date TEXT NOT NULL,
           product TEXT,
           bag_size TEXT,
+          planned_run_rate REAL,
           customer TEXT,
           country_of_origin TEXT,
           num_pallets INTEGER,
@@ -248,6 +251,17 @@ export class DatabaseService implements IDatabaseService {
           notes TEXT,
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS production_labor_plan_history (
+          id SERIAL PRIMARY KEY,
+          schedule_type TEXT NOT NULL,
+          start_date TEXT NOT NULL,
+          end_date TEXT NOT NULL,
+          line_filter INTEGER,
+          plan_payload JSONB NOT NULL,
+          created_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
         CREATE TABLE IF NOT EXISTS executives (
@@ -339,6 +353,11 @@ export class DatabaseService implements IDatabaseService {
       // Add lead column to work_orders if it doesn't exist (migration)
       await client.query(`
         ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS lead TEXT;
+      `);
+
+      // Add planned_run_rate column to work_orders if it doesn't exist (migration)
+      await client.query(`
+        ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS planned_run_rate REAL;
       `);
 
       // Add overtime columns to labor_snapshots if they don't exist (migration)
@@ -1918,10 +1937,27 @@ export class DatabaseService implements IDatabaseService {
 
   // Production Costing Analytics
   async getProductionCostingAnalytics(startDate?: string, endDate?: string): Promise<any> {
-    const PROD_HOURLY_WAGE = 24.50;
     const today = getLocalISOString().split('T')[0];
     const start = startDate || today;
     const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
+
+    const wageResult = await this.pool.query(
+      `SELECT
+         COALESCE(SUM(production_labor_cost), 0) AS total_production_labor_cost,
+         COALESCE(SUM(production_headcount), 0) AS total_production_headcount
+       FROM labor_snapshots
+       WHERE timestamp >= $1
+         AND timestamp <= $2
+         AND production_headcount > 0`,
+      [start, end]
+    );
+
+    const wageRow = wageResult.rows[0];
+    const totalProductionLaborCost = parseFloat(wageRow.total_production_labor_cost) || 0;
+    const totalProductionHeadcount = parseFloat(wageRow.total_production_headcount) || 0;
+    const productionHourlyWage = totalProductionHeadcount > 0
+      ? totalProductionLaborCost / totalProductionHeadcount
+      : this.DEFAULT_PROD_HOURLY_WAGE;
 
     // Get all work orders with completed cases in date range
     const result = await this.pool.query(`
@@ -1978,7 +2014,7 @@ export class DatabaseService implements IDatabaseService {
       // Calculate labor cost for this work order
       // labor = number of workers, elapsedMs = time spent
       const timeHours = (wo.elapsedMs || 0) / (1000 * 60 * 60);
-      const laborCost = (wo.labor || 0) * timeHours * PROD_HOURLY_WAGE;
+      const laborCost = (wo.labor || 0) * timeHours * productionHourlyWage;
 
       // Product aggregation
       const productKey = wo.product || 'Unknown Product';
@@ -2100,6 +2136,484 @@ export class DatabaseService implements IDatabaseService {
     };
   }
 
+  async getProductionSchedulerKPI(startDate?: string, endDate?: string, line?: number): Promise<any> {
+    const today = getLocalISOString().split('T')[0];
+    const start = startDate || today;
+    const end = endDate || today;
+    const rangeEnd = `${end}T23:59:59`;
+
+    const wageResult = await this.pool.query(
+      `SELECT
+         COALESCE(SUM(production_labor_cost), 0) AS total_production_labor_cost,
+         COALESCE(SUM(production_headcount), 0) AS total_production_headcount
+       FROM labor_snapshots
+       WHERE timestamp >= $1
+         AND timestamp <= $2
+         AND production_headcount > 0`,
+      [start, rangeEnd]
+    );
+
+    const wageRow = wageResult.rows[0];
+    const totalProductionLaborCost = parseFloat(wageRow.total_production_labor_cost) || 0;
+    const totalProductionHeadcount = parseFloat(wageRow.total_production_headcount) || 0;
+    const averageProductionWage = totalProductionHeadcount > 0
+      ? totalProductionLaborCost / totalProductionHeadcount
+      : this.DEFAULT_PROD_HOURLY_WAGE;
+
+    const params: any[] = [start, end];
+    let lineFilter = '';
+    if (line) {
+      lineFilter = ' AND line = $3';
+      params.push(line);
+    }
+
+    const workOrderResult = await this.pool.query(
+      `SELECT * FROM work_orders
+       WHERE status = 'Completed'
+         AND completed_cases > 0
+         AND date >= $1
+         AND date <= $2
+         ${lineFilter}
+       ORDER BY date ASC, line ASC`,
+      params
+    );
+
+    const workOrders = this.toCamelCase(workOrderResult.rows);
+
+    let totalCases = 0;
+    let totalBags = 0;
+    let totalMinutes = 0;
+    let totalLaborHours = 0;
+    let workersSum = 0;
+    let workersCount = 0;
+
+    const byLine: Record<number, {
+      lineNumber: number;
+      totalCases: number;
+      totalBags: number;
+      totalMinutes: number;
+      totalLaborHours: number;
+      workersSum: number;
+      workersCount: number;
+      laborCost: number;
+      casesPerHour: number;
+      casesPerMinute: number;
+      casesPerPerson: number;
+      bagsPerHour: number;
+      bagsPerMinute: number;
+      bagsPerPerson: number;
+    }> = {};
+
+    const byDate: Record<string, {
+      date: string;
+      totalCases: number;
+      totalBags: number;
+      totalMinutes: number;
+      totalLaborHours: number;
+      workersSum: number;
+      workersCount: number;
+      laborCost: number;
+      casesPerHour: number;
+      casesPerMinute: number;
+      casesPerPerson: number;
+      bagsPerHour: number;
+      bagsPerMinute: number;
+      bagsPerPerson: number;
+    }> = {};
+
+    workOrders.forEach((wo: any) => {
+      const cases = wo.completedCases || 0;
+      const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
+      const bags = cases * bagsPerCase;
+      const minutes = (wo.elapsedMs || 0) / (1000 * 60);
+      const hours = minutes / 60;
+      const workers = wo.labor || 0;
+      const laborHours = workers * hours;
+      const laborCost = laborHours * averageProductionWage;
+
+      totalCases += cases;
+      totalBags += bags;
+      totalMinutes += minutes;
+      totalLaborHours += laborHours;
+
+      if (workers > 0) {
+        workersSum += workers;
+        workersCount += 1;
+      }
+
+      if (!byLine[wo.line]) {
+        byLine[wo.line] = {
+          lineNumber: wo.line,
+          totalCases: 0,
+          totalBags: 0,
+          totalMinutes: 0,
+          totalLaborHours: 0,
+          workersSum: 0,
+          workersCount: 0,
+          laborCost: 0,
+          casesPerHour: 0,
+          casesPerMinute: 0,
+          casesPerPerson: 0,
+          bagsPerHour: 0,
+          bagsPerMinute: 0,
+          bagsPerPerson: 0,
+        };
+      }
+
+      const lineBucket = byLine[wo.line];
+      lineBucket.totalCases += cases;
+      lineBucket.totalBags += bags;
+      lineBucket.totalMinutes += minutes;
+      lineBucket.totalLaborHours += laborHours;
+      lineBucket.laborCost += laborCost;
+      if (workers > 0) {
+        lineBucket.workersSum += workers;
+        lineBucket.workersCount += 1;
+      }
+
+      const dateKey = wo.date;
+      if (!byDate[dateKey]) {
+        byDate[dateKey] = {
+          date: dateKey,
+          totalCases: 0,
+          totalBags: 0,
+          totalMinutes: 0,
+          totalLaborHours: 0,
+          workersSum: 0,
+          workersCount: 0,
+          laborCost: 0,
+          casesPerHour: 0,
+          casesPerMinute: 0,
+          casesPerPerson: 0,
+          bagsPerHour: 0,
+          bagsPerMinute: 0,
+          bagsPerPerson: 0,
+        };
+      }
+
+      const dateBucket = byDate[dateKey];
+      dateBucket.totalCases += cases;
+      dateBucket.totalBags += bags;
+      dateBucket.totalMinutes += minutes;
+      dateBucket.totalLaborHours += laborHours;
+      dateBucket.laborCost += laborCost;
+      if (workers > 0) {
+        dateBucket.workersSum += workers;
+        dateBucket.workersCount += 1;
+      }
+    });
+
+    const safeRate = (numerator: number, denominator: number) => denominator > 0 ? numerator / denominator : 0;
+    const getTeamAssignment = (dayOfWeek: number, shiftsRunning: number) => {
+      if (shiftsRunning <= 0) return 'Off';
+
+      if (scheduleType === '4-10') {
+        if (dayOfWeek === 3 && shiftsRunning > 1) return 'A + B';
+        if (dayOfWeek >= 1 && dayOfWeek <= 2) return 'A Team';
+        if (dayOfWeek >= 4 && dayOfWeek <= 6) return 'B Team';
+      }
+
+      return 'A Team';
+    };
+
+    const lines = Object.values(byLine)
+      .map((lineMetrics) => {
+        const avgWorkers = safeRate(lineMetrics.workersSum, lineMetrics.workersCount);
+        const totalHours = lineMetrics.totalMinutes / 60;
+        return {
+          lineNumber: lineMetrics.lineNumber,
+          totalCases: lineMetrics.totalCases,
+          totalBags: lineMetrics.totalBags,
+          totalMinutes: Math.round(lineMetrics.totalMinutes),
+          totalLaborHours: Math.round(lineMetrics.totalLaborHours * 100) / 100,
+          laborCost: Math.round(lineMetrics.laborCost * 100) / 100,
+          casesPerHour: Math.round(safeRate(lineMetrics.totalCases, totalHours) * 100) / 100,
+          casesPerMinute: Math.round(safeRate(lineMetrics.totalCases, lineMetrics.totalMinutes) * 100) / 100,
+          casesPerPerson: Math.round(safeRate(lineMetrics.totalCases, avgWorkers) * 100) / 100,
+          bagsPerHour: Math.round(safeRate(lineMetrics.totalBags, totalHours) * 100) / 100,
+          bagsPerMinute: Math.round(safeRate(lineMetrics.totalBags, lineMetrics.totalMinutes) * 100) / 100,
+          bagsPerPerson: Math.round(safeRate(lineMetrics.totalBags, avgWorkers) * 100) / 100,
+        };
+      })
+      .sort((a, b) => a.lineNumber - b.lineNumber);
+
+    const history = Object.values(byDate)
+      .map((dayMetrics) => {
+        const avgWorkers = safeRate(dayMetrics.workersSum, dayMetrics.workersCount);
+        const totalHours = dayMetrics.totalMinutes / 60;
+        return {
+          date: dayMetrics.date,
+          totalCases: dayMetrics.totalCases,
+          totalBags: dayMetrics.totalBags,
+          totalMinutes: Math.round(dayMetrics.totalMinutes),
+          totalLaborHours: Math.round(dayMetrics.totalLaborHours * 100) / 100,
+          laborCost: Math.round(dayMetrics.laborCost * 100) / 100,
+          casesPerHour: Math.round(safeRate(dayMetrics.totalCases, totalHours) * 100) / 100,
+          casesPerMinute: Math.round(safeRate(dayMetrics.totalCases, dayMetrics.totalMinutes) * 100) / 100,
+          casesPerPerson: Math.round(safeRate(dayMetrics.totalCases, avgWorkers) * 100) / 100,
+          bagsPerHour: Math.round(safeRate(dayMetrics.totalBags, totalHours) * 100) / 100,
+          bagsPerMinute: Math.round(safeRate(dayMetrics.totalBags, dayMetrics.totalMinutes) * 100) / 100,
+          bagsPerPerson: Math.round(safeRate(dayMetrics.totalBags, avgWorkers) * 100) / 100,
+        };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const avgWorkers = safeRate(workersSum, workersCount);
+    const totalHours = totalMinutes / 60;
+
+    return {
+      dateRange: { start, end },
+      source: 'production-scheduler-work-orders',
+      averageProductionWage: Math.round(averageProductionWage * 100) / 100,
+      totals: {
+        totalWorkOrders: workOrders.length,
+        totalCases,
+        totalBags,
+        totalMinutes: Math.round(totalMinutes),
+        totalLaborHours: Math.round(totalLaborHours * 100) / 100,
+        totalLaborCost: Math.round((totalLaborHours * averageProductionWage) * 100) / 100,
+        casesPerHour: Math.round(safeRate(totalCases, totalHours) * 100) / 100,
+        casesPerMinute: Math.round(safeRate(totalCases, totalMinutes) * 100) / 100,
+        casesPerPerson: Math.round(safeRate(totalCases, avgWorkers) * 100) / 100,
+        bagsPerHour: Math.round(safeRate(totalBags, totalHours) * 100) / 100,
+        bagsPerMinute: Math.round(safeRate(totalBags, totalMinutes) * 100) / 100,
+        bagsPerPerson: Math.round(safeRate(totalBags, avgWorkers) * 100) / 100,
+      },
+      byLine: lines,
+      history,
+    };
+  }
+
+  async getProductionLaborPlanner(startDate?: string, endDate?: string, scheduleType: '5-8' | '4-10' = '5-8', line?: number): Promise<any> {
+    const today = getLocalISOString().split('T')[0];
+    const start = startDate || today;
+    const end = endDate || today;
+
+    const workOrders = await this.getWorkOrders(undefined, start, end);
+    const filteredWorkOrders = workOrders
+      .filter((wo: any) => !!wo.date)
+      .filter((wo: any) => (line ? wo.line === line : true));
+
+    const plannerConfig = {
+      scheduleType,
+      shiftHours: scheduleType === '4-10' ? 10 : 8,
+      breaksPerShiftMinutes: 20,
+      lunchMinutes: 30,
+      lineCrewCount: 9,
+      forkliftPerLine: 1,
+      leadCountPerLine: 1,
+      leadAssistantCountPerLine: 1,
+      leadEarlyStartHours: 0.5,
+      slotHours: 2,
+      defaultBagsPerMinute: 45,
+      shiftStartTime: '07:00 AM',
+      shiftEndTime: scheduleType === '4-10' ? '05:30 PM' : '03:30 PM',
+      leadStartTime: '06:30 AM',
+    };
+
+    const safeRate = (numerator: number, denominator: number) => denominator > 0 ? numerator / denominator : 0;
+
+    const dateCursor = new Date(`${start}T00:00:00`);
+    const endDateObj = new Date(`${end}T00:00:00`);
+    const byDate: any[] = [];
+
+    let totalRequiredHours = 0;
+    let totalAvailableHours = 0;
+    let totalOvertimeHours = 0;
+    let saturdayRequired = false;
+    let totalWorkOrders = 0;
+    let peakHeadcountPerShift = 0;
+    let peakTotalHeadcountNeeded = 0;
+
+    while (dateCursor <= endDateObj) {
+      const dateKey = dateCursor.toISOString().split('T')[0];
+      const dayOfWeek = dateCursor.getDay();
+      const dayOrders = filteredWorkOrders.filter((wo: any) => wo.date === dateKey);
+      const activeLines = [...new Set(dayOrders.map((wo: any) => wo.line))];
+
+      const is5x8Workday = dayOfWeek >= 1 && dayOfWeek <= 5;
+      const teamMultiplier = scheduleType === '4-10'
+        ? (dayOfWeek === 3 ? 2 : 1)
+        : (is5x8Workday ? 1 : 0);
+
+      const netProductiveShiftHours = Math.max(
+        0,
+        plannerConfig.shiftHours - ((plannerConfig.breaksPerShiftMinutes + plannerConfig.lunchMinutes) / 60)
+      );
+
+      const lineCapacityHours =
+        (plannerConfig.lineCrewCount * netProductiveShiftHours) +
+        ((plannerConfig.leadCountPerLine + plannerConfig.leadAssistantCountPerLine) * plannerConfig.leadEarlyStartHours) +
+        (plannerConfig.forkliftPerLine * netProductiveShiftHours);
+
+      const availableHours = activeLines.length * lineCapacityHours * teamMultiplier;
+      const lineCrewPerLinePerShift = plannerConfig.lineCrewCount;
+      const forkliftPerLinePerShift = plannerConfig.forkliftPerLine;
+      const headcountPerLinePerShift = lineCrewPerLinePerShift + forkliftPerLinePerShift;
+      const totalDepartmentHeadcountPerShift = activeLines.length * headcountPerLinePerShift;
+      const totalDepartmentHeadcountNeeded = totalDepartmentHeadcountPerShift * teamMultiplier;
+
+      let requiredHours = 0;
+      let requiredCases = 0;
+      let requiredBags = 0;
+
+      const byLine: Record<number, any> = {};
+
+      dayOrders.forEach((wo: any) => {
+        const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
+        const targetCases = wo.targetCases || wo.completedCases || 0;
+        const totalBags = targetCases * bagsPerCase;
+        const runRate = Number(wo.plannedRunRate) > 0 ? Number(wo.plannedRunRate) : plannerConfig.defaultBagsPerMinute;
+        const productivityMinutes = safeRate(totalBags, runRate);
+        const productivityHours = productivityMinutes / 60;
+        const runtimeHours = Math.max(plannerConfig.slotHours, productivityHours);
+
+        const lineLaborHours = runtimeHours * plannerConfig.lineCrewCount;
+        const forkliftHours = runtimeHours * plannerConfig.forkliftPerLine;
+        const totalOrderHours = lineLaborHours + forkliftHours;
+
+        requiredHours += totalOrderHours;
+        requiredCases += targetCases;
+        requiredBags += totalBags;
+
+        if (!byLine[wo.line]) {
+          byLine[wo.line] = {
+            lineNumber: wo.line,
+            workOrders: 0,
+            requiredHours: 0,
+            requiredCases: 0,
+            requiredBags: 0,
+          };
+        }
+
+        byLine[wo.line].workOrders += 1;
+        byLine[wo.line].requiredHours += totalOrderHours;
+        byLine[wo.line].requiredCases += targetCases;
+        byLine[wo.line].requiredBags += totalBags;
+      });
+
+      const overtimeHours = Math.max(0, requiredHours - availableHours);
+      const requiresSaturday = scheduleType === '5-8' && dayOfWeek === 6 && requiredHours > 0;
+
+      if (requiresSaturday) {
+        saturdayRequired = true;
+      }
+
+      totalRequiredHours += requiredHours;
+      totalAvailableHours += availableHours;
+      totalOvertimeHours += overtimeHours;
+      totalWorkOrders += dayOrders.length;
+      peakHeadcountPerShift = Math.max(peakHeadcountPerShift, totalDepartmentHeadcountPerShift);
+      peakTotalHeadcountNeeded = Math.max(peakTotalHeadcountNeeded, totalDepartmentHeadcountNeeded);
+
+      byDate.push({
+        date: dateKey,
+        dayOfWeek,
+        shiftsRunning: teamMultiplier,
+        teamAssignment: getTeamAssignment(dayOfWeek, teamMultiplier),
+        shiftStartTime: plannerConfig.shiftStartTime,
+        shiftEndTime: plannerConfig.shiftEndTime,
+        workOrders: dayOrders.length,
+        activeLines: activeLines.length,
+        lineCrewPerLinePerShift,
+        forkliftPerLinePerShift,
+        headcountPerLinePerShift,
+        totalDepartmentHeadcountPerShift,
+        totalDepartmentHeadcountNeeded,
+        requiredHours: Math.round(requiredHours * 100) / 100,
+        availableHours: Math.round(availableHours * 100) / 100,
+        overtimeHours: Math.round(overtimeHours * 100) / 100,
+        requiresOvertime: overtimeHours > 0,
+        requiresSaturday,
+        requiredCases,
+        requiredBags,
+        byLine: Object.values(byLine).map((lineData: any) => ({
+          ...lineData,
+          requiredHours: Math.round(lineData.requiredHours * 100) / 100,
+          lineCrewHeadcountPerShift: plannerConfig.lineCrewCount,
+          forkliftHeadcountPerShift: plannerConfig.forkliftPerLine,
+          totalHeadcountPerLinePerShift: plannerConfig.lineCrewCount + plannerConfig.forkliftPerLine,
+          shiftStartTime: plannerConfig.shiftStartTime,
+          shiftEndTime: plannerConfig.shiftEndTime,
+        })),
+      });
+
+      dateCursor.setDate(dateCursor.getDate() + 1);
+    }
+
+    const summary = {
+      totalWorkOrders,
+      totalRequiredHours: Math.round(totalRequiredHours * 100) / 100,
+      totalAvailableHours: Math.round(totalAvailableHours * 100) / 100,
+      totalOvertimeHours: Math.round(totalOvertimeHours * 100) / 100,
+      utilizationPct: Math.round(safeRate(totalRequiredHours, totalAvailableHours) * 10000) / 100,
+      saturdayRequired,
+      scheduleType,
+      shiftStartTime: plannerConfig.shiftStartTime,
+      shiftEndTime: plannerConfig.shiftEndTime,
+      lineCrewPerLinePerShift: plannerConfig.lineCrewCount,
+      forkliftPerLinePerShift: plannerConfig.forkliftPerLine,
+      headcountPerLinePerShift: plannerConfig.lineCrewCount + plannerConfig.forkliftPerLine,
+      peakHeadcountPerShift,
+      peakTotalHeadcountNeeded,
+    };
+
+    return {
+      dateRange: { start, end },
+      plannerConfig,
+      summary,
+      byDate,
+    };
+  }
+
+  async saveProductionLaborPlanHistory(data: {
+    scheduleType: '5-8' | '4-10';
+    startDate: string;
+    endDate: string;
+    lineFilter?: number;
+    planPayload: any;
+    createdBy?: string;
+  }): Promise<any> {
+    const result = await this.pool.query(
+      `INSERT INTO production_labor_plan_history (
+        schedule_type, start_date, end_date, line_filter, plan_payload, created_by
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *`,
+      [
+        data.scheduleType,
+        data.startDate,
+        data.endDate,
+        data.lineFilter || null,
+        JSON.stringify(data.planPayload),
+        data.createdBy || null,
+      ]
+    );
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getProductionLaborPlanHistory(options?: { limit?: number; scheduleType?: '5-8' | '4-10' }): Promise<any[]> {
+    let query = 'SELECT * FROM production_labor_plan_history WHERE 1=1';
+    const params: any[] = [];
+    let paramCount = 1;
+
+    if (options?.scheduleType) {
+      query += ` AND schedule_type = $${paramCount}`;
+      params.push(options.scheduleType);
+      paramCount++;
+    }
+
+    query += ' ORDER BY created_at DESC';
+
+    if (options?.limit) {
+      query += ` LIMIT $${paramCount}`;
+      params.push(options.limit);
+    }
+
+    const result = await this.pool.query(query, params);
+    return this.toCamelCase(result.rows);
+  }
+
   // Work Orders
   async getWorkOrders(date?: string, startDate?: string, endDate?: string): Promise<any[]> {
     let query = 'SELECT * FROM work_orders ORDER BY line, slot';
@@ -2129,11 +2643,11 @@ export class DatabaseService implements IDatabaseService {
     const now = getLocalISOString();
     const result = await this.pool.query(`
       INSERT INTO work_orders (
-        id, line, slot, date, product, bag_size, customer, lead, country_of_origin, num_pallets, 
+        id, line, slot, date, product, bag_size, planned_run_rate, customer, lead, country_of_origin, num_pallets, 
         labor, priority, lot1, lot2, lot3, lot4, notes, status, 
         target_cases, completed_cases, start_timestamp, elapsed_ms, 
         is_paused, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING *
     `, [
       workOrder.id || Date.now().toString(),
@@ -2142,6 +2656,7 @@ export class DatabaseService implements IDatabaseService {
       workOrder.date,
       workOrder.product || null,
       workOrder.bagSize || null,
+      workOrder.plannedRunRate || null,
       workOrder.customer || null,
       workOrder.lead || null,
       workOrder.countryOfOrigin || null,
@@ -2204,6 +2719,8 @@ export class DatabaseService implements IDatabaseService {
   // Production Downtime
   async createDowntime(downtime: any): Promise<any> {
     const now = getLocalISOString();
+    const parsedStart = downtime.startTime ? new Date(downtime.startTime) : new Date();
+    const startTime = Number.isNaN(parsedStart.getTime()) ? now : getLocalISOString(parsedStart);
     const result = await this.pool.query(`
       INSERT INTO production_downtime (
         line, reason, start_time, notes, created_at, updated_at
@@ -2212,7 +2729,7 @@ export class DatabaseService implements IDatabaseService {
     `, [
       downtime.line,
       downtime.reason,
-      downtime.startTime || now,
+      startTime,
       downtime.notes || null,
       now,
       now
@@ -2231,12 +2748,19 @@ export class DatabaseService implements IDatabaseService {
       params.push(filters.line);
       paramCount++;
     }
-    if (filters?.startDate) {
-      query += ` AND start_time >= $${paramCount}`;
+    if (filters?.startDate && filters?.endDate) {
+      query += ` AND (
+        (start_time >= $${paramCount} AND start_time <= $${paramCount + 1})
+        OR (end_time IS NOT NULL AND end_time >= $${paramCount} AND end_time <= $${paramCount + 1})
+        OR (start_time <= $${paramCount} AND (end_time IS NULL OR end_time >= $${paramCount}))
+      )`;
+      params.push(filters.startDate, filters.endDate);
+      paramCount += 2;
+    } else if (filters?.startDate) {
+      query += ` AND (start_time >= $${paramCount} OR (end_time IS NOT NULL AND end_time >= $${paramCount}) OR end_time IS NULL)`;
       params.push(filters.startDate);
       paramCount++;
-    }
-    if (filters?.endDate) {
+    } else if (filters?.endDate) {
       query += ` AND start_time <= $${paramCount}`;
       params.push(filters.endDate);
       paramCount++;
@@ -2262,7 +2786,11 @@ export class DatabaseService implements IDatabaseService {
     console.log('Found downtime record:', downtime);
     const now = new Date();
     const startTime = new Date(downtime.start_time);
-    const durationMinutes = Math.round((now.getTime() - startTime.getTime()) / 60000);
+    if (Number.isNaN(startTime.getTime())) {
+      throw new Error('Downtime start time is invalid');
+    }
+
+    const durationMinutes = Math.max(0, Math.round((now.getTime() - startTime.getTime()) / 60000));
     console.log('Calculated duration:', durationMinutes, 'minutes');
 
     const result = await this.pool.query(`

@@ -238,6 +238,20 @@ app.get('/api/kpi/production', async (req, res) => {
   }
 });
 
+// Get scheduler-based production KPIs (cases/bags only)
+app.get('/api/kpi/production-scheduler', async (req, res) => {
+  try {
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const line = req.query.line ? parseInt(req.query.line as string) : undefined;
+
+    const kpi = await db.getProductionSchedulerKPI(startDate, endDate, line);
+    res.json(kpi);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ==================== KPI CALCULATIONS ====================
 
 async function calculateShippingReceivingKPI(date: string): Promise<ShippingReceivingKPI> {
@@ -720,11 +734,22 @@ app.post('/api/production/downtime', async (req, res) => {
 app.get('/api/production/downtime', async (req, res) => {
   try {
     const { line, startDate, endDate } = req.query;
+    const rawStartDate = startDate as string | undefined;
+    const rawEndDate = endDate as string | undefined;
+
+    const normalizedStartDate = rawStartDate
+      ? (rawStartDate.includes('T') ? rawStartDate : `${rawStartDate}T00:00:00`)
+      : undefined;
+
+    const normalizedEndDate = rawEndDate
+      ? (rawEndDate.includes('T') ? rawEndDate : `${rawEndDate}T23:59:59`)
+      : undefined;
+
     console.log('Fetching downtimes with filters:', { line, startDate, endDate });
     const downtimes = await db.getDowntimes({
       line: line ? parseInt(line as string) : undefined,
-      startDate: startDate as string,
-      endDate: endDate ? `${endDate}T23:59:59` : undefined
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate,
     });
     console.log('Returning', downtimes.length, 'downtime records');
     res.json(downtimes);
@@ -744,6 +769,54 @@ app.put('/api/production/downtime/:id/end', async (req, res) => {
   } catch (error: any) {
     console.error('Error ending downtime:', error);
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Production Labor Planner
+app.get('/api/production/labor-planner', async (req, res) => {
+  try {
+    const startDate = req.query.startDate as string | undefined;
+    const endDate = req.query.endDate as string | undefined;
+    const scheduleType = (req.query.scheduleType as '5-8' | '4-10' | undefined) || '5-8';
+    const line = req.query.line ? parseInt(req.query.line as string) : undefined;
+
+    const plan = await db.getProductionLaborPlanner(startDate, endDate, scheduleType, line);
+    res.json(plan);
+  } catch (error: any) {
+    console.error('Error fetching labor planner:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/production/labor-planner/history', async (req, res) => {
+  try {
+    const { scheduleType, startDate, endDate, lineFilter, planPayload, createdBy } = req.body;
+
+    const saved = await db.saveProductionLaborPlanHistory({
+      scheduleType,
+      startDate,
+      endDate,
+      lineFilter,
+      planPayload,
+      createdBy,
+    });
+
+    res.status(201).json(saved);
+  } catch (error: any) {
+    console.error('Error saving labor planner history:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/production/labor-planner/history', async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+    const scheduleType = req.query.scheduleType as '5-8' | '4-10' | undefined;
+    const history = await db.getProductionLaborPlanHistory({ limit, scheduleType });
+    res.json(history);
+  } catch (error: any) {
+    console.error('Error fetching labor planner history:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

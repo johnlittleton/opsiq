@@ -13,6 +13,7 @@ import AppointmentHistory from './pages/AppointmentHistory';
 import ActiveDrivers from './pages/ActiveDrivers';
 import Scheduler from './pages/Scheduler';
 import ProductionKPI from './pages/ProductionKPI';
+import ProductionKPIHistory from './pages/ProductionKPIHistory';
 import ShippingReceivingKPI from './pages/ShippingReceivingKPI';
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
 import ExecutiveAnalytics from './pages/ExecutiveAnalytics';
@@ -20,6 +21,8 @@ import ProductionCosting from './pages/ProductionCosting';
 import Settings from './pages/Settings';
 import LaborTracker from './pages/LaborTracker';
 import LaborHistory from './pages/LaborHistory';
+import ProductionLaborPlanner from './pages/ProductionLaborPlanner';
+import ProductionLaborPlannerHistory from './pages/ProductionLaborPlannerHistory';
 import ProductionScheduler from './pages/ProductionScheduler';
 import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
@@ -61,12 +64,15 @@ const AppRoutes: React.FC = () => {
       <Route path="/checkin-history" element={<CheckInHistory />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />
       <Route path="/production" element={<ProductionKPI />} />
+      <Route path="/production-kpi-history" element={<ProductionKPIHistory />} />
       <Route path="/shipping" element={<ShippingReceivingKPI />} />
       <Route path="/executive" element={<ExecutiveDashboard />} />
       <Route path="/executive-analytics" element={<ExecutiveAnalytics />} />
       <Route path="/production-costing" element={<ProductionCosting />} />
       <Route path="/labor-tracker" element={<LaborTracker />} />
       <Route path="/labor-history" element={<LaborHistory />} />
+      <Route path="/production-labor-planner" element={<ProductionLaborPlanner />} />
+      <Route path="/production-labor-planner-history" element={<ProductionLaborPlannerHistory />} />
       <Route path="/production-scheduler" element={<ProductionScheduler />} />
       <Route path="/production-dashboard" element={<ProductionDashboard />} />
       <Route path="/dashboard" element={<ProductionDashboard />} />

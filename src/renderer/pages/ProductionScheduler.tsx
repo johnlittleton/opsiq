@@ -35,6 +35,7 @@ interface WorkOrder {
   lead?: string;
   countryOfOrigin?: string;
   numPallets?: number;
+  plannedRunRate?: number;
   labor?: number;
   priority?: string;
   lot1?: string;
@@ -75,6 +76,13 @@ export default function ProductionScheduler() {
   const [selectedCalendarWO, setSelectedCalendarWO] = useState<WorkOrder | null>(null);
 
   const selectedDateStr = getLocalDateString(selectedDate);
+  const getRunRateLabel = (wo: WorkOrder, includeDefault = false) => {
+    const runRate = Number(wo.plannedRunRate);
+    if (runRate > 0) {
+      return `${runRate}/min`;
+    }
+    return includeDefault ? '45/min (default)' : '-';
+  };
 
   useEffect(() => {
     fetchWorkOrders();
@@ -363,7 +371,7 @@ export default function ProductionScheduler() {
         <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
         <div className="product"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
         <div className="bag-size"><b>Bag Size:</b> {wo.bagSize || 'N/A'}</div>
-        <div className="pallets"><b>Pallets:</b> {wo.numPallets || ''}</div>
+        <div className="pallets"><b>Run Rate:</b> {getRunRateLabel(wo, true)}</div>
         <div className="labor"><b>Labor:</b> {wo.labor || ''}</div>
         <div className="priority-bar">
           <b>Priority:</b> <span className={`priority-badge priority-${(wo.priority || 'Normal').toLowerCase()}`}>{wo.priority || 'Normal'}</span>
@@ -550,7 +558,7 @@ export default function ProductionScheduler() {
           <div class="wo-section-title">Customer & Logistics</div>
           <div class="wo-row"><div class="wo-label">Customer:</div><div class="wo-value">${wo.customer || 'N/A'}</div></div>
           <div class="wo-row"><div class="wo-label">Lead:</div><div class="wo-value">${wo.lead || 'N/A'}</div></div>
-          <div class="wo-row"><div class="wo-label">Pallets:</div><div class="wo-value">${wo.numPallets || 'N/A'}</div></div>
+          <div class="wo-row"><div class="wo-label">Planned Run Rate:</div><div class="wo-value">${wo.plannedRunRate ? `${wo.plannedRunRate} bags/min` : 'N/A'}</div></div>
           <div class="wo-row"><div class="wo-label">Priority:</div><div class="wo-value"><span class="priority-${(wo.priority || 'Normal').toLowerCase()}">${wo.priority || 'Normal'}</span></div></div>
         </div>
 
@@ -736,6 +744,12 @@ export default function ProductionScheduler() {
           <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
             📊 Dashboard
           </button>
+          <button className="dashboard-btn" onClick={() => navigate('/production')}>
+            📈 KPI Dashboard
+          </button>
+          <button className="dashboard-btn" onClick={() => navigate('/production-labor-planner')}>
+            👷 Labor Planner
+          </button>
           <button className="history-btn" onClick={() => navigate('/work-order-history')}>
             📋 WO History
           </button>
@@ -771,7 +785,7 @@ export default function ProductionScheduler() {
                     <th>Lead</th>
                     <th>Country</th>
                     <th>Priority</th>
-                    <th>Pallets</th>
+                    <th>Run Rate</th>
                     <th>Labor</th>
                     <th>Lots</th>
                     <th>Target</th>
@@ -796,7 +810,7 @@ export default function ProductionScheduler() {
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{wo.numPallets || '-'}</td>
+                      <td>{getRunRateLabel(wo, true)}</td>
                       <td>{wo.labor || '-'}</td>
                       <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
@@ -848,7 +862,7 @@ export default function ProductionScheduler() {
                     <th>Lead</th>
                     <th>Country</th>
                     <th>Priority</th>
-                    <th>Pallets</th>
+                    <th>Run Rate</th>
                     <th>Labor</th>
                     <th>Lots</th>
                     <th>Target</th>
@@ -871,7 +885,7 @@ export default function ProductionScheduler() {
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{wo.numPallets || '-'}</td>
+                      <td>{wo.plannedRunRate ? `${wo.plannedRunRate}/min` : '-'}</td>
                       <td>{wo.labor || '-'}</td>
                       <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
@@ -1028,11 +1042,19 @@ export default function ProductionScheduler() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Pallets</label>
+                  <label>Planned Run Rate (bags/min)</label>
                   <input
                     type="number"
-                    value={editingWorkOrder.numPallets || ''}
-                    onChange={(e) => setEditingWorkOrder({ ...editingWorkOrder, numPallets: parseInt(e.target.value) })}
+                    step="0.1"
+                    min="0"
+                    value={editingWorkOrder.plannedRunRate || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setEditingWorkOrder({
+                        ...editingWorkOrder,
+                        plannedRunRate: value === '' ? undefined : parseFloat(value)
+                      });
+                    }}
                   />
                 </div>
                 <div className="form-group">

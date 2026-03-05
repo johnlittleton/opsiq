@@ -1,15 +1,58 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
-import { ProductionEntry, ProductionKPI, Shift } from '../../shared/types';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import './ProductionScheduler.css';
+import './ProductionKPI.css';
+
+interface SchedulerHistoryPoint {
+  date: string;
+  totalCases: number;
+  totalBags: number;
+  laborCost: number;
+  casesPerHour: number;
+  bagsPerHour: number;
+}
+
+interface SchedulerLinePoint {
+  lineNumber: number;
+  totalCases: number;
+  totalBags: number;
+  totalLaborHours: number;
+  laborCost: number;
+  casesPerHour: number;
+  casesPerMinute: number;
+  casesPerPerson: number;
+  bagsPerHour: number;
+  bagsPerMinute: number;
+  bagsPerPerson: number;
+}
+
+interface SchedulerKPI {
+  averageProductionWage: number;
+  totals: {
+    totalWorkOrders: number;
+    totalCases: number;
+    totalBags: number;
+    totalMinutes: number;
+    totalLaborHours: number;
+    totalLaborCost: number;
+    casesPerHour: number;
+    casesPerMinute: number;
+    casesPerPerson: number;
+    bagsPerHour: number;
+    bagsPerMinute: number;
+    bagsPerPerson: number;
+  };
+  byLine: SchedulerLinePoint[];
+  history: SchedulerHistoryPoint[];
+}
 
 const ProductionKPIPage: React.FC = () => {
-  const [entries, setEntries] = useState<ProductionEntry[]>([]);
-  const [kpi, setKpi] = useState<ProductionKPI | null>(null);
+  const navigate = useNavigate();
+  const [kpi, setKpi] = useState<SchedulerKPI | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Helper function to get local date string without timezone issues
@@ -25,16 +68,7 @@ const ProductionKPIPage: React.FC = () => {
     endDate: getLocalDateString(new Date()),
   });
 
-  const [formData, setFormData] = useState({
-    date: getLocalDateString(new Date()),
-    shift: 'A' as Shift,
-    lineNumber: 1,
-    laborHours: '',
-    laborRate: '',
-    pallets: '',
-    cases: '',
-    scrapCases: '',
-  });
+  const [selectedLine, setSelectedLine] = useState<number>(0);
 
   useEffect(() => {
     loadData();
@@ -42,15 +76,13 @@ const ProductionKPIPage: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [entriesData, kpiData] = await Promise.all([
-        apiClient.getProductionEntries({
-          startDate: dateRange.startDate,
-          endDate: dateRange.endDate,
-        }),
-        apiClient.getProductionKPI(dateRange.startDate, dateRange.endDate),
-      ]);
-      setEntries(entriesData);
+      const kpiData = await apiClient.getProductionSchedulerKPI(
+        dateRange.startDate,
+        dateRange.endDate,
+        selectedLine > 0 ? selectedLine : undefined
+      );
       setKpi(kpiData);
     } catch (err: any) {
       setError(err.message);
@@ -59,80 +91,30 @@ const ProductionKPIPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!formData.laborHours || !formData.laborRate || !formData.pallets || !formData.cases) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await apiClient.createProductionEntry({
-        date: formData.date,
-        shift: formData.shift,
-        lineNumber: formData.lineNumber,
-        laborHours: parseFloat(formData.laborHours),
-        laborRate: parseFloat(formData.laborRate),
-        pallets: parseInt(formData.pallets),
-        cases: parseInt(formData.cases),
-        scrapCases: parseInt(formData.scrapCases || '0'),
-      });
-
-      // Reset form
-      setFormData({
-        ...formData,
-        laborHours: '',
-        laborRate: '',
-        pallets: '',
-        cases: '',
-        scrapCases: '',
-      });
-      setShowForm(false);
-      loadData();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const prepareChartData = () => {
-    const last7Days = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = format(subDays(new Date(), i), 'yyyy-MM-dd');
-      const dayEntries = entries.filter(e => e.date === date);
-      const totalPallets = dayEntries.reduce((sum, e) => sum + e.pallets, 0);
-      const totalCases = dayEntries.reduce((sum, e) => sum + e.cases, 0);
-      const totalScrap = dayEntries.reduce((sum, e) => sum + e.scrapCases, 0);
-      const scrapRate = totalCases > 0 ? (totalScrap / totalCases) * 100 : 0;
-
-      last7Days.push({
-        date: format(subDays(new Date(), i), 'MMM dd'),
-        pallets: totalPallets,
-        cases: totalCases,
-        scrapRate: parseFloat(scrapRate.toFixed(2)),
-      });
-    }
-    return last7Days;
-  };
+  const chartData = (kpi?.history || []).map(point => ({
+    ...point,
+    dateLabel: format(new Date(`${point.date}T00:00:00`), 'MMM dd'),
+  }));
 
   if (loading) {
     return <div className="loading">Loading production data...</div>;
   }
 
-  const chartData = prepareChartData();
-
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 className="page-title">Production KPI Dashboard</h1>
-        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ Add Entry'}
+    <div className="production-scheduler">
+      <div className="header-bar">
+        <button className="back-btn" onClick={() => navigate('/production-scheduler')}>
+          ← Scheduler
         </button>
+        <h1>Production KPI Dashboard</h1>
+        <div className="header-controls">
+          <button className="history-btn" onClick={() => navigate('/production-kpi-history')}>
+            📜 KPI History
+          </button>
+        </div>
       </div>
+
+      <div className="production-kpi-content" style={{ padding: '16px 20px' }}>
 
       {error && <div className="error">{error}</div>}
 
@@ -157,148 +139,63 @@ const ProductionKPIPage: React.FC = () => {
               className="form-input"
             />
           </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Line</label>
+            <select
+              value={selectedLine}
+              onChange={(e) => setSelectedLine(parseInt(e.target.value))}
+              className="form-select"
+            >
+              <option value={0}>All Lines</option>
+              {[1, 2, 3, 4, 5, 6].map(n => (
+                <option key={n} value={n}>Line {n}</option>
+              ))}
+            </select>
+          </div>
           <button className="btn btn-secondary" onClick={loadData}>
             Refresh
           </button>
         </div>
       </div>
 
-      {/* Entry Form */}
-      {showForm && (
-        <div className="card">
-          <h3 className="card-title">Add Production Entry</h3>
-          <form onSubmit={handleSubmit}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-              <div className="form-group">
-                <label>Date *</label>
-                <input
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="form-input"
-                  disabled={submitting}
-                />
-              </div>
-              <div className="form-group">
-                <label>Shift *</label>
-                <select
-                  value={formData.shift}
-                  onChange={(e) => setFormData({ ...formData, shift: e.target.value as Shift })}
-                  className="form-select"
-                  disabled={submitting}
-                >
-                  <option value="A">Shift A</option>
-                  <option value="B">Shift B</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Line (1-6) *</label>
-                <select
-                  value={formData.lineNumber}
-                  onChange={(e) => setFormData({ ...formData, lineNumber: parseInt(e.target.value) })}
-                  className="form-select"
-                  disabled={submitting}
-                >
-                  {[1, 2, 3, 4, 5, 6].map(n => (
-                    <option key={n} value={n}>Line {n}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Labor Hours *</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={formData.laborHours}
-                  onChange={(e) => setFormData({ ...formData, laborHours: e.target.value })}
-                  className="form-input"
-                  placeholder="8.0"
-                  disabled={submitting}
-                />
-              </div>
-              <div className="form-group">
-                <label>Labor Rate ($/hr) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.laborRate}
-                  onChange={(e) => setFormData({ ...formData, laborRate: e.target.value })}
-                  className="form-input"
-                  placeholder="25.00"
-                  disabled={submitting}
-                />
-              </div>
-              <div className="form-group">
-                <label>Pallets *</label>
-                <input
-                  type="number"
-                  value={formData.pallets}
-                  onChange={(e) => setFormData({ ...formData, pallets: e.target.value })}
-                  className="form-input"
-                  placeholder="100"
-                  disabled={submitting}
-                />
-              </div>
-              <div className="form-group">
-                <label>Cases *</label>
-                <input
-                  type="number"
-                  value={formData.cases}
-                  onChange={(e) => setFormData({ ...formData, cases: e.target.value })}
-                  className="form-input"
-                  placeholder="1000"
-                  disabled={submitting}
-                />
-              </div>
-              <div className="form-group">
-                <label>Scrap Cases</label>
-                <input
-                  type="number"
-                  value={formData.scrapCases}
-                  onChange={(e) => setFormData({ ...formData, scrapCases: e.target.value })}
-                  className="form-input"
-                  placeholder="0"
-                  disabled={submitting}
-                />
-              </div>
-            </div>
-            <div style={{ marginTop: '16px' }}>
-              <button type="submit" className="btn btn-success" disabled={submitting}>
-                {submitting ? 'Saving...' : 'Save Entry'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {/* KPI Summary Cards */}
       {kpi && (
         <div className="kpi-grid">
           <div className="kpi-card">
+            <div className="kpi-label">Avg Production Wage</div>
+            <div className="kpi-value">${kpi.averageProductionWage.toFixed(2)}<span className="kpi-unit">/hr</span></div>
+          </div>
+          <div className="kpi-card">
             <div className="kpi-label">Total Labor Hours</div>
-            <div className="kpi-value">{kpi.totalLaborHours.toFixed(1)}<span className="kpi-unit">hrs</span></div>
+            <div className="kpi-value">{kpi.totals.totalLaborHours.toFixed(1)}<span className="kpi-unit">hrs</span></div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Total Labor Cost</div>
-            <div className="kpi-value">${kpi.totalLaborCost.toLocaleString()}</div>
-          </div>
-          <div className="kpi-card">
-            <div className="kpi-label">Total Pallets</div>
-            <div className="kpi-value">{kpi.totalPallets.toLocaleString()}</div>
+            <div className="kpi-value">${kpi.totals.totalLaborCost.toLocaleString()}</div>
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Total Cases</div>
-            <div className="kpi-value">{kpi.totalCases.toLocaleString()}</div>
+            <div className="kpi-value">{kpi.totals.totalCases.toLocaleString()}</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-label">Total Scrap</div>
-            <div className="kpi-value">{kpi.totalScrap.toLocaleString()}</div>
+            <div className="kpi-label">Total Bags</div>
+            <div className="kpi-value">{kpi.totals.totalBags.toLocaleString()}</div>
           </div>
           <div className="kpi-card">
-            <div className="kpi-label">Scrap Rate</div>
-            <div className="kpi-value" style={{ color: kpi.scrapRate > 5 ? '#e74c3c' : kpi.scrapRate > 2 ? '#f39c12' : '#27ae60' }}>
-              {kpi.scrapRate.toFixed(2)}<span className="kpi-unit">%</span>
-            </div>
+            <div className="kpi-label">Cases / Hour</div>
+            <div className="kpi-value">{kpi.totals.casesPerHour.toFixed(2)}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Cases / Minute</div>
+            <div className="kpi-value">{kpi.totals.casesPerMinute.toFixed(2)}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Cases / Person</div>
+            <div className="kpi-value">{kpi.totals.casesPerPerson.toFixed(2)}</div>
+          </div>
+          <div className="kpi-card">
+            <div className="kpi-label">Bags / Hour</div>
+            <div className="kpi-value">{kpi.totals.bagsPerHour.toFixed(2)}</div>
           </div>
         </div>
       )}
@@ -306,30 +203,32 @@ const ProductionKPIPage: React.FC = () => {
       {/* Charts */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
         <div className="card">
-          <h3 className="card-title">7-Day Pallets Trend</h3>
+          <h3 className="card-title">Cases and Bags Trend</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" stroke="#b0b0b0" />
+              <XAxis dataKey="dateLabel" stroke="#b0b0b0" />
               <YAxis stroke="#b0b0b0" />
               <Tooltip contentStyle={{ background: '#252525', border: '1px solid #444' }} />
               <Legend />
-              <Line type="monotone" dataKey="pallets" stroke="#4a9eff" strokeWidth={2} />
+              <Line type="monotone" dataKey="totalCases" stroke="#4a9eff" strokeWidth={2} name="Cases" />
+              <Line type="monotone" dataKey="totalBags" stroke="#27ae60" strokeWidth={2} name="Bags" />
             </LineChart>
           </ResponsiveContainer>
         </div>
 
         <div className="card">
-          <h3 className="card-title">7-Day Scrap Rate</h3>
+          <h3 className="card-title">Output Efficiency Trend</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
+            <BarChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-              <XAxis dataKey="date" stroke="#b0b0b0" />
+              <XAxis dataKey="dateLabel" stroke="#b0b0b0" />
               <YAxis stroke="#b0b0b0" />
               <Tooltip contentStyle={{ background: '#252525', border: '1px solid #444' }} />
               <Legend />
-              <Line type="monotone" dataKey="scrapRate" stroke="#e74c3c" strokeWidth={2} name="Scrap %" />
-            </LineChart>
+              <Bar dataKey="casesPerHour" fill="#4a9eff" name="Cases/Hour" />
+              <Bar dataKey="bagsPerHour" fill="#27ae60" name="Bags/Hour" />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -338,36 +237,47 @@ const ProductionKPIPage: React.FC = () => {
       {kpi && (
         <div className="card">
           <h3 className="card-title">Production by Line</h3>
-          <table className="data-table">
+          <div className="production-kpi-table-scroll">
+          <table className="data-table production-kpi-table">
             <thead>
               <tr>
                 <th>Line</th>
+                <th>Cases</th>
+                <th>Bags</th>
+                <th>Labor Mins</th>
                 <th>Labor Hours</th>
                 <th>Labor Cost</th>
-                <th>Pallets</th>
-                <th>Cases</th>
-                <th>Scrap</th>
-                <th>Scrap Rate</th>
+                <th>Cases/Hr</th>
+                <th>Cases/Min</th>
+                <th>Cases/Person</th>
+                <th>Bags/Hr</th>
+                <th>Bags/Min</th>
+                <th>Bags/Person</th>
               </tr>
             </thead>
             <tbody>
-              {kpi.lineBreakdown.map(line => (
+              {kpi.byLine.map(line => (
                 <tr key={line.lineNumber}>
                   <td><strong>Line {line.lineNumber}</strong></td>
-                  <td>{line.laborHours.toFixed(1)} hrs</td>
+                  <td>{line.totalCases.toLocaleString()}</td>
+                  <td>{line.totalBags.toLocaleString()}</td>
+                  <td>{Math.round(line.totalLaborHours * 60).toLocaleString()}</td>
+                  <td>{line.totalLaborHours.toFixed(1)} hrs</td>
                   <td>${line.laborCost.toLocaleString()}</td>
-                  <td>{line.pallets.toLocaleString()}</td>
-                  <td>{line.cases.toLocaleString()}</td>
-                  <td>{line.scrap.toLocaleString()}</td>
-                  <td style={{ color: line.scrapRate > 5 ? '#e74c3c' : line.scrapRate > 2 ? '#f39c12' : '#27ae60' }}>
-                    {line.scrapRate.toFixed(2)}%
-                  </td>
+                  <td>{line.casesPerHour.toFixed(2)}</td>
+                  <td>{line.casesPerMinute.toFixed(2)}</td>
+                  <td>{line.casesPerPerson.toFixed(2)}</td>
+                  <td>{line.bagsPerHour.toFixed(2)}</td>
+                  <td>{line.bagsPerMinute.toFixed(2)}</td>
+                  <td>{line.bagsPerPerson.toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

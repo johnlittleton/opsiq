@@ -210,6 +210,7 @@ export class DatabaseService implements IDatabaseService {
         date TEXT NOT NULL,
         product TEXT,
         bagSize TEXT,
+        plannedRunRate REAL,
         customer TEXT,
         lead TEXT,
         countryOfOrigin TEXT,
@@ -441,6 +442,11 @@ export class DatabaseService implements IDatabaseService {
       if (!workOrderColumnNames.includes('countryOfOrigin')) {
         console.log('Adding countryOfOrigin column to work_orders...');
         this.db.exec('ALTER TABLE work_orders ADD COLUMN countryOfOrigin TEXT');
+      }
+
+      if (!workOrderColumnNames.includes('plannedRunRate')) {
+        console.log('Adding plannedRunRate column to work_orders...');
+        this.db.exec('ALTER TABLE work_orders ADD COLUMN plannedRunRate REAL');
       }
     } catch (err) {
       console.error('Migration error for work_orders:', err);
@@ -2063,11 +2069,11 @@ export class DatabaseService implements IDatabaseService {
       
       const stmt = this.db.prepare(`
         INSERT INTO work_orders (
-          id, line, slot, date, product, bagSize, customer, lead, countryOfOrigin, numPallets, 
+          id, line, slot, date, product, bagSize, plannedRunRate, customer, lead, countryOfOrigin, numPallets, 
           labor, priority, lot1, lot2, lot3, lot4, notes, status, 
           targetCases, completedCases, startTimestamp, elapsedMs, 
           isPaused, elapsedDisplay, createdAt, updatedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       console.log('  Executing INSERT...');
@@ -2078,6 +2084,7 @@ export class DatabaseService implements IDatabaseService {
         workOrder.date,
         workOrder.product || null,
         workOrder.bagSize || null,
+        workOrder.plannedRunRate || null,
         workOrder.customer || null,
         workOrder.lead || null,
         workOrder.countryOfOrigin || null,
@@ -2147,6 +2154,8 @@ export class DatabaseService implements IDatabaseService {
   // Production Downtime
   async createDowntime(downtime: any): Promise<any> {
     const now = getLocalISOString();
+    const parsedStart = downtime.startTime ? new Date(downtime.startTime) : new Date();
+    const startTime = Number.isNaN(parsedStart.getTime()) ? now : getLocalISOString(parsedStart);
     const stmt = this.db.prepare(`
       INSERT INTO production_downtime (
         line, reason, startTime, notes, createdAt, updatedAt
@@ -2156,7 +2165,7 @@ export class DatabaseService implements IDatabaseService {
     const result = stmt.run(
       downtime.line,
       downtime.reason,
-      downtime.startTime || now,
+      startTime,
       downtime.notes || null,
       now,
       now
@@ -2173,11 +2182,17 @@ export class DatabaseService implements IDatabaseService {
       query += ' AND line = ?';
       params.push(filters.line);
     }
-    if (filters?.startDate) {
-      query += ' AND startTime >= ?';
-      params.push(filters.startDate);
-    }
-    if (filters?.endDate) {
+    if (filters?.startDate && filters?.endDate) {
+      query += ` AND (
+        (startTime >= ? AND startTime <= ?)
+        OR (endTime IS NOT NULL AND endTime >= ? AND endTime <= ?)
+        OR (startTime <= ? AND (endTime IS NULL OR endTime >= ?))
+      )`;
+      params.push(filters.startDate, filters.endDate, filters.startDate, filters.endDate, filters.startDate, filters.startDate);
+    } else if (filters?.startDate) {
+      query += ' AND (startTime >= ? OR (endTime IS NOT NULL AND endTime >= ?) OR endTime IS NULL)';
+      params.push(filters.startDate, filters.startDate);
+    } else if (filters?.endDate) {
       query += ' AND startTime <= ?';
       params.push(filters.endDate);
     }
@@ -2201,8 +2216,11 @@ export class DatabaseService implements IDatabaseService {
     console.log('Found downtime record:', downtime);
     const now = getLocalISOString();
     const startTime = new Date(downtime.startTime).getTime();
+    if (Number.isNaN(startTime)) {
+      throw new Error('Downtime start time is invalid');
+    }
     const endTime = new Date(now).getTime();
-    const durationMinutes = Math.round((endTime - startTime) / 60000);
+    const durationMinutes = Math.max(0, Math.round((endTime - startTime) / 60000));
     console.log('Calculated duration:', durationMinutes, 'minutes');
 
     this.db.prepare(`
