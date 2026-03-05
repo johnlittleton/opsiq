@@ -672,7 +672,12 @@ app.post('/api/production/work-orders', async (req, res) => {
   console.log('📥 POST /api/production/work-orders called');
   console.log('  Body:', req.body);
   try {
-    const workOrder = await db.createWorkOrder(req.body);
+    const normalizedBody = {
+      ...req.body,
+      plannedRunRate: req.body.plannedRunRate ?? req.body.planned_run_rate ?? null,
+    };
+
+    const workOrder = await db.createWorkOrder(normalizedBody);
     console.log('  Created work order:', workOrder);
     io.emit('workorder:updated', workOrder);
     res.json(workOrder);
@@ -684,7 +689,12 @@ app.post('/api/production/work-orders', async (req, res) => {
 
 app.put('/api/production/work-orders/:id', async (req, res) => {
   try {
-    const workOrder = await db.updateWorkOrder(req.params.id, req.body);
+    const normalizedBody = {
+      ...req.body,
+      plannedRunRate: req.body.plannedRunRate ?? req.body.planned_run_rate ?? req.body.plannedrate ?? null,
+    };
+
+    const workOrder = await db.updateWorkOrder(req.params.id, normalizedBody);
     if (workOrder) {
       io.emit('workorder:updated', workOrder);
       res.json(workOrder);

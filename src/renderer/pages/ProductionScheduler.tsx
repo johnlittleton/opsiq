@@ -185,7 +185,8 @@ export default function ProductionScheduler() {
       line: editingWorkOrder.line,
       slot: editingWorkOrder.slot,
       date: selectedDateStr,
-      status: editingWorkOrder.status || 'Scheduled'
+      status: editingWorkOrder.status || 'Scheduled',
+      planned_run_rate: editingWorkOrder.plannedRunRate
     };
 
     try {
