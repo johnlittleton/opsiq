@@ -1,6 +1,6 @@
 {
   "name": "opsiq",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "OpsIQ - Production-ready dock and production management system",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -98,7 +98,7 @@
     "publish": {
       "provider": "github",
       "owner": "johnlittleton",
-      "repo": "opsiq"
+      "repo": "opsiq-updates"
     }
   }
 }

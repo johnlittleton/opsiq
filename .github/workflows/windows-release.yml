@@ -42,6 +42,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist:win
 
+      - name: Validate updates repo token
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.UPDATES_REPO_TOKEN }}" ]; then
+            echo "UPDATES_REPO_TOKEN is not set. Add a PAT secret with repo write access to johnlittleton/opsiq-updates."
+            exit 1
+          fi
+
       - name: Upload release artifacts (workflow artifacts)
         uses: actions/upload-artifact@v4
         with:
@@ -52,6 +60,8 @@ jobs:
       - name: Publish GitHub Release
         uses: ncipollo/release-action@v1
         with:
+          owner: johnlittleton
+          repo: opsiq-updates
           tag: ${{ steps.app_version.outputs.tag }}
           name: OpsIQ ${{ steps.app_version.outputs.version }}
           generateReleaseNotes: true
@@ -59,4 +69,4 @@ jobs:
           allowUpdates: true
           updateOnlyUnreleased: false
           artifacts: "release/*"
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.UPDATES_REPO_TOKEN }}
