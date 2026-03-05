@@ -2304,17 +2304,6 @@ export class DatabaseService implements IDatabaseService {
     });
 
     const safeRate = (numerator: number, denominator: number) => denominator > 0 ? numerator / denominator : 0;
-    const getTeamAssignment = (dayOfWeek: number, shiftsRunning: number) => {
-      if (shiftsRunning <= 0) return 'Off';
-
-      if (scheduleType === '4-10') {
-        if (dayOfWeek === 3 && shiftsRunning > 1) return 'A + B';
-        if (dayOfWeek >= 1 && dayOfWeek <= 2) return 'A Team';
-        if (dayOfWeek >= 4 && dayOfWeek <= 6) return 'B Team';
-      }
-
-      return 'A Team';
-    };
 
     const lines = Object.values(byLine)
       .map((lineMetrics) => {
@@ -2412,6 +2401,17 @@ export class DatabaseService implements IDatabaseService {
     };
 
     const safeRate = (numerator: number, denominator: number) => denominator > 0 ? numerator / denominator : 0;
+    const getTeamAssignment = (dayOfWeek: number, shiftsRunning: number) => {
+      if (shiftsRunning <= 0) return 'Off';
+
+      if (scheduleType === '4-10') {
+        if (dayOfWeek === 3 && shiftsRunning > 1) return 'A + B';
+        if (dayOfWeek >= 1 && dayOfWeek <= 2) return 'A Team';
+        if (dayOfWeek >= 4 && dayOfWeek <= 6) return 'B Team';
+      }
+
+      return 'A Team';
+    };
 
     const dateCursor = new Date(`${start}T00:00:00`);
     const endDateObj = new Date(`${end}T00:00:00`);
