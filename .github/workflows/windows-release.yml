@@ -62,9 +62,10 @@ jobs:
         with:
           owner: johnlittleton
           repo: opsiq-updates
+          commit: main
           tag: ${{ steps.app_version.outputs.tag }}
           name: OpsIQ ${{ steps.app_version.outputs.version }}
-          generateReleaseNotes: true
+          generateReleaseNotes: false
           prerelease: ${{ inputs.prerelease }}
           allowUpdates: true
           updateOnlyUnreleased: false
