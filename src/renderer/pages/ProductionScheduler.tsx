@@ -296,22 +296,51 @@ export default function ProductionScheduler() {
     const wo = workOrders.find(w => w.id === id);
     if (!wo) return;
 
+    const finalCompletedCases = casesInputs[id] ?? wo.completedCases ?? 0;
     const elapsedMs = (wo.elapsedMs || 0) + (wo.startTimestamp && !wo.isPaused ? Date.now() - wo.startTimestamp : 0);
     const h = Math.floor(elapsedMs / 3600000);
     const m = Math.floor((elapsedMs % 3600000) / 60000);
     const s = Math.floor((elapsedMs % 60000) / 1000);
 
-    await fetch(`${API_BASE}/api/production/work-orders/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        status: 'Completed',
-        elapsedMs,
-        isPaused: true,
-        elapsedDisplay: `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
-      })
-    });
-    await fetchWorkOrders();
+    try {
+      const response = await fetch(`${API_BASE}/api/production/work-orders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'Completed',
+          completedCases: finalCompletedCases,
+          elapsedMs,
+          isPaused: true,
+          elapsedDisplay: `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Failed to complete work order:', error);
+        alert('Failed to complete work order: ' + error);
+        return;
+      }
+
+      const updatedWorkOrder = await response.json().catch(() => null);
+      if (updatedWorkOrder) {
+        setWorkOrders(prev => prev.map(existing => (
+          existing.id === id
+            ? {
+                ...existing,
+                ...updatedWorkOrder,
+                plannedRunRate: updatedWorkOrder.plannedRunRate ?? updatedWorkOrder.planned_run_rate ?? existing.plannedRunRate
+              }
+            : existing
+        )));
+      }
+      setCasesInputs(prev => ({ ...prev, [id]: finalCompletedCases }));
+
+      await fetchWorkOrders();
+    } catch (error) {
+      console.error('Error completing work order:', error);
+      alert('Error completing work order: ' + error);
+    }
   };
 
   const updateCompletedCases = async (id: string, completedCases: number) => {
