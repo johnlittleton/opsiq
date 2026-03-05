@@ -313,6 +313,67 @@ export default function ProductionScheduler() {
     return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
   };
 
+  const getBagsPerCase = (wo: WorkOrder): number => {
+    if (!wo?.bagSize) return 1;
+    const match = wo.bagSize.match(/^(\d+)/);
+    return match ? parseInt(match[1], 10) : 1;
+  };
+
+  const getElapsedMinutes = (wo: WorkOrder): number => {
+    if (!wo?.startTimestamp) return 0;
+    const elapsedMs = (wo.elapsedMs || 0) + (wo.isPaused ? 0 : Date.now() - wo.startTimestamp);
+    return elapsedMs > 0 ? elapsedMs / 60000 : 0;
+  };
+
+  const getCurrentCasesPerMinute = (wo: WorkOrder): number | null => {
+    const elapsedMinutes = getElapsedMinutes(wo);
+    const completedCases = Number(wo.completedCases || 0);
+    if (elapsedMinutes <= 0 || completedCases <= 0) return null;
+    return completedCases / elapsedMinutes;
+  };
+
+  const getCurrentBagsPerMinute = (wo: WorkOrder): number | null => {
+    const currentCasesPerMinute = getCurrentCasesPerMinute(wo);
+    if (currentCasesPerMinute === null) return null;
+    return currentCasesPerMinute * getBagsPerCase(wo);
+  };
+
+  const formatEtaMinutes = (minutes: number | null): string => {
+    if (minutes === null || !Number.isFinite(minutes) || minutes < 0) return '--';
+    if (minutes < 1) return '<1m';
+    const totalMinutes = Math.round(minutes);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const getEtaCases = (wo: WorkOrder): string => {
+    const targetCases = Number(wo.targetCases || 0);
+    const completedCases = Number(wo.completedCases || 0);
+    if (targetCases <= 0) return '--';
+    if (completedCases >= targetCases) return 'Done';
+
+    const currentCasesPerMinute = getCurrentCasesPerMinute(wo);
+    if (!currentCasesPerMinute || currentCasesPerMinute <= 0) return '--';
+
+    const remainingCases = targetCases - completedCases;
+    return formatEtaMinutes(remainingCases / currentCasesPerMinute);
+  };
+
+  const getEtaBags = (wo: WorkOrder): string => {
+    const targetCases = Number(wo.targetCases || 0);
+    const completedCases = Number(wo.completedCases || 0);
+    if (targetCases <= 0) return '--';
+    if (completedCases >= targetCases) return 'Done';
+
+    const currentBagsPerMinute = getCurrentBagsPerMinute(wo);
+    if (!currentBagsPerMinute || currentBagsPerMinute <= 0) return '--';
+
+    const remainingCases = targetCases - completedCases;
+    const remainingBags = remainingCases * getBagsPerCase(wo);
+    return formatEtaMinutes(remainingBags / currentBagsPerMinute);
+  };
+
   const renderWorkOrderCard = (line: number, slot: number) => {
     const wo = getWorkOrderForSlot(line, slot);
 
@@ -413,6 +474,12 @@ export default function ProductionScheduler() {
         <div className="status-badge-active">Active</div>
         <div className="elapsed-timer-display">
           <b>Elapsed:</b> {calculateElapsedTime(wo)}
+        </div>
+        <div className="elapsed-timer-display">
+          <b>ETA (Cases):</b> {getEtaCases(wo)}
+        </div>
+        <div className="elapsed-timer-display">
+          <b>ETA (Bags):</b> {getEtaBags(wo)}
         </div>
         
         <div className="wo-actions" onClick={(e) => e.stopPropagation()}>
@@ -792,6 +859,8 @@ export default function ProductionScheduler() {
                     <th>Target</th>
                     <th>Completed</th>
                     <th>Elapsed</th>
+                    <th>ETA (Cases)</th>
+                    <th>ETA (Bags)</th>
                     <th>Notes</th>
                     <th>Actions</th>
                   </tr>
@@ -834,6 +903,8 @@ export default function ProductionScheduler() {
                         />
                       </td>
                       <td className="elapsed-cell">{calculateElapsedTime(wo)}</td>
+                      <td>{getEtaCases(wo)}</td>
+                      <td>{getEtaBags(wo)}</td>
                       <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
                       <td onClick={(e) => e.stopPropagation()}>
                         <button className="btn-small go-btn" onClick={() => updateCompletedCases(wo.id, casesInputs[wo.id] ?? 0)}>Go</button>

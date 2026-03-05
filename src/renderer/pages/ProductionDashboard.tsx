@@ -157,6 +157,59 @@ export default function ProductionDashboard() {
     return plannedRunRate !== null ? plannedRunRate : null;
   };
 
+  const getElapsedMinutes = (wo: any): number => {
+    if (!wo || !wo.startTimestamp) return 0;
+    const elapsedMs = (wo.elapsedMs || 0) + (wo.isPaused ? 0 : Date.now() - wo.startTimestamp);
+    return elapsedMs > 0 ? elapsedMs / 60000 : 0;
+  };
+
+  const getCurrentCasesPerMinute = (wo: any): number | null => {
+    const elapsedMinutes = getElapsedMinutes(wo);
+    const completedCases = Number(wo?.completedCases || 0);
+    if (elapsedMinutes <= 0 || completedCases <= 0) return null;
+    return completedCases / elapsedMinutes;
+  };
+
+  const getCurrentBagsPerMinute = (wo: any): number | null => {
+    const currentCasesPerMinute = getCurrentCasesPerMinute(wo);
+    if (currentCasesPerMinute === null) return null;
+    return currentCasesPerMinute * getBagsPerCase(wo);
+  };
+
+  const formatEtaMinutes = (minutes: number | null): string => {
+    if (minutes === null || !Number.isFinite(minutes) || minutes < 0) return '--';
+    if (minutes < 1) return '<1m';
+    const rounded = Math.round(minutes);
+    const hours = Math.floor(rounded / 60);
+    const mins = rounded % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const calculateEtaCases = (wo: any) => {
+    if (!wo) return '--';
+    const plannedCases = getPlannedCases(wo);
+    const completedCases = Number(wo?.completedCases || 0);
+    if (plannedCases <= 0) return '--';
+    if (completedCases >= plannedCases) return 'Done';
+    const currentCasesPerMinute = getCurrentCasesPerMinute(wo);
+    if (!currentCasesPerMinute || currentCasesPerMinute <= 0) return '--';
+    const remainingCases = plannedCases - completedCases;
+    return formatEtaMinutes(remainingCases / currentCasesPerMinute);
+  };
+
+  const calculateEtaBags = (wo: any) => {
+    if (!wo) return '--';
+    const plannedCases = getPlannedCases(wo);
+    const completedCases = Number(wo?.completedCases || 0);
+    if (plannedCases <= 0) return '--';
+    if (completedCases >= plannedCases) return 'Done';
+    const currentBagsPerMinute = getCurrentBagsPerMinute(wo);
+    if (!currentBagsPerMinute || currentBagsPerMinute <= 0) return '--';
+    const remainingCases = plannedCases - completedCases;
+    const remainingBags = remainingCases * getBagsPerCase(wo);
+    return formatEtaMinutes(remainingBags / currentBagsPerMinute);
+  };
+
   const calculateRequiredRateCases = (wo: any) => {
     if (!wo) return '--';
     const requiredBagsPerMinute = getRequiredBagsPerMinute(wo);
@@ -345,6 +398,16 @@ export default function ProductionDashboard() {
                       <div className="metric">
                         <span className="metric-label">Current Staff:</span>
                         <span className="metric-value current-staff">{wo.labor || '--'} people</span>
+                      </div>
+                    </div>
+                    <div className="metric-row">
+                      <div className="metric">
+                        <span className="metric-label">ETA (Cases):</span>
+                        <span className="metric-value required-rate">{calculateEtaCases(wo)}</span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">ETA (Bags):</span>
+                        <span className="metric-value required-rate">{calculateEtaBags(wo)}</span>
                       </div>
                     </div>
                   </div>
