@@ -376,7 +376,7 @@ export default function ProductionDashboard() {
                   <div className="metrics-section">
                     <div className="metric-row">
                       <div className="metric">
-                        <span className="metric-label">Planned Rate:</span>
+                        <span className="metric-label">Planned Bags/Min:</span>
                         <span className="metric-value required-rate">{calculateRequiredRate(wo)} bags/min</span>
                       </div>
                       <div className="metric">
@@ -386,7 +386,7 @@ export default function ProductionDashboard() {
                     </div>
                     <div className="metric-row">
                       <div className="metric">
-                        <span className="metric-label">Planned Rate (Cases):</span>
+                        <span className="metric-label">Planned Cases/Min:</span>
                         <span className="metric-value required-rate">{calculateRequiredRateCases(wo)} cases/min</span>
                       </div>
                       <div className="metric">

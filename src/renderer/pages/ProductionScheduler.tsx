@@ -90,6 +90,21 @@ export default function ProductionScheduler() {
     return includeDefault ? '45/min (default)' : '-';
   };
 
+  const getPlannedBagsPerMinute = (wo: WorkOrder): number | null => {
+    return getPlannedRunRate(wo);
+  };
+
+  const getPlannedCasesPerMinute = (wo: WorkOrder): number | null => {
+    const plannedBagsPerMinute = getPlannedBagsPerMinute(wo);
+    if (plannedBagsPerMinute === null) return null;
+    const bagsPerCase = getBagsPerCase(wo);
+    return bagsPerCase > 0 ? plannedBagsPerMinute / bagsPerCase : null;
+  };
+
+  const formatRate = (value: number | null): string => {
+    return value === null ? '--' : value.toFixed(1);
+  };
+
   useEffect(() => {
     fetchWorkOrders();
     // Fetch every 2 seconds to keep timers updated
@@ -447,7 +462,8 @@ export default function ProductionScheduler() {
         <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
         <div className="product"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
         <div className="bag-size"><b>Bag Size:</b> {wo.bagSize || 'N/A'}</div>
-        <div className="pallets"><b>Run Rate:</b> {getRunRateLabel(wo, false)}</div>
+        <div className="pallets"><b>Planned Bags/Min:</b> {formatRate(getPlannedBagsPerMinute(wo))}</div>
+        <div className="pallets"><b>Planned Cases/Min:</b> {formatRate(getPlannedCasesPerMinute(wo))}</div>
         <div className="labor"><b>Labor:</b> {wo.labor || ''}</div>
         <div className="priority-bar">
           <b>Priority:</b> <span className={`priority-badge priority-${(wo.priority || 'Normal').toLowerCase()}`}>{wo.priority || 'Normal'}</span>
@@ -867,7 +883,8 @@ export default function ProductionScheduler() {
                     <th>Lead</th>
                     <th>Country</th>
                     <th>Priority</th>
-                    <th>Run Rate</th>
+                    <th>Planned Bags/Min</th>
+                    <th>Planned Cases/Min</th>
                     <th>Labor</th>
                     <th>Lots</th>
                     <th>Target</th>
@@ -894,7 +911,8 @@ export default function ProductionScheduler() {
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{getRunRateLabel(wo, false)}</td>
+                      <td>{formatRate(getPlannedBagsPerMinute(wo))}</td>
+                      <td>{formatRate(getPlannedCasesPerMinute(wo))}</td>
                       <td>{wo.labor || '-'}</td>
                       <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}

@@ -672,9 +672,16 @@ app.post('/api/production/work-orders', async (req, res) => {
   console.log('📥 POST /api/production/work-orders called');
   console.log('  Body:', req.body);
   try {
+    const { planned_run_rate, plannedrate, ...restBody } = req.body;
+    const hasPlannedRunRate = Object.prototype.hasOwnProperty.call(req.body, 'plannedRunRate')
+      || Object.prototype.hasOwnProperty.call(req.body, 'planned_run_rate')
+      || Object.prototype.hasOwnProperty.call(req.body, 'plannedrate');
+
     const normalizedBody = {
-      ...req.body,
-      plannedRunRate: req.body.plannedRunRate ?? req.body.planned_run_rate ?? null,
+      ...restBody,
+      ...(hasPlannedRunRate
+        ? { plannedRunRate: req.body.plannedRunRate ?? req.body.planned_run_rate ?? req.body.plannedrate ?? null }
+        : {}),
     };
 
     const workOrder = await db.createWorkOrder(normalizedBody);
@@ -689,9 +696,16 @@ app.post('/api/production/work-orders', async (req, res) => {
 
 app.put('/api/production/work-orders/:id', async (req, res) => {
   try {
+    const { planned_run_rate, plannedrate, ...restBody } = req.body;
+    const hasPlannedRunRate = Object.prototype.hasOwnProperty.call(req.body, 'plannedRunRate')
+      || Object.prototype.hasOwnProperty.call(req.body, 'planned_run_rate')
+      || Object.prototype.hasOwnProperty.call(req.body, 'plannedrate');
+
     const normalizedBody = {
-      ...req.body,
-      plannedRunRate: req.body.plannedRunRate ?? req.body.planned_run_rate ?? req.body.plannedrate ?? null,
+      ...restBody,
+      ...(hasPlannedRunRate
+        ? { plannedRunRate: req.body.plannedRunRate ?? req.body.planned_run_rate ?? req.body.plannedrate ?? null }
+        : {}),
     };
 
     const workOrder = await db.updateWorkOrder(req.params.id, normalizedBody);
