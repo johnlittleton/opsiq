@@ -28,6 +28,13 @@ import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 
+type UpdaterStatus = {
+  state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  version?: string;
+  percent?: number;
+  message?: string;
+};
+
 // Public routes that don't require authentication (display dashboards for TVs/monitors)
 const PUBLIC_ROUTES = [
   '/production-dashboard',
@@ -85,15 +92,65 @@ const AppRoutes: React.FC = () => {
 
 const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
+  const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatus | null>(null);
 
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
 
+  useEffect(() => {
+    if (!window.electronAPI?.onUpdaterStatus) return;
+
+    const unsubscribe = window.electronAPI.onUpdaterStatus((status) => {
+      setUpdaterStatus(status);
+
+      if (status.state === 'not-available') {
+        setTimeout(() => {
+          setUpdaterStatus((current) => (current?.state === 'not-available' ? null : current));
+        }, 2500);
+      }
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  const shouldShowBanner = updaterStatus && updaterStatus.state !== 'not-available';
+
+  const bannerMessage = (() => {
+    if (!updaterStatus) return '';
+    if (updaterStatus.state === 'checking') return 'Checking for app updates...';
+    if (updaterStatus.state === 'available') return `Update ${updaterStatus.version || ''} found. Downloading now...`.trim();
+    if (updaterStatus.state === 'downloading') return `Downloading update... ${Math.round(updaterStatus.percent || 0)}%`;
+    if (updaterStatus.state === 'downloaded') return `Update ${updaterStatus.version || ''} ready. Restart app to apply.`.trim();
+    if (updaterStatus.state === 'error') return updaterStatus.message || 'Update check failed. Please try again later.';
+    return '';
+  })();
+
   return (
-    <Router>
-      <AppRoutes />
-    </Router>
+    <>
+      {shouldShowBanner && (
+        <div className={`update-banner update-banner-${updaterStatus.state}`}>
+          <span>{bannerMessage}</span>
+          <div className="update-banner-actions">
+            {updaterStatus.state === 'downloaded' && (
+              <button
+                className="update-banner-btn"
+                onClick={() => window.electronAPI?.restartApp?.()}
+              >
+                Restart Now
+              </button>
+            )}
+            <button className="update-banner-close" onClick={() => setUpdaterStatus(null)}>×</button>
+          </div>
+        </div>
+      )}
+
+      <Router>
+        <AppRoutes />
+      </Router>
+    </>
   );
 };
 

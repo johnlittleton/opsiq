@@ -4,6 +4,15 @@ import path from 'path';
 import fs from 'fs';
 import { exec } from 'child_process';
 
+type UpdaterState = 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+
+interface UpdaterStatusPayload {
+  state: UpdaterState;
+  version?: string;
+  percent?: number;
+  message?: string;
+}
+
 // ==================== CONFIGURATION ====================
 
 interface WindowConfig {
@@ -198,41 +207,48 @@ function createWindow() {
 
 // ==================== AUTO-UPDATER ====================
 
+const sendUpdaterStatus = (payload: UpdaterStatusPayload) => {
+  const windows = BrowserWindow.getAllWindows();
+  windows.forEach((window) => {
+    window.webContents.send('updater-status', payload);
+  });
+};
+
 // Configure auto-updater
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for updates...');
+  sendUpdaterStatus({ state: 'checking' });
 });
 
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info.version);
+  sendUpdaterStatus({ state: 'available', version: info.version });
 });
 
 autoUpdater.on('update-not-available', () => {
   console.log('App is up to date');
+  sendUpdaterStatus({ state: 'not-available' });
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
   console.log(`Download progress: ${Math.round(progressObj.percent)}%`);
+  sendUpdaterStatus({
+    state: 'downloading',
+    percent: Math.round(progressObj.percent),
+  });
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded, will install on quit');
-  // Notify user
-  const windows = BrowserWindow.getAllWindows();
-  if (windows.length > 0) {
-    windows[0].webContents.executeJavaScript(`
-      if (confirm('New version ${info.version} downloaded. Restart now to update?')) {
-        require('electron').ipcRenderer.send('restart-app');
-      }
-    `);
-  }
+  sendUpdaterStatus({ state: 'downloaded', version: info.version });
 });
 
 autoUpdater.on('error', (err) => {
   console.error('Auto-updater error:', err);
+  sendUpdaterStatus({ state: 'error', message: err?.message || 'Update check failed' });
 });
 
 ipcMain.on('restart-app', () => {

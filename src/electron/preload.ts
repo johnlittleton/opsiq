@@ -5,6 +5,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
   getDisplays: () => ipcRenderer.invoke('get-displays'),
+  onUpdaterStatus: (callback: (status: any) => void) => {
+    const listener = (_event: any, status: any) => callback(status);
+    ipcRenderer.on('updater-status', listener);
+    return () => ipcRenderer.removeListener('updater-status', listener);
+  },
+  restartApp: () => ipcRenderer.send('restart-app'),
 });
 
 contextBridge.exposeInMainWorld('electron', {

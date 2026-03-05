@@ -135,3 +135,70 @@ a {
 a:hover {
   color: var(--accent-hover);
 }
+
+.update-banner {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 420px;
+  max-width: 80vw;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--glass2);
+  border: 1px solid var(--border-bright);
+  box-shadow: var(--shadow-heavy);
+  color: var(--text-bright);
+}
+
+.update-banner-checking,
+.update-banner-available,
+.update-banner-downloading {
+  border-color: color-mix(in oklab, var(--accent-primary) 55%, transparent);
+}
+
+.update-banner-downloaded {
+  border-color: color-mix(in oklab, var(--ok) 55%, transparent);
+}
+
+.update-banner-error {
+  border-color: color-mix(in oklab, var(--err) 55%, transparent);
+}
+
+.update-banner-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.update-banner-btn {
+  background: color-mix(in oklab, var(--ok) 28%, transparent);
+  color: var(--text-bright);
+  border: 1px solid color-mix(in oklab, var(--ok) 60%, transparent);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.update-banner-btn:hover {
+  background: color-mix(in oklab, var(--ok) 40%, transparent);
+}
+
+.update-banner-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.update-banner-close:hover {
+  color: var(--text-bright);
+  border-color: var(--border-bright);
+}

@@ -3,6 +3,13 @@ export interface IElectronAPI {
   getSettings: () => Promise<any>;
   saveSettings: (settings: any) => Promise<void>;
   getDisplays: () => Promise<any[]>;
+  onUpdaterStatus?: (callback: (status: {
+    state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+    version?: string;
+    percent?: number;
+    message?: string;
+  }) => void) => (() => void);
+  restartApp?: () => void;
 }
 
 export interface IElectron {
