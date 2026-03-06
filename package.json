@@ -91,6 +91,14 @@
       ],
       "icon": "assets/OpsIQ.ico"
     },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "assets/OpsIQ.icns",
+      "category": "public.app-category.business"
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
