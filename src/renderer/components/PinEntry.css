@@ -215,6 +215,53 @@
   transform: scale(1.05);
 }
 
+/* Mobile/short-screen layout: prevent logo overlap with PIN card */
+@media (max-width: 480px), (max-height: 850px) {
+  .pin-entry-splash {
+    justify-content: flex-start;
+    gap: 18px;
+    padding: 18px 14px 22px;
+    box-sizing: border-box;
+  }
+
+  .splash-logo-container {
+    margin-bottom: 0;
+  }
+
+  .opsiq-logo-image {
+    height: min(34vh, 230px);
+  }
+
+  .splash-pin-section {
+    width: min(92vw, 360px);
+    min-width: 0;
+    margin-top: 0;
+    padding: 16px 18px;
+    gap: 10px;
+  }
+
+  .pin-input {
+    width: min(72vw, 220px);
+  }
+
+  .splash-powered-by {
+    position: static;
+    right: auto;
+    bottom: auto;
+    margin-top: 4px;
+    gap: 8px;
+  }
+
+  .powered-by-text {
+    font-size: 0.85rem;
+    letter-spacing: 0.12em;
+  }
+
+  .atlas-logo {
+    height: min(18vh, 120px);
+  }
+}
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { HashRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PinEntry from './components/PinEntry';
@@ -90,6 +90,92 @@ const AppRoutes: React.FC = () => {
   );
 };
 
+const MobileHamburgerMenu: React.FC = () => {
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+  const [showViewOptions, setShowViewOptions] = useState(false);
+
+  useEffect(() => {
+    setIsOpen(false);
+    setShowViewOptions(false);
+  }, [location.pathname]);
+
+  if (!isAuthenticated) return null;
+
+  const hasDesktopWindowControls = typeof window !== 'undefined' && !!window.electron;
+
+  const handleHome = () => {
+    navigate('/home');
+    setIsOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+    setIsOpen(false);
+  };
+
+  const handleToggleFullscreen = () => {
+    window.electron?.toggleFullscreen?.();
+    setIsOpen(false);
+  };
+
+  const handleToggleAlwaysOnTop = () => {
+    window.electron?.toggleAlwaysOnTop?.();
+    setIsOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        className="mobile-hamburger-trigger"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-label="Open menu"
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      {isOpen && <button className="mobile-hamburger-backdrop" onClick={() => setIsOpen(false)} aria-label="Close menu" />}
+
+      <aside className={`mobile-hamburger-panel ${isOpen ? 'open' : ''}`}>
+        <button className="mobile-hamburger-item" onClick={handleHome}>Home</button>
+
+        <button
+          className="mobile-hamburger-item"
+          onClick={() => setShowViewOptions((current) => !current)}
+        >
+          View
+        </button>
+
+        {showViewOptions && (
+          <div className="mobile-hamburger-submenu">
+            <button
+              className="mobile-hamburger-item"
+              onClick={handleToggleFullscreen}
+              disabled={!hasDesktopWindowControls}
+            >
+              Toggle Fullscreen
+            </button>
+            <button
+              className="mobile-hamburger-item"
+              onClick={handleToggleAlwaysOnTop}
+              disabled={!hasDesktopWindowControls}
+            >
+              Always On Top
+            </button>
+          </div>
+        )}
+
+        <button className="mobile-hamburger-item danger" onClick={handleLogout}>Logout</button>
+      </aside>
+    </>
+  );
+};
+
 const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
   const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatus | null>(null);
@@ -148,6 +234,7 @@ const AppContent: React.FC = () => {
       )}
 
       <Router>
+        <MobileHamburgerMenu />
         <AppRoutes />
       </Router>
     </>
