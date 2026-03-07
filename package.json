@@ -31,7 +31,7 @@
     "node": "20.x"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.1.0",
+    "@capacitor/cli": "^5.7.8",
     "@types/better-sqlite3": "^7.6.9",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
@@ -54,9 +54,9 @@
     "wait-on": "^7.2.0"
   },
   "dependencies": {
-    "@capacitor/android": "^8.1.0",
-    "@capacitor/core": "^8.1.0",
-    "@capacitor/ios": "^8.1.0",
+    "@capacitor/android": "^5.7.8",
+    "@capacitor/core": "^5.7.8",
+    "@capacitor/ios": "^5.7.8",
     "better-sqlite3": "^11.0.0",
     "clsx": "^2.1.0",
     "cors": "^2.8.5",
