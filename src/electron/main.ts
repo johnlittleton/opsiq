@@ -158,32 +158,6 @@ function createWindow() {
     mainWindow.show();
   });
 
-  // Window control handlers
-  ipcMain.on('window-minimize', () => {
-    mainWindow.minimize();
-  });
-
-  ipcMain.on('window-maximize', () => {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
-  });
-
-  ipcMain.on('window-close', () => {
-    mainWindow.close();
-  });
-
-  ipcMain.on('window-toggle-fullscreen', () => {
-    mainWindow.setFullScreen(!mainWindow.isFullScreen());
-  });
-
-  ipcMain.on('window-toggle-always-on-top', () => {
-    const isOnTop = mainWindow.isAlwaysOnTop();
-    mainWindow.setAlwaysOnTop(!isOnTop);
-  });
-
   // Load URL based on environment
   const screenArg = getScreenArgument();
   let url: string;
@@ -205,18 +179,79 @@ function createWindow() {
   return mainWindow;
 }
 
+const withSenderWindow = (event: Electron.IpcMainEvent, action: (window: BrowserWindow) => void) => {
+  try {
+    if (!event.sender || event.sender.isDestroyed()) return;
+
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return;
+
+    if (window.isDestroyed()) return;
+    action(window);
+  } catch (error) {
+    console.warn('Skipped window action because target was destroyed:', error);
+  }
+};
+
+// Window control handlers (global, sender-targeted)
+ipcMain.on('window-minimize', (event) => {
+  withSenderWindow(event, (window) => window.minimize());
+});
+
+ipcMain.on('window-maximize', (event) => {
+  withSenderWindow(event, (window) => {
+    if (window.isMaximized()) {
+      window.unmaximize();
+    } else {
+      window.maximize();
+    }
+  });
+});
+
+ipcMain.on('window-close', (event) => {
+  withSenderWindow(event, (window) => window.close());
+});
+
+ipcMain.on('window-toggle-fullscreen', (event) => {
+  withSenderWindow(event, (window) => window.setFullScreen(!window.isFullScreen()));
+});
+
+ipcMain.on('window-toggle-always-on-top', (event) => {
+  withSenderWindow(event, (window) => {
+    const isOnTop = window.isAlwaysOnTop();
+    window.setAlwaysOnTop(!isOnTop);
+  });
+});
+
 // ==================== AUTO-UPDATER ====================
 
 const sendUpdaterStatus = (payload: UpdaterStatusPayload) => {
   const windows = BrowserWindow.getAllWindows();
   windows.forEach((window) => {
-    window.webContents.send('updater-status', payload);
+    if (window.isDestroyed() || window.webContents.isDestroyed()) return;
+    try {
+      window.webContents.send('updater-status', payload);
+    } catch (error) {
+      console.warn('Unable to send updater status to destroyed window:', error);
+    }
   });
 };
 
 // Configure auto-updater
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+
+const shouldRunAutoUpdater = () => {
+  if (process.env.NODE_ENV === 'development') return false;
+
+  // Unsigned mac builds often re-download updates without successfully applying them.
+  // Keep mac updater off by default to avoid endless update loops unless explicitly enabled.
+  if (process.platform === 'darwin' && process.env.OPSIQ_ENABLE_MAC_AUTO_UPDATE !== 'true') {
+    return false;
+  }
+
+  return true;
+};
 
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for updates...');
@@ -246,9 +281,23 @@ autoUpdater.on('update-downloaded', (info) => {
   sendUpdaterStatus({ state: 'downloaded', version: info.version });
 });
 
+const isMissingMacManifest404 = (message: string) => {
+  const lower = message.toLowerCase();
+  return lower.includes('latest-mac.yml') && lower.includes('404');
+};
+
 autoUpdater.on('error', (err) => {
+  const rawMessage = err?.message || '';
+
+  // Treat missing mac update manifest as "no update" instead of surfacing raw stack text in UI.
+  if (isMissingMacManifest404(rawMessage)) {
+    console.warn('Updater manifest missing for this platform. Treating as no update available.');
+    sendUpdaterStatus({ state: 'not-available' });
+    return;
+  }
+
   console.error('Auto-updater error:', err);
-  sendUpdaterStatus({ state: 'error', message: err?.message || 'Update check failed' });
+  sendUpdaterStatus({ state: 'error', message: 'Update check failed. Please try again later.' });
 });
 
 ipcMain.on('restart-app', () => {
@@ -266,8 +315,11 @@ app.whenReady().then(() => {
   
   // Check for updates 5 seconds after startup
   setTimeout(() => {
-    if (process.env.NODE_ENV !== 'development') {
+    if (shouldRunAutoUpdater()) {
       autoUpdater.checkForUpdates();
+    } else if (process.platform === 'darwin') {
+      sendUpdaterStatus({ state: 'not-available' });
+      console.log('Mac auto-updater disabled by default. Set OPSIQ_ENABLE_MAC_AUTO_UPDATE=true to enable.');
     }
   }, 5000);
 
