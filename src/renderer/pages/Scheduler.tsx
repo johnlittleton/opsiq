@@ -134,6 +134,23 @@ const Scheduler: React.FC = () => {
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
   const handleToday = () => setCurrentMonth(new Date());
 
+  const handleMonthJump = (value: string) => {
+    if (!value) return;
+    const [yearStr, monthStr] = value.split('-');
+    const year = Number(yearStr);
+    const monthIndex = Number(monthStr) - 1;
+    if (Number.isNaN(year) || Number.isNaN(monthIndex)) return;
+    setCurrentMonth(new Date(year, monthIndex, 1));
+  };
+
+  const handleDateJump = (value: string) => {
+    if (!value) return;
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return;
+    setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    setSelectedDate(date);
+  };
+
   const openModal = (date?: Date, appointment?: Appointment) => {
     if (appointment) {
       setEditingAppointment(appointment);
@@ -536,48 +553,70 @@ const Scheduler: React.FC = () => {
               <button onClick={handlePrevMonth} className="scheduler__nav-btn">‹</button>
               <h2 className="scheduler__month">{format(currentMonth, 'MMMM yyyy')}</h2>
               <button onClick={handleNextMonth} className="scheduler__nav-btn">›</button>
+              <div className="scheduler__calendar-jump-controls">
+                <label className="scheduler__calendar-jump-field">
+                  Month
+                  <input
+                    type="month"
+                    value={format(currentMonth, 'yyyy-MM')}
+                    onChange={(e) => handleMonthJump(e.target.value)}
+                    className="scheduler__calendar-jump-input"
+                  />
+                </label>
+                <label className="scheduler__calendar-jump-field">
+                  Date
+                  <input
+                    type="date"
+                    value={selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''}
+                    onChange={(e) => handleDateJump(e.target.value)}
+                    className="scheduler__calendar-jump-input"
+                  />
+                </label>
+              </div>
               <button onClick={handleToday} className="scheduler__today-btn">Today</button>
             </div>
 
-            <div className="scheduler__weekdays">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="scheduler__weekday">{day}</div>
-              ))}
-          </div>
+            <div className="scheduler__calendar-body">
+              <div className="scheduler__weekdays">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="scheduler__weekday">{day}</div>
+                ))}
+              </div>
 
-          <div className="scheduler__days">
-            {calendarDays.map(day => {
-              const dayAppointments = getAppointmentsForDay(day);
-              const isCurrentMonth = isSameMonth(day, currentMonth);
-              const isToday = isSameDay(day, new Date());
+              <div className="scheduler__days">
+                {calendarDays.map(day => {
+                  const dayAppointments = getAppointmentsForDay(day);
+                  const isCurrentMonth = isSameMonth(day, currentMonth);
+                  const isToday = isSameDay(day, new Date());
 
-              return (
-                <div
-                  key={day.toString()}
-                  className={`scheduler__day ${!isCurrentMonth ? 'scheduler__day--other' : ''} ${isToday ? 'scheduler__day--today' : ''}`}
-                  onClick={() => openModal(day)}
-                >
-                  <div className="scheduler__day-number">{format(day, 'd')}</div>
-                  <div className="scheduler__day-appointments">
-                    {dayAppointments.map(apt => (
-                      <div
-                        key={apt.id}
-                        className={`scheduler__appointment scheduler__appointment--${(apt.type || 'inbound').toLowerCase()}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openModal(day, apt);
-                        }}
-                      >
-                        <div className="scheduler__appointment-time">{apt.appointmentTime || '-'}</div>
-                        <div className="scheduler__appointment-company">{apt.company || 'N/A'}</div>
+                  return (
+                    <div
+                      key={day.toString()}
+                      className={`scheduler__day ${!isCurrentMonth ? 'scheduler__day--other' : ''} ${isToday ? 'scheduler__day--today' : ''}`}
+                      onClick={() => openModal(day)}
+                    >
+                      <div className="scheduler__day-number">{format(day, 'd')}</div>
+                      <div className="scheduler__day-appointments">
+                        {dayAppointments.map(apt => (
+                          <div
+                            key={apt.id}
+                            className={`scheduler__appointment scheduler__appointment--${(apt.type || 'inbound').toLowerCase()}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openModal(day, apt);
+                            }}
+                          >
+                            <div className="scheduler__appointment-time">{apt.appointmentTime || '-'}</div>
+                            <div className="scheduler__appointment-company">{apt.company || 'N/A'}</div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
         )}
 
         {showModal && (

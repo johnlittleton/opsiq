@@ -9,7 +9,8 @@
 .scheduler__content {
   flex: 1;
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .scheduler__title-controls {
@@ -295,18 +296,23 @@
 
 /* Calendar */
 .scheduler__calendar {
+  display: flex;
+  flex-direction: column;
   background: var(--glass);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 24px;
+  padding: 16px;
+  max-height: calc(100vh - 96px);
+  overflow: hidden;
   backdrop-filter: blur(10px);
 }
 
 .scheduler__calendar-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .scheduler__nav-btn {
@@ -348,6 +354,44 @@
   transition: all 0.2s;
 }
 
+.scheduler__calendar-jump-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.scheduler__calendar-jump-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.scheduler__calendar-jump-input {
+  padding: 6px 8px;
+  min-width: 146px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.scheduler__calendar-jump-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.scheduler__calendar-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  touch-action: pan-y;
+}
+
 .scheduler__today-btn:hover {
   border-color: var(--accent-primary);
   background: rgba(255, 255, 255, 0.1);
@@ -377,7 +421,7 @@
 }
 
 .scheduler__day {
-  min-height: 100px;
+  min-height: 132px;
   padding: 8px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border);
@@ -411,6 +455,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 92px;
+  overflow-y: auto;
 }
 
 .scheduler__appointment {
