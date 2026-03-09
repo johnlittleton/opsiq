@@ -28,8 +28,36 @@ interface AppSettings {
   windowPresets?: Record<string, WindowConfig>;
 }
 
+interface UpdaterRuntimeState {
+  mutedDownloadedVersion?: string;
+}
+
 const SETTINGS_PATH = path.join(app.getPath('userData'), 'settings.json');
+const UPDATER_STATE_PATH = path.join(app.getPath('userData'), 'updater-state.json');
 const ICON_PATH = path.join(__dirname, '../../assets/OpsIQ.ico');
+
+const loadUpdaterState = (): UpdaterRuntimeState => {
+  try {
+    if (fs.existsSync(UPDATER_STATE_PATH)) {
+      return JSON.parse(fs.readFileSync(UPDATER_STATE_PATH, 'utf-8'));
+    }
+  } catch (error) {
+    console.warn('Failed to load updater runtime state:', error);
+  }
+  return {};
+};
+
+const saveUpdaterState = (state: UpdaterRuntimeState) => {
+  try {
+    const dir = path.dirname(UPDATER_STATE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(UPDATER_STATE_PATH, JSON.stringify(state, null, 2));
+  } catch (error) {
+    console.warn('Failed to save updater runtime state:', error);
+  }
+};
 
 // ==================== MULTI-INSTANCE LOGIC ====================
 
@@ -241,6 +269,9 @@ const sendUpdaterStatus = (payload: UpdaterStatusPayload) => {
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
+const updaterRuntimeState = loadUpdaterState();
+let activeUpdateVersion: string | null = null;
+
 const shouldRunAutoUpdater = () => {
   if (process.env.NODE_ENV === 'development') return false;
 
@@ -259,7 +290,25 @@ autoUpdater.on('checking-for-update', () => {
 });
 
 autoUpdater.on('update-available', (info) => {
-  console.log('Update available:', info.version);
+  const version = info.version || '';
+  activeUpdateVersion = version || null;
+
+  if (
+    updaterRuntimeState.mutedDownloadedVersion &&
+    version &&
+    updaterRuntimeState.mutedDownloadedVersion !== version
+  ) {
+    updaterRuntimeState.mutedDownloadedVersion = undefined;
+    saveUpdaterState(updaterRuntimeState);
+  }
+
+  if (version && updaterRuntimeState.mutedDownloadedVersion === version) {
+    console.log('Update available but already prompted for this version:', version);
+    sendUpdaterStatus({ state: 'not-available' });
+    return;
+  }
+
+  console.log('Update available:', version);
   sendUpdaterStatus({ state: 'available', version: info.version });
 });
 
@@ -269,6 +318,10 @@ autoUpdater.on('update-not-available', () => {
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
+  if (activeUpdateVersion && updaterRuntimeState.mutedDownloadedVersion === activeUpdateVersion) {
+    return;
+  }
+
   console.log(`Download progress: ${Math.round(progressObj.percent)}%`);
   sendUpdaterStatus({
     state: 'downloading',
@@ -277,6 +330,19 @@ autoUpdater.on('download-progress', (progressObj) => {
 });
 
 autoUpdater.on('update-downloaded', (info) => {
+  const version = info.version || '';
+
+  if (version && updaterRuntimeState.mutedDownloadedVersion === version) {
+    console.log('Skipping repeated downloaded prompt for version:', version);
+    sendUpdaterStatus({ state: 'not-available' });
+    return;
+  }
+
+  if (version) {
+    updaterRuntimeState.mutedDownloadedVersion = version;
+    saveUpdaterState(updaterRuntimeState);
+  }
+
   console.log('Update downloaded, will install on quit');
   sendUpdaterStatus({ state: 'downloaded', version: info.version });
 });
