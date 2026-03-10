@@ -41,9 +41,62 @@ workflows:
 
       - name: Build IPA
         script: |
-          xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
-            --scheme "$XCODE_SCHEME"
+          set -e
+          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          MATCHED_PROFILE_NAME=""
+
+          for profile in "$PROFILE_DIR"/*.mobileprovision; do
+            security cms -D -i "$profile" > /tmp/profile.plist
+            app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true)
+            if [[ "$app_id" == *".com.slingshot.opsiq.mobile" ]]; then
+              MATCHED_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist)
+              break
+            fi
+          done
+
+          if [[ -z "$MATCHED_PROFILE_NAME" ]]; then
+            echo "No provisioning profile found for com.slingshot.opsiq.mobile"
+            exit 1
+          fi
+
+          echo "Using provisioning profile: $MATCHED_PROFILE_NAME"
+
+          cat > /tmp/export_options.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>ZL366VWFY8</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.slingshot.opsiq.mobile</key>
+              <string>$MATCHED_PROFILE_NAME</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath build/ios/archive/OpsIQMobile.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=ZL366VWFY8 \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$MATCHED_PROFILE_NAME"
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/ios/archive/OpsIQMobile.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist /tmp/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
