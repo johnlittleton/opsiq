@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { HashRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PinEntry from './components/PinEntry';
@@ -44,10 +44,23 @@ const PUBLIC_ROUTES = [
   '/shipping'
 ];
 
+const MOBILE_ALLOWED_ROUTES = [
+  '/',
+  '/home',
+  '/dockboard',
+  '/scheduler',
+  '/production-dashboard',
+  '/dashboard',
+  '/executive',
+];
+
 const AppRoutes: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, login } = useAuth();
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
 
   const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
     login(name, role, sessionToken);
@@ -56,6 +69,10 @@ const AppRoutes: React.FC = () => {
   // Show PIN entry only for protected routes when not authenticated
   if (!isAuthenticated && !isPublicRoute) {
     return <PinEntry onSuccess={handlePinSuccess} />;
+  }
+
+  if (isAuthenticated && isMobileRuntime && !MOBILE_ALLOWED_ROUTES.includes(location.pathname)) {
+    return <Navigate to="/home" replace />;
   }
 
   return (
@@ -96,6 +113,9 @@ const MobileHamburgerMenu: React.FC = () => {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [showViewOptions, setShowViewOptions] = useState(false);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const lastMenuToggleAtRef = useRef(0);
 
   useEffect(() => {
     setIsOpen(false);
@@ -105,6 +125,106 @@ const MobileHamburgerMenu: React.FC = () => {
   if (!isAuthenticated) return null;
 
   const hasDesktopWindowControls = typeof window !== 'undefined' && !!window.electron;
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
+  const isHomeRoute = location.pathname === '/' || location.pathname === '/home';
+
+  const getPageNavLinks = (pathname: string) => {
+    if (isMobileRuntime) {
+      return [
+        { label: 'Dock Dashboard', path: '/dockboard' },
+        { label: 'Appointment Scheduler', path: '/scheduler' },
+        { label: 'Production Dashboard', path: '/production-dashboard' },
+        { label: 'Executive Dashboard', path: '/executive' }
+      ];
+    }
+
+    if (pathname.startsWith('/dockboard') || pathname === '/checkin' || pathname === '/active-drivers' || pathname === '/history' || pathname === '/checkin-history' || pathname === '/appointment-history' || pathname === '/scheduler') {
+      return [
+        { label: 'Dock Board', path: '/dockboard' },
+        { label: 'Driver Check-In', path: '/checkin' },
+        { label: 'Active Drivers', path: '/active-drivers' },
+        { label: 'Scheduler', path: '/scheduler' },
+        { label: 'Dock History', path: '/history' },
+        { label: 'Check-In History', path: '/checkin-history' },
+        { label: 'Appointment History', path: '/appointment-history' }
+      ];
+    }
+
+    if (pathname.startsWith('/production') || pathname === '/work-order-history' || pathname === '/downtime-history' || pathname === '/labor-tracker' || pathname === '/labor-history') {
+      return [
+        { label: 'Production Scheduler', path: '/production-scheduler' },
+        { label: 'Production Dashboard', path: '/production-dashboard' },
+        { label: 'Production KPI', path: '/production' },
+        { label: 'KPI History', path: '/production-kpi-history' },
+        { label: 'Labor Planner', path: '/production-labor-planner' },
+        { label: 'Labor Planner History', path: '/production-labor-planner-history' },
+        { label: 'Labor Tracker', path: '/labor-tracker' },
+        { label: 'Labor History', path: '/labor-history' },
+        { label: 'WO History', path: '/work-order-history' },
+        { label: 'Downtime History', path: '/downtime-history' }
+      ];
+    }
+
+    if (pathname === '/executive' || pathname === '/executive-analytics' || pathname === '/production-costing' || pathname === '/shipping') {
+      return [
+        { label: 'Executive Dashboard', path: '/executive' },
+        { label: 'Executive Analytics', path: '/executive-analytics' },
+        { label: 'Shipping & Receiving KPI', path: '/shipping' },
+        { label: 'Production Costing', path: '/production-costing' }
+      ];
+    }
+
+    return [
+      { label: 'Settings', path: '/settings' }
+    ];
+  };
+
+  const pageNavLinks = isHomeRoute ? [] : getPageNavLinks(location.pathname);
+
+  const beginTouch = (event: React.TouchEvent) => {
+    const touch = event.touches[0];
+    setTouchStartX(touch.clientX);
+    setTouchStartY(touch.clientY);
+  };
+
+  const handleEdgeSwipe = (event: React.TouchEvent) => {
+    if (isOpen) return;
+    if (touchStartX === null || touchStartY === null) return;
+
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+
+    // Left-edge horizontal swipe opens menu.
+    if (touchStartX <= 24 && deltaX > 52 && deltaY < 36) {
+      setIsOpen(true);
+      setTouchStartX(null);
+      setTouchStartY(null);
+    }
+  };
+
+  const handlePanelSwipe = (event: React.TouchEvent) => {
+    if (!isOpen) return;
+    if (touchStartX === null || touchStartY === null) return;
+
+    const touch = event.touches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = Math.abs(touch.clientY - touchStartY);
+
+    // Swipe left to close open menu.
+    if (deltaX < -48 && deltaY < 36) {
+      setIsOpen(false);
+      setTouchStartX(null);
+      setTouchStartY(null);
+    }
+  };
+
+  const endTouch = () => {
+    setTouchStartX(null);
+    setTouchStartY(null);
+  };
 
   const handleHome = () => {
     navigate('/home');
@@ -127,12 +247,39 @@ const MobileHamburgerMenu: React.FC = () => {
     setIsOpen(false);
   };
 
+  const toggleMenu = () => {
+    const now = Date.now();
+    // iOS can emit touch + click for one tap; gate rapid duplicate toggles.
+    if (now - lastMenuToggleAtRef.current < 250) return;
+    lastMenuToggleAtRef.current = now;
+    setIsOpen((current) => !current);
+  };
+
+  const handleMenuPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMenu();
+  };
+
+  const navigateAndClose = (path: string) => {
+    navigate(path);
+    setIsOpen(false);
+  };
+
   return (
     <>
+      <div
+        className="mobile-edge-swipe-zone"
+        onTouchStart={beginTouch}
+        onTouchMove={handleEdgeSwipe}
+        onTouchEnd={endTouch}
+      />
+
       <button
         className="mobile-hamburger-trigger"
-        onClick={() => setIsOpen((current) => !current)}
+        onPointerDown={handleMenuPointerDown}
         aria-label="Open menu"
+        aria-expanded={isOpen}
       >
         <span />
         <span />
@@ -141,17 +288,38 @@ const MobileHamburgerMenu: React.FC = () => {
 
       {isOpen && <button className="mobile-hamburger-backdrop" onClick={() => setIsOpen(false)} aria-label="Close menu" />}
 
-      <aside className={`mobile-hamburger-panel ${isOpen ? 'open' : ''}`}>
+      <aside
+        className={`mobile-hamburger-panel ${isOpen ? 'open' : ''}`}
+        onTouchStart={beginTouch}
+        onTouchMove={handlePanelSwipe}
+        onTouchEnd={endTouch}
+      >
         <button className="mobile-hamburger-item" onClick={handleHome}>Home</button>
 
-        <button
-          className="mobile-hamburger-item"
-          onClick={() => setShowViewOptions((current) => !current)}
-        >
-          View
-        </button>
+        {!isHomeRoute && isMobileRuntime && pageNavLinks.length > 0 && (
+          <div className="mobile-hamburger-submenu">
+            {pageNavLinks.map((link) => (
+              <button
+                key={link.path}
+                className="mobile-hamburger-item"
+                onClick={() => navigateAndClose(link.path)}
+              >
+                {link.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-        {showViewOptions && (
+        {!isMobileRuntime && (
+          <button
+            className="mobile-hamburger-item"
+            onClick={() => setShowViewOptions((current) => !current)}
+          >
+            View
+          </button>
+        )}
+
+        {!isMobileRuntime && showViewOptions && (
           <div className="mobile-hamburger-submenu">
             <button
               className="mobile-hamburger-item"
