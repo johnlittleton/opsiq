@@ -44,6 +44,8 @@ workflows:
       - name: Build IPA
         script: |
           set -euo pipefail
+          BUILD_NUMBER="${CM_BUILD_ID:-2}"
+          echo "Using build number: $BUILD_NUMBER"
           shopt -s nullglob
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           MATCHED_PROFILE_NAME=""
@@ -97,6 +99,7 @@ workflows:
             -configuration Release \
             -archivePath build/ios/archive/OpsIQMobile.xcarchive \
             archive \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=ZL366VWFY8 \
             CODE_SIGN_IDENTITY="Apple Distribution" \
