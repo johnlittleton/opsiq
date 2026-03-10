@@ -318,6 +318,28 @@
   border-bottom: 1px solid #2a3142;
 }
 
+.line-full-view-btn {
+  margin-bottom: 6px;
+  align-self: flex-start;
+  background: none;
+  color: #2ecc71;
+  border: 2px solid #2ecc71;
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 3;
+}
+
+.line-full-view-btn:active {
+  transform: scale(0.98);
+}
+
 .line-header h3 {
   margin: 0;
   font-size: 0.8rem;
@@ -550,4 +572,19 @@
   background: rgba(40, 167, 69, 0.2);
   color: #28a745;
   border: 1px solid #28a745;
+}
+
+/* iPhone single-line drill-in keeps mobile header and back navigation visible */
+.production-dashboard.single-line-mobile {
+  padding-top: 8px;
+}
+
+.production-dashboard.single-line-mobile .lines-grid {
+  grid-template-columns: 1fr;
+  padding: 8px;
+}
+
+.production-dashboard.single-line-mobile .line-card {
+  min-height: auto;
+  padding: 10px;
 }

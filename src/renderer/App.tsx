@@ -271,6 +271,18 @@ const MobileHamburgerMenu: React.FC = () => {
     toggleMenu();
   };
 
+  const handleMenuTouchStart = (event: React.TouchEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMenu();
+  };
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleMenu();
+  };
+
   const navigateAndClose = (path: string) => {
     navigate(path);
     setIsOpen(false);
@@ -288,6 +300,8 @@ const MobileHamburgerMenu: React.FC = () => {
       <button
         className="mobile-hamburger-trigger"
         onPointerDown={handleMenuPointerDown}
+        onTouchStart={handleMenuTouchStart}
+        onClick={handleMenuClick}
         aria-label="Open menu"
         aria-expanded={isOpen}
       >

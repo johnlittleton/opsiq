@@ -23,6 +23,14 @@ interface CurrentShift {
 const ExecutiveDashboard: React.FC = () => {
   console.log('ExecutiveDashboard component rendering...');
   const navigate = useNavigate();
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   const { executiveName, userRole, logout } = useAuth();
   const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,7 +210,7 @@ const ExecutiveDashboard: React.FC = () => {
             <p className="subtitle">Site Performance Overview • Logged in as: {executiveName}</p>
           </div>
           
-          <div className="header-actions">
+          {!isMobileRuntime && <div className="header-actions">
             <div className="date-selector">
               <div className="date-field">
                 <label>Start Date</label>
@@ -232,7 +240,7 @@ const ExecutiveDashboard: React.FC = () => {
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
-          </div>
+          </div>}
         </div>
 
         {/* Top-Level KPIs */}

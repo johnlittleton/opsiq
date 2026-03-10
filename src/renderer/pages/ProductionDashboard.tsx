@@ -20,6 +20,14 @@ export default function ProductionDashboard() {
   const [searchParams] = useSearchParams();
   const lineParam = searchParams.get('line');
   const specificLine = lineParam ? parseInt(lineParam) : null;
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   
   console.log('🔧 ProductionDashboard - Line filter from URL:', lineParam, '→ specificLine:', specificLine);
   
@@ -283,7 +291,15 @@ export default function ProductionDashboard() {
     ? LINES.find(line => line.id === specificLine)?.name || 'Production Dashboard'
     : 'Production Dashboard';
 
-  const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? 'single-line' : ''}`;
+  const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? (isMobileRuntime ? 'single-line-mobile' : 'single-line') : ''}`;
+
+  const handleBack = () => {
+    if (specificLine && isMobileRuntime) {
+      navigate('/production-dashboard');
+      return;
+    }
+    navigate('/');
+  };
 
   return (
     <div className={dashboardClasses}>
@@ -296,9 +312,11 @@ export default function ProductionDashboard() {
       )}
       {specificLine && <DriverWaitingTicker lineFilter={specificLine} />}
       <div className="dashboard-header">
-        <button className="back-btn" onClick={() => navigate('/')}>← Home</button>
+        <button className="back-btn" onClick={handleBack}>
+          {specificLine && isMobileRuntime ? '← All Lines' : '← Home'}
+        </button>
         <h1>{pageTitle}</h1>
-        <div className="header-controls">
+          {!isMobileRuntime && <div className="header-controls">
           {!specificLine && <button className="schedule-btn" onClick={() => navigate('/production-scheduler')}>📋 Schedule</button>}
           {!specificLine && (
             <button 
@@ -312,7 +330,7 @@ export default function ProductionDashboard() {
             </button>
           )}
           <button className="refresh-btn" onClick={fetchWorkOrders}>🔄 Refresh</button>
-        </div>
+          </div>}
       </div>
 
       <div className="lines-grid">
@@ -334,6 +352,21 @@ export default function ProductionDashboard() {
                   {status === 'running' ? 'RUNNING' : status === 'stopped' ? 'STOPPED' : 'IDLE'}
                 </div>
               </div>
+
+              {isMobileRuntime && !specificLine && (
+                <button
+                  type="button"
+                  className="line-full-view-btn"
+                  onTouchStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    navigate(`/production-dashboard?line=${line.id}`);
+                  }}
+                  onClick={() => navigate(`/production-dashboard?line=${line.id}`)}
+                >
+                  Full View
+                </button>
+              )}
 
               {wo ? (
                 <div className="job-info">
