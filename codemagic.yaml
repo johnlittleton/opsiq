@@ -50,14 +50,9 @@ workflows:
             <key>method</key>
             <string>app-store</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>teamID</key>
             <string>ZL366VWFY8</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.slingshot.opsiq.mobile</key>
-              <string>OpsIQ Mobile App Store</string>
-            </dict>
             <key>destination</key>
             <string>export</string>
             <key>compileBitcode</key>
@@ -71,11 +66,10 @@ workflows:
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/ios/archive/OpsIQMobile.xcarchive \
+            -allowProvisioningUpdates \
             archive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=ZL366VWFY8 \
-            PROVISIONING_PROFILE_SPECIFIER="OpsIQ Mobile App Store" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=ZL366VWFY8
 
           xcodebuild \
             -exportArchive \
