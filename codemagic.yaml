@@ -41,11 +41,19 @@ workflows:
 
       - name: Build IPA
         script: |
-          set -e
+          set -euo pipefail
+          shopt -s nullglob
           PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
           MATCHED_PROFILE_NAME=""
+          PROFILE_FILES=("$PROFILE_DIR"/*.mobileprovision)
 
-          for profile in "$PROFILE_DIR"/*.mobileprovision; do
+          if [[ ${#PROFILE_FILES[@]} -eq 0 ]]; then
+            echo "No provisioning profiles found in: $PROFILE_DIR"
+            echo "Ensure signing profiles are fetched before archive."
+            exit 1
+          fi
+
+          for profile in "${PROFILE_FILES[@]}"; do
             security cms -D -i "$profile" > /tmp/profile.plist
             app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true)
             if [[ "$app_id" == *".com.slingshot.opsiq.mobile" ]]; then
