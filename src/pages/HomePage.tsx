@@ -8,6 +8,14 @@ export const HomePage: React.FC = () => {
   const { executiveName, logout } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   
   const dockOperationsCards = [
     {
@@ -93,6 +101,16 @@ export const HomePage: React.FC = () => {
     },
   ];
 
+  const mobileDockCards = dockOperationsCards.filter((card) => card.title === 'Dock Dashboard');
+  const mobileAppointmentCards = appointmentCards.filter((card) => card.title === 'Appointment Scheduler');
+  const mobileProductionCards = productionCards.filter((card) => card.title === 'Production Dashboard');
+  const mobileManagementCards = managementCards.filter((card) => card.title === 'Executive Dashboard');
+
+  const displayDockCards = isMobileRuntime ? mobileDockCards : dockOperationsCards;
+  const displayAppointmentCards = isMobileRuntime ? mobileAppointmentCards : appointmentCards;
+  const displayProductionCards = isMobileRuntime ? mobileProductionCards : productionCards;
+  const displayManagementCards = isMobileRuntime ? mobileManagementCards : managementCards;
+
   const handleMinimize = () => {
     if (window.electron) {
       window.electron.minimize();
@@ -124,34 +142,38 @@ export const HomePage: React.FC = () => {
       {/* Window Controls */}
       <div className="home-page__controls">
         <div className="home-page__controls-left">
-          <button 
-            className="home-page__control-button"
-            onClick={() => setShowViewMenu(!showViewMenu)}
-          >
-            View
-          </button>
-          {showViewMenu && (
-            <div className="home-page__dropdown">
-              <button className="home-page__dropdown-item" onClick={handleFullscreen}>
-                Toggle Fullscreen
-              </button>
-              <button className="home-page__dropdown-item" onClick={handleAlwaysOnTop}>
-                Always on Top
-              </button>
-              <div className="home-page__dropdown-divider" />
+          {!isMobileRuntime && (
+            <>
               <button 
-                className="home-page__dropdown-item"
-                onClick={() => { setViewMode('compact'); setShowViewMenu(false); }}
+                className="home-page__control-button"
+                onClick={() => setShowViewMenu(!showViewMenu)}
               >
-                ✓ Compact View
+                View
               </button>
-              <button 
-                className="home-page__dropdown-item"
-                onClick={() => { setViewMode('grid'); setShowViewMenu(false); }}
-              >
-                {viewMode === 'grid' ? '✓ ' : ''}Grid View
-              </button>
-            </div>
+              {showViewMenu && (
+                <div className="home-page__dropdown">
+                  <button className="home-page__dropdown-item" onClick={handleFullscreen}>
+                    Toggle Fullscreen
+                  </button>
+                  <button className="home-page__dropdown-item" onClick={handleAlwaysOnTop}>
+                    Always on Top
+                  </button>
+                  <div className="home-page__dropdown-divider" />
+                  <button 
+                    className="home-page__dropdown-item"
+                    onClick={() => { setViewMode('compact'); setShowViewMenu(false); }}
+                  >
+                    ✓ Compact View
+                  </button>
+                  <button 
+                    className="home-page__dropdown-item"
+                    onClick={() => { setViewMode('grid'); setShowViewMenu(false); }}
+                  >
+                    {viewMode === 'grid' ? '✓ ' : ''}Grid View
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
         <div className="home-page__controls-right">
@@ -159,12 +181,16 @@ export const HomePage: React.FC = () => {
           <button className="home-page__logout-button" onClick={logout}>
             🚪 Logout
           </button>
-          <button className="home-page__window-button" onClick={handleMinimize}>
-            −
-          </button>
-          <button className="home-page__window-button" onClick={handleMaximize}>
-            □
-          </button>
+          {!isMobileRuntime && (
+            <>
+              <button className="home-page__window-button" onClick={handleMinimize}>
+                −
+              </button>
+              <button className="home-page__window-button" onClick={handleMaximize}>
+                □
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -176,7 +202,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Dock Operations</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {dockOperationsCards.map((card, index) => (
+          {displayDockCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -195,7 +221,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Appointments</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {appointmentCards.map((card, index) => (
+          {displayAppointmentCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -214,7 +240,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Production</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {productionCards.map((card, index) => (
+          {displayProductionCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -233,7 +259,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Management</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {managementCards.map((card, index) => (
+          {displayManagementCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -249,32 +275,34 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">System Status</h2>
-        <div className="home-page__status">
-          <div className="home-page__status-card">
-            <div className="home-page__status-indicator" />
-            <div className="home-page__status-content">
-              <div className="home-page__status-label">MAUI Blazor Runtime</div>
-              <div className="home-page__status-value">Active</div>
+      {!isMobileRuntime && (
+        <div className="home-page__section">
+          <h2 className="home-page__section-title">System Status</h2>
+          <div className="home-page__status">
+            <div className="home-page__status-card">
+              <div className="home-page__status-indicator" />
+              <div className="home-page__status-content">
+                <div className="home-page__status-label">MAUI Blazor Runtime</div>
+                <div className="home-page__status-value">Active</div>
+              </div>
             </div>
-          </div>
-          <div className="home-page__status-card">
-            <div className="home-page__status-indicator" />
-            <div className="home-page__status-content">
-              <div className="home-page__status-label">Navigation System</div>
-              <div className="home-page__status-value">Interactive</div>
+            <div className="home-page__status-card">
+              <div className="home-page__status-indicator" />
+              <div className="home-page__status-content">
+                <div className="home-page__status-label">Navigation System</div>
+                <div className="home-page__status-value">Interactive</div>
+              </div>
             </div>
-          </div>
-          <div className="home-page__status-card">
-            <div className="home-page__status-indicator" />
-            <div className="home-page__status-content">
-              <div className="home-page__status-label">Services</div>
-              <div className="home-page__status-value">Ready</div>
+            <div className="home-page__status-card">
+              <div className="home-page__status-indicator" />
+              <div className="home-page__status-content">
+                <div className="home-page__status-label">Services</div>
+                <div className="home-page__status-value">Ready</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

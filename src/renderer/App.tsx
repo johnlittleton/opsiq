@@ -60,7 +60,12 @@ const AppRoutes: React.FC = () => {
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
   const isMobileRuntime =
     typeof window !== 'undefined' &&
-    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
 
   const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
     login(name, role, sessionToken);
@@ -127,7 +132,12 @@ const MobileHamburgerMenu: React.FC = () => {
   const hasDesktopWindowControls = typeof window !== 'undefined' && !!window.electron;
   const isMobileRuntime =
     typeof window !== 'undefined' &&
-    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   const isHomeRoute = location.pathname === '/' || location.pathname === '/home';
 
   const getPageNavLinks = (pathname: string) => {
