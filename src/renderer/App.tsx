@@ -35,6 +35,16 @@ type UpdaterStatus = {
   message?: string;
 };
 
+const isNativeIOSRuntime = (): boolean => {
+  if (typeof window === 'undefined') return false;
+
+  return (
+    window.location.protocol === 'capacitor:' ||
+    (window as any).Capacitor?.isNativePlatform?.() === true ||
+    (window as any).Capacitor?.getPlatform?.() === 'ios'
+  );
+};
+
 // Public routes that don't require authentication (display dashboards for TVs/monitors)
 const PUBLIC_ROUTES = [
   '/production-dashboard',
@@ -59,13 +69,8 @@ const AppRoutes: React.FC = () => {
   const { isAuthenticated, login } = useAuth();
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
   const isMobileRuntime =
-    typeof window !== 'undefined' &&
-    (
-      window.location.protocol === 'capacitor:' ||
-      (window as any).Capacitor?.isNativePlatform?.() === true ||
-      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
-      window.matchMedia('(max-width: 900px)').matches
-    );
+    isNativeIOSRuntime() ||
+    (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
 
   const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
     login(name, role, sessionToken);
@@ -131,13 +136,8 @@ const MobileHamburgerMenu: React.FC = () => {
 
   const hasDesktopWindowControls = typeof window !== 'undefined' && !!window.electron;
   const isMobileRuntime =
-    typeof window !== 'undefined' &&
-    (
-      window.location.protocol === 'capacitor:' ||
-      (window as any).Capacitor?.isNativePlatform?.() === true ||
-      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
-      window.matchMedia('(max-width: 900px)').matches
-    );
+    isNativeIOSRuntime() ||
+    (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
   const isHomeRoute = location.pathname === '/' || location.pathname === '/home';
 
   const getPageNavLinks = (pathname: string) => {
@@ -375,6 +375,20 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     initializeSync();
   }, [initializeSync]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const root = document.getElementById('root');
+    const nativeIOS = isNativeIOSRuntime();
+    document.body.classList.toggle('ios-mobile', nativeIOS);
+    root?.classList.toggle('ios-mobile', nativeIOS);
+
+    return () => {
+      document.body.classList.remove('ios-mobile');
+      root?.classList.remove('ios-mobile');
+    };
+  }, []);
 
   useEffect(() => {
     if (!window.electronAPI?.onUpdaterStatus) return;

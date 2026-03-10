@@ -205,18 +205,51 @@ a:hover {
 
 .mobile-hamburger-trigger,
 .mobile-hamburger-panel,
-.mobile-hamburger-backdrop {
+.mobile-hamburger-backdrop,
+.mobile-edge-swipe-zone {
   display: none;
+}
+
+@media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+    overflow: auto !important;
+  }
+
+  body {
+    overflow: auto;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  [class*="page"],
+  [class*="board"],
+  [class*="scheduler"],
+  [class*="history"],
+  [class*="dashboard"],
+  [class*="tracker"],
+  [class*="planner"] {
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 @media (max-width: 900px) {
   .mobile-hamburger-trigger {
     position: fixed;
-    top: max(12px, env(safe-area-inset-top));
-    left: 12px;
-    z-index: 10050;
-    width: 40px;
-    height: 40px;
+    top: max(52px, calc(env(safe-area-inset-top) + 10px));
+    left: calc(env(safe-area-inset-left) + 10px);
+    z-index: 10150;
+    width: 44px;
+    height: 44px;
     border-radius: 10px;
     border: 1px solid var(--border-bright);
     background: var(--glass2);
@@ -226,6 +259,22 @@ a:hover {
     align-items: center;
     gap: 4px;
     box-shadow: var(--shadow-heavy);
+    pointer-events: auto;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  .mobile-edge-swipe-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 26px;
+    height: 100vh;
+    z-index: 10070;
+    display: block;
+    background: transparent;
+    touch-action: pan-y;
   }
 
   .mobile-hamburger-trigger span {
@@ -238,7 +287,7 @@ a:hover {
   .mobile-hamburger-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 10040;
+    z-index: 10060;
     background: rgba(5, 8, 16, 0.45);
     border: none;
     display: block;
@@ -248,7 +297,7 @@ a:hover {
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 10060;
+    z-index: 10090;
     width: min(82vw, 320px);
     height: 100vh;
     padding: max(60px, calc(env(safe-area-inset-top) + 20px)) 12px 16px;
@@ -257,6 +306,7 @@ a:hover {
     transform: translateX(-105%);
     transition: transform 180ms ease;
     display: block;
+    pointer-events: auto;
   }
 
   .mobile-hamburger-panel.open {
@@ -293,3 +343,189 @@ a:hover {
     background: color-mix(in oklab, var(--err) 12%, transparent);
   }
 }
+
+  /* Force mobile layout for native iOS runtime (WebView width can bypass max-width media rules). */
+  body.ios-mobile,
+  #root.ios-mobile {
+    min-height: 100dvh;
+    overflow: auto !important;
+  }
+
+  body.ios-mobile {
+    overflow: auto;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #root.ios-mobile {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  body.ios-mobile .title-bar,
+  body.ios-mobile .home-page__controls,
+  body.ios-mobile .header-controls,
+  body.ios-mobile .header-actions,
+  body.ios-mobile .back-btn,
+  body.ios-mobile .view-toggle-group,
+  body.ios-mobile .scheduler-nav-buttons {
+    display: none !important;
+  }
+
+  body.ios-mobile .mobile-hamburger-trigger {
+    position: fixed;
+    top: max(52px, calc(env(safe-area-inset-top) + 10px));
+    left: calc(env(safe-area-inset-left) + 10px);
+    z-index: 10150;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    border: 1px solid var(--border-bright);
+    background: var(--glass2);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    box-shadow: var(--shadow-heavy);
+    pointer-events: auto;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  body.ios-mobile .mobile-hamburger-trigger span {
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    background: var(--text-bright);
+  }
+
+  body.ios-mobile .mobile-edge-swipe-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 26px;
+    height: 100vh;
+    z-index: 10070;
+    display: block;
+    background: transparent;
+    touch-action: pan-y;
+  }
+
+  body.ios-mobile .mobile-hamburger-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10060;
+    background: rgba(5, 8, 16, 0.45);
+    border: none;
+    display: block;
+  }
+
+  body.ios-mobile .mobile-hamburger-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 10090;
+    width: min(82vw, 320px);
+    height: 100vh;
+    padding: max(60px, calc(env(safe-area-inset-top) + 20px)) 12px 16px;
+    background: color-mix(in oklab, var(--bg0) 90%, black 10%);
+    border-right: 1px solid var(--border-bright);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+    display: block;
+    pointer-events: auto;
+  }
+
+  body.ios-mobile .mobile-hamburger-panel.open {
+    transform: translateX(0);
+  }
+
+  body.ios-mobile .home-page {
+    min-height: 100dvh;
+    padding: calc(env(safe-area-inset-top) + 56px) 12px calc(env(safe-area-inset-bottom) + 18px);
+  }
+
+  body.ios-mobile .home-page__quick-access--compact,
+  body.ios-mobile .home-page__quick-access--grid,
+  body.ios-mobile .home-page__status {
+    grid-template-columns: 1fr;
+  }
+
+  body.ios-mobile .dock-board-page {
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.ios-mobile .dock-board-page__content {
+    display: none;
+  }
+
+  body.ios-mobile .dock-board-page__mobile-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    max-width: 100%;
+    gap: 6px;
+    padding: calc(env(safe-area-inset-top) + 62px) 0 calc(env(safe-area-inset-bottom) + 190px);
+    margin: 0;
+    min-height: 100dvh;
+    box-sizing: border-box;
+  }
+
+  body.ios-mobile .dock-board-page__mobile-grid .dock-tile,
+  body.ios-mobile .dock-board-page__mobile-grid .dock-board-page__parked-truck {
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    min-height: 114px;
+    aspect-ratio: 1 / 1;
+    margin: 0;
+  }
+
+  body.ios-mobile .dock-board-mobile-chat-btn {
+    position: fixed;
+    right: calc(env(safe-area-inset-right) + 10px);
+    top: max(52px, calc(env(safe-area-inset-top) + 10px));
+    z-index: 10160;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(241, 196, 15, 0.2);
+    border: 2px solid #f1c40f;
+    color: #f1c40f;
+    font-size: 12px;
+    font-weight: 700;
+    touch-action: manipulation;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body.ios-mobile .dock-board-mobile-legend {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(env(safe-area-inset-bottom) + 8px);
+    z-index: 10095;
+    display: block;
+    width: auto;
+    max-height: min(30vh, 210px);
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(16, 24, 39, 0.42);
+    border: 1px solid rgba(148, 163, 184, 0.38);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: none;
+  }
