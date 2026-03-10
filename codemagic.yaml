@@ -8,6 +8,9 @@ workflows:
       app_store_connect: CodemagicAppStoreConnect
 
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.slingshot.opsiq.mobile
       vars:
         XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
@@ -41,41 +44,9 @@ workflows:
 
       - name: Build IPA
         script: |
-          mkdir -p build/ios/archive build/ios/ipa
-          cat > /tmp/export_options.plist <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>teamID</key>
-            <string>ZL366VWFY8</string>
-            <key>destination</key>
-            <string>export</string>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild \
-            -workspace "$XCODE_WORKSPACE" \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -archivePath build/ios/archive/OpsIQMobile.xcarchive \
-            -allowProvisioningUpdates \
-            archive \
-            CODE_SIGN_STYLE=Automatic \
-            DEVELOPMENT_TEAM=ZL366VWFY8
-
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/ios/archive/OpsIQMobile.xcarchive \
-            -exportPath build/ios/ipa \
-            -exportOptionsPlist /tmp/export_options.plist
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
