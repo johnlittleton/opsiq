@@ -14,7 +14,6 @@ workflows:
       vars:
         XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
-        APP_STORE_APPLE_ID: ""
       node: 20
       xcode: latest
 
