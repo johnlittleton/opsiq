@@ -44,6 +44,7 @@ workflows:
       - name: Build IPA
         script: |
           set -euo pipefail
+          mkdir -p build/ios/archive build/ios/ipa
           BUILD_NUMBER="${CM_BUILD_ID:-2}"
           echo "Using build number: $BUILD_NUMBER"
           shopt -s nullglob
@@ -93,7 +94,7 @@ workflows:
           </plist>
           EOF
 
-          xcodebuild \
+          if ! xcodebuild \
             -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
@@ -103,13 +104,23 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=ZL366VWFY8 \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$MATCHED_PROFILE_NAME"
+            PROVISIONING_PROFILE_SPECIFIER="$MATCHED_PROFILE_NAME" \
+            2>&1 | tee /tmp/opsiq-archive.log; then
+            echo "Archive failed. Key errors:"
+            grep -E "error:|No profile|requires a provisioning profile|ARCHIVE FAILED|Code Signing Error" /tmp/opsiq-archive.log | tail -n 30 || true
+            exit 1
+          fi
 
-          xcodebuild \
+          if ! xcodebuild \
             -exportArchive \
             -archivePath build/ios/archive/OpsIQMobile.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist /tmp/export_options.plist
+            -exportOptionsPlist /tmp/export_options.plist \
+            2>&1 | tee /tmp/opsiq-export.log; then
+            echo "Export failed. Key errors:"
+            grep -E "error:|EXPORT FAILED|No profile|provision|signing" /tmp/opsiq-export.log | tail -n 30 || true
+            exit 1
+          fi
 
     artifacts:
       - build/ios/ipa/*.ipa
