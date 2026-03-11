@@ -52,6 +52,7 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const bannerRef = useRef<HTMLDivElement>(null);
+  const isMobileView = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
 
   // Auto-fill sender name from authenticated user
   useEffect(() => {
@@ -350,7 +351,7 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
       localStorage.setItem(`dismissed-${activeChannel}`, latestId.toString());
     }
     
-    onToggle?.();
+    // Keep chat open after dismissing notifications; close only via explicit close button.
   };
 
   // Complete/archive chat for current channel
@@ -473,8 +474,8 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
         >
           <div 
             className="message-banner__header"
-            onMouseDown={handleMouseDown}
-            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            onMouseDown={isMobileView ? undefined : handleMouseDown}
+            style={{ cursor: isMobileView ? 'default' : (isDragging ? 'grabbing' : 'grab') }}
           >
             <h3 className="message-banner__title">💬 Team Chat</h3>
             <div style={{ display: 'flex', gap: '8px' }}>

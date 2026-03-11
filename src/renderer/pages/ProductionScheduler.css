@@ -3,7 +3,7 @@
   color: #f3f6fa;
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: auto;
 }
 
@@ -46,6 +46,12 @@
   align-items: center;
 }
 
+.scheduler-nav-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .header-controls input[type="date"] {
   padding: 8px 12px;
   border-radius: 12px;
@@ -55,6 +61,20 @@
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .header-controls,
+  .back-btn,
+  .view-toggle-group,
+  .scheduler-nav-buttons {
+    display: none !important;
+  }
+
+  .header-bar {
+    padding-left: calc(env(safe-area-inset-left) + 64px);
+    justify-content: flex-start;
+  }
 }
 
 /* Message/Chat Button - Yellow like image */

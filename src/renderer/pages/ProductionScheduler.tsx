@@ -55,6 +55,9 @@ interface WorkOrder {
 export default function ProductionScheduler() {
   const navigate = useNavigate();
   const { executiveName, sessionToken } = useAuth();
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
@@ -869,25 +872,29 @@ export default function ProductionScheduler() {
         onUnreadCountChange={setUnreadCount}
       />
       <div className="header-bar">
-        <button className="back-btn" onClick={() => navigate('/')}>
-          ← Home
-        </button>
+        {!isMobileRuntime && (
+          <button className="back-btn" onClick={() => navigate('/')}>
+            ← Home
+          </button>
+        )}
         <h1>Production Scheduler</h1>
         <div className="header-controls">
-          <div className="view-toggle-group">
-            <button 
-              className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-            >
-              📋 List
-            </button>
-            <button 
-              className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
-              onClick={() => setViewMode('calendar')}
-            >
-              📅 Calendar
-            </button>
-          </div>
+          {!isMobileRuntime && (
+            <div className="view-toggle-group">
+              <button 
+                className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => setViewMode('list')}
+              >
+                📋 List
+              </button>
+              <button 
+                className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+                onClick={() => setViewMode('calendar')}
+              >
+                📅 Calendar
+              </button>
+            </div>
+          )}
           <input
             type="date"
             value={selectedDateStr}
@@ -916,21 +923,25 @@ export default function ProductionScheduler() {
               <span className="message-badge">{unreadCount}</span>
             )}
           </button>
-          <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
-            📊 Dashboard
-          </button>
-          <button className="dashboard-btn" onClick={() => navigate('/production')}>
-            📈 KPI Dashboard
-          </button>
-          <button className="dashboard-btn" onClick={() => navigate('/production-labor-planner')}>
-            👷 Labor Planner
-          </button>
-          <button className="history-btn" onClick={() => navigate('/work-order-history')}>
-            📋 WO History
-          </button>
-          <button className="downtime-history-btn" onClick={() => navigate('/downtime-history')}>
-            ⏱️ Downtime
-          </button>
+          {!isMobileRuntime && (
+            <div className="scheduler-nav-buttons">
+              <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
+                📊 Dashboard
+              </button>
+              <button className="dashboard-btn" onClick={() => navigate('/production')}>
+                📈 KPI Dashboard
+              </button>
+              <button className="dashboard-btn" onClick={() => navigate('/production-labor-planner')}>
+                👷 Labor Planner
+              </button>
+              <button className="history-btn" onClick={() => navigate('/work-order-history')}>
+                📋 WO History
+              </button>
+              <button className="downtime-history-btn" onClick={() => navigate('/downtime-history')}>
+                ⏱️ Downtime
+              </button>
+            </div>
+          )}
           <button className="add-wo-btn" onClick={() => openModal(1, 0)}>
             ➕ Add Work Order
           </button>

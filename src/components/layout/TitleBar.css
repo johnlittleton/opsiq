@@ -155,3 +155,27 @@
   background: #e81123;
   color: white;
 }
+
+@media (max-width: 900px) {
+  .title-bar {
+    min-height: 40px;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .title-bar__drag-region {
+    -webkit-app-region: no-drag;
+    padding-left: 62px;
+  }
+
+  .title-bar__title,
+  .title-bar__menu,
+  .title-bar__home-btn,
+  .title-bar__controls,
+  .title-bar__drag-region .legend {
+    display: none;
+  }
+
+  .title-bar__content {
+    margin-left: 0;
+  }
+}

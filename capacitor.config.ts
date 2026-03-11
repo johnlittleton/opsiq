@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.slingshot.opsiq.mobile',
+  appId: 'com.johnlittleton.opsiq.mobile',
   appName: 'OpsIQ Mobile',
   webDir: 'dist/renderer'
 };

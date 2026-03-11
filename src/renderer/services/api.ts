@@ -27,7 +27,17 @@ class ApiClient {
 
   private initSocket() {
     console.log('🔌 Connecting to:', SOCKET_URL);
+    const isCapacitorRuntime =
+      typeof window !== 'undefined' && window.location.protocol === 'capacitor:';
+
     this.socket = io(SOCKET_URL, {
+      ...(isCapacitorRuntime
+        ? {
+            transports: ['websocket' as const],
+            upgrade: false,
+            timeout: 15000,
+          }
+        : {}),
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
@@ -47,7 +57,13 @@ class ApiClient {
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
+      const details = {
+        type: error?.type,
+        message: error?.message,
+        description: error?.description,
+        context: error?.context,
+      };
+      console.error('Connection error:', details);
       this.reconnectAttempts++;
     });
   }
