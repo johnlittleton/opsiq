@@ -948,6 +948,44 @@ export default function ProductionScheduler() {
         </div>
       </div>
 
+      {isMobileRuntime && (
+        <div className="mobile-scheduler-tools">
+          <div className="mobile-tool-row">
+            <button
+              className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              📋 List
+            </button>
+            <button
+              className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+              onClick={() => setViewMode('calendar')}
+            >
+              📅 Calendar
+            </button>
+            <button className="add-wo-btn" onClick={() => openModal(1, 0)}>
+              ➕ Add WO
+            </button>
+          </div>
+          <div className="mobile-tool-row">
+            <input
+              type="date"
+              value={selectedDateStr}
+              onChange={(e) => {
+                const [year, month, day] = e.target.value.split('-').map(Number);
+                setSelectedDate(new Date(year, month - 1, day));
+              }}
+            />
+            <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
+              📊 Dashboard
+            </button>
+            <button className="history-btn" onClick={() => navigate('/work-order-history')}>
+              📋 WO History
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="loading">Loading...</div>
       ) : viewMode === 'calendar' ? (

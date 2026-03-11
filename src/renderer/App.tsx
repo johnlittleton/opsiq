@@ -59,6 +59,7 @@ const MOBILE_ALLOWED_ROUTES = [
   '/home',
   '/dockboard',
   '/scheduler',
+  '/production-scheduler',
   '/production-dashboard',
   '/dashboard',
   '/executive',
@@ -148,6 +149,7 @@ const MobileHamburgerMenu: React.FC = () => {
       return [
         { label: 'Dock Dashboard', path: '/dockboard' },
         { label: 'Appointment Scheduler', path: '/scheduler' },
+        { label: 'Production Scheduler', path: '/production-scheduler' },
         { label: 'Production Dashboard', path: '/production-dashboard' },
         { label: 'Executive Dashboard', path: '/executive' },
         { label: 'Executive Analytics', path: '/executive-analytics' },

@@ -63,6 +63,10 @@
   font-weight: 600;
 }
 
+.mobile-scheduler-tools {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .header-controls,
   .back-btn,
@@ -74,6 +78,34 @@
   .header-bar {
     padding-left: calc(env(safe-area-inset-left) + 64px);
     justify-content: flex-start;
+  }
+
+  .mobile-scheduler-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #2a3142;
+    background: #232837;
+  }
+
+  .mobile-tool-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .mobile-tool-row input[type="date"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    border: 3px solid #7ffb7f;
+    background: #181c24;
+    color: #f3f6fa;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
   }
 }
 
