@@ -57,9 +57,14 @@ workflows:
             <key>method</key>
             <string>app-store</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
             <key>teamID</key>
             <string>ZL366VWFY8</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.slingshot.opsiq.mobile</key>
+              <string>OpsIQ Mobile App Store</string>
+            </dict>
           </dict>
           </plist>
           EOF
@@ -71,8 +76,10 @@ workflows:
             -archivePath build/ios/archive/OpsIQMobile.xcarchive \
             archive \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=ZL366VWFY8 \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="OpsIQ Mobile App Store" \
             2>&1 | tee /tmp/opsiq-archive.log; then
             echo "Archive failed. Key errors:"
             grep -E "error:|No profile|requires a provisioning profile|ARCHIVE FAILED|Code Signing Error" /tmp/opsiq-archive.log | tail -n 30 || true
