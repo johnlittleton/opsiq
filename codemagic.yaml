@@ -9,10 +9,8 @@ workflows:
 
     environment:
       ios_signing:
-        provisioning_profiles:
-          - opsiq_ios_appstore_profile
-        certificates:
-          - opsiq_ios_distribution
+        distribution_type: app_store
+        bundle_identifier: com.johnlittleton.opsiq.mobile
       vars:
         XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
@@ -51,33 +49,6 @@ workflows:
             BUILD_NUMBER="$(date +%s)"
           fi
           echo "Using build number: $BUILD_NUMBER"
-          shopt -s nullglob
-          PROFILE_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          MATCHED_PROFILE_NAME=""
-          PROFILE_FILES=("$PROFILE_DIR"/*.mobileprovision)
-
-          if [[ ${#PROFILE_FILES[@]} -eq 0 ]]; then
-            echo "No provisioning profiles found in: $PROFILE_DIR"
-            echo "Ensure signing profiles are fetched before archive."
-            exit 1
-          fi
-
-          for profile in "${PROFILE_FILES[@]}"; do
-            security cms -D -i "$profile" > /tmp/profile.plist
-            app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true)
-            if [[ "$app_id" == *".com.johnlittleton.opsiq.mobile" ]]; then
-              MATCHED_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist)
-              break
-            fi
-          done
-
-          if [[ -z "$MATCHED_PROFILE_NAME" ]]; then
-            echo "No provisioning profile found for com.johnlittleton.opsiq.mobile"
-            exit 1
-          fi
-
-          echo "Using provisioning profile: $MATCHED_PROFILE_NAME"
-
           cat > /tmp/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -86,14 +57,9 @@ workflows:
             <key>method</key>
             <string>app-store</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>teamID</key>
             <string>ZL366VWFY8</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.johnlittleton.opsiq.mobile</key>
-              <string>$MATCHED_PROFILE_NAME</string>
-            </dict>
           </dict>
           </plist>
           EOF
@@ -105,10 +71,8 @@ workflows:
             -archivePath build/ios/archive/OpsIQMobile.xcarchive \
             archive \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=ZL366VWFY8 \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$MATCHED_PROFILE_NAME" \
             2>&1 | tee /tmp/opsiq-archive.log; then
             echo "Archive failed. Key errors:"
             grep -E "error:|No profile|requires a provisioning profile|ARCHIVE FAILED|Code Signing Error" /tmp/opsiq-archive.log | tail -n 30 || true
