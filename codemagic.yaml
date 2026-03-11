@@ -65,14 +65,14 @@ workflows:
           for profile in "${PROFILE_FILES[@]}"; do
             security cms -D -i "$profile" > /tmp/profile.plist
             app_id=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" /tmp/profile.plist 2>/dev/null || true)
-            if [[ "$app_id" == *".com.slingshot.opsiq.mobile" ]]; then
+            if [[ "$app_id" == *".com.johnlittleton.opsiq.mobile" ]]; then
               MATCHED_PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /tmp/profile.plist)
               break
             fi
           done
 
           if [[ -z "$MATCHED_PROFILE_NAME" ]]; then
-            echo "No provisioning profile found for com.slingshot.opsiq.mobile"
+            echo "No provisioning profile found for com.johnlittleton.opsiq.mobile"
             exit 1
           fi
 
@@ -91,7 +91,7 @@ workflows:
             <string>ZL366VWFY8</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>com.slingshot.opsiq.mobile</key>
+              <key>com.johnlittleton.opsiq.mobile</key>
               <string>$MATCHED_PROFILE_NAME</string>
             </dict>
           </dict>

@@ -21,7 +21,7 @@ This uses Apple's own CI/CD (Xcode Cloud) and App Store Connect. No Codemagic ne
 1. Accept all agreements in App Store Connect.
 2. Confirm app record exists:
    - Name: OpsIQ Mobile
-   - Bundle ID: `com.slingshot.opsiq.mobile`
+  - Bundle ID: `com.johnlittleton.opsiq.mobile`
 3. In Apple Developer, ensure the App ID exists for that bundle id.
 
 ## 2. Open Xcode Cloud setup

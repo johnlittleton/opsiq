@@ -13,7 +13,7 @@ This project includes `codemagic.yaml` with a workflow named `ios-testflight`.
 
 1. In App Store Connect, create app record (if not created):
    - Platform: iOS
-   - Bundle ID: `com.slingshot.opsiq.mobile`
+   - Bundle ID: `com.johnlittleton.opsiq.mobile`
    - App name: OpsIQ Mobile
 2. In the app, open **TestFlight** and finish any required agreements/prompts.
 
