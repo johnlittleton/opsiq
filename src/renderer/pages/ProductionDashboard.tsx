@@ -291,7 +291,7 @@ export default function ProductionDashboard() {
     ? LINES.find(line => line.id === specificLine)?.name || 'Production Dashboard'
     : 'Production Dashboard';
 
-  const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? (isMobileRuntime ? 'single-line-mobile' : 'single-line') : ''}`;
+  const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? (isMobileRuntime ? 'single-line-mobile' : 'single-line') : ''} ${isMobileRuntime && !specificLine ? 'multi-line-mobile' : ''}`;
 
   const handleBack = () => {
     if (specificLine && isMobileRuntime) {
@@ -344,7 +344,23 @@ export default function ProductionDashboard() {
           const hasAlert = !specificLine && hasDriverAlertForLine(line.id);
 
           return (
-            <div key={line.id} className={`line-card ${status} ${hasAlert ? 'driver-alert' : ''}`}>
+            <div
+              key={line.id}
+              className={`line-card ${status} ${hasAlert ? 'driver-alert' : ''} ${isMobileRuntime && !specificLine ? 'line-card--selectable' : ''}`}
+              onClick={() => {
+                if (isMobileRuntime && !specificLine) {
+                  navigate(`/production-dashboard?line=${line.id}`);
+                }
+              }}
+              role={isMobileRuntime && !specificLine ? 'button' : undefined}
+              tabIndex={isMobileRuntime && !specificLine ? 0 : undefined}
+              onKeyDown={(event) => {
+                if (isMobileRuntime && !specificLine && (event.key === 'Enter' || event.key === ' ')) {
+                  event.preventDefault();
+                  navigate(`/production-dashboard?line=${line.id}`);
+                }
+              }}
+            >
               {hasAlert && <DriverWaitingTicker lineFilter={line.id} inline={true} />}
               <div className="line-header">
                 <h3>{line.name}</h3>
@@ -362,9 +378,12 @@ export default function ProductionDashboard() {
                     event.stopPropagation();
                     navigate(`/production-dashboard?line=${line.id}`);
                   }}
-                  onClick={() => navigate(`/production-dashboard?line=${line.id}`)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    navigate(`/production-dashboard?line=${line.id}`);
+                  }}
                 >
-                  Full View
+                  Tap for Full View
                 </button>
               )}
 
