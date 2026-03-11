@@ -210,7 +210,7 @@ const ExecutiveDashboard: React.FC = () => {
             <p className="subtitle">Site Performance Overview • Logged in as: {executiveName}</p>
           </div>
           
-          {!isMobileRuntime && <div className="header-actions">
+          <div className="header-actions header-actions--desktop">
             <div className="date-selector">
               <div className="date-field">
                 <label>Start Date</label>
@@ -239,8 +239,41 @@ const ExecutiveDashboard: React.FC = () => {
             <button className="today-btn" onClick={setToday}>📅 Today</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
+            <button className="costing-btn" onClick={() => navigate('/shipping')}>📦 Shipping KPI</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
-          </div>}
+          </div>
+
+          {isMobileRuntime && (
+            <div className="header-actions-mobile">
+              <div className="date-selector date-selector-mobile">
+                <div className="date-field">
+                  <label>Start Date</label>
+                  <input
+                    type="date"
+                    value={dateRange.startDate}
+                    onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                  />
+                </div>
+                <div className="date-field">
+                  <label>End Date</label>
+                  <input
+                    type="date"
+                    value={dateRange.endDate}
+                    onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="mobile-action-row">
+                <button className="today-btn" onClick={setToday}>📅 Today</button>
+                <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
+              </div>
+              <div className="mobile-action-row">
+                <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Costing</button>
+                <button className="costing-btn" onClick={() => navigate('/shipping')}>📦 Shipping</button>
+                <button className="logout-btn" onClick={logout}>🔒 Logout</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Top-Level KPIs */}

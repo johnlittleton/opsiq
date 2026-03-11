@@ -36,6 +36,27 @@
   align-items: flex-end;
 }
 
+.header-actions-mobile {
+  display: none;
+  width: 100%;
+  gap: 8px;
+  flex-direction: column;
+}
+
+.mobile-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.date-selector-mobile {
+  width: 100%;
+}
+
+.date-selector-mobile .date-field {
+  flex: 1;
+}
+
 .today-btn {
   background: none !important;
   color: #3498db !important;
@@ -818,6 +839,24 @@
   .col-avg-time,
   .col-avg-pallets {
     text-align: left !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .header-actions--desktop {
+    display: none;
+  }
+
+  .header-actions-mobile {
+    display: flex;
+  }
+
+  .header-actions-mobile .today-btn,
+  .header-actions-mobile .analytics-btn,
+  .header-actions-mobile .costing-btn,
+  .header-actions-mobile .logout-btn {
+    flex: 1;
+    min-width: 120px;
   }
 }
 

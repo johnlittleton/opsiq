@@ -62,6 +62,9 @@ const MOBILE_ALLOWED_ROUTES = [
   '/production-dashboard',
   '/dashboard',
   '/executive',
+  '/executive-analytics',
+  '/production-costing',
+  '/shipping',
 ];
 
 const AppRoutes: React.FC = () => {
@@ -146,7 +149,10 @@ const MobileHamburgerMenu: React.FC = () => {
         { label: 'Dock Dashboard', path: '/dockboard' },
         { label: 'Appointment Scheduler', path: '/scheduler' },
         { label: 'Production Dashboard', path: '/production-dashboard' },
-        { label: 'Executive Dashboard', path: '/executive' }
+        { label: 'Executive Dashboard', path: '/executive' },
+        { label: 'Executive Analytics', path: '/executive-analytics' },
+        { label: 'Production Costing', path: '/production-costing' },
+        { label: 'Shipping KPI', path: '/shipping' }
       ];
     }
 
