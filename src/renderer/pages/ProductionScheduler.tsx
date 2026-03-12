@@ -52,6 +52,12 @@ interface WorkOrder {
   planned_run_rate?: number;
 }
 
+interface CurrentShift {
+  shiftNumber: number;
+  shiftName: string;
+  startTime: string;
+}
+
 export default function ProductionScheduler() {
   const navigate = useNavigate();
   const { executiveName, sessionToken } = useAuth();
@@ -75,6 +81,10 @@ export default function ProductionScheduler() {
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedCalendarWO, setSelectedCalendarWO] = useState<WorkOrder | null>(null);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
+  const [plannedShiftEndTime, setPlannedShiftEndTime] = useState<string | null>(null);
+  const [showShiftReminder, setShowShiftReminder] = useState(false);
+  const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
 
   const selectedDateStr = getLocalDateString(selectedDate);
   const getPlannedRunRate = (wo: WorkOrder): number | null => {
@@ -109,6 +119,18 @@ export default function ProductionScheduler() {
     fetchWorkOrders();
     // Fetch every 2 seconds to keep timers updated
     const interval = setInterval(fetchWorkOrders, 2000);
+    return () => clearInterval(interval);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchCurrentShift();
+    fetchPlannerShiftWindow();
+
+    const interval = setInterval(() => {
+      fetchCurrentShift();
+      fetchPlannerShiftWindow();
+    }, 60000);
+
     return () => clearInterval(interval);
   }, [selectedDate]);
 
@@ -177,6 +199,83 @@ export default function ProductionScheduler() {
       }
     } catch (error) {
       console.error('Failed to fetch month work orders:', error);
+    }
+  };
+
+  const fetchCurrentShift = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      if (!response.ok) {
+        setCurrentShift(null);
+        return;
+      }
+      const data = await response.json();
+      setCurrentShift(data);
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      setCurrentShift(null);
+    }
+  };
+
+  const fetchPlannerShiftWindow = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/production-labor-planner?startDate=${selectedDateStr}&endDate=${selectedDateStr}`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const endTime = data?.summary?.shiftEndTime || data?.plannerConfig?.shiftEndTime || null;
+      setPlannedShiftEndTime(endTime);
+    } catch (error) {
+      console.error('Failed to fetch labor planner shift window:', error);
+    }
+  };
+
+  const parseShiftTime = (baseDate: Date, timeLabel: string): Date | null => {
+    const match = String(timeLabel || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return null;
+
+    const hours12 = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridiem = match[3].toUpperCase();
+    let hours24 = hours12 % 12;
+    if (meridiem === 'PM') hours24 += 12;
+
+    const target = new Date(baseDate);
+    target.setHours(hours24, minutes, 0, 0);
+    return target;
+  };
+
+  const getShiftMinutesRemaining = (): number | null => {
+    if (!currentShift || !plannedShiftEndTime) return null;
+
+    const start = new Date(currentShift.startTime);
+    const plannedEnd = parseShiftTime(start, plannedShiftEndTime);
+    if (!plannedEnd) return null;
+
+    if (plannedEnd.getTime() < start.getTime()) {
+      plannedEnd.setDate(plannedEnd.getDate() + 1);
+    }
+
+    return Math.floor((plannedEnd.getTime() - Date.now()) / 60000);
+  };
+
+  const minutesRemaining = getShiftMinutesRemaining();
+  const shiftKey = currentShift ? `${currentShift.shiftNumber}-${currentShift.startTime}` : null;
+
+  useEffect(() => {
+    if (messengerOpen) return;
+    if (!shiftKey || minutesRemaining === null) return;
+
+    const withinReminderWindow = minutesRemaining >= 0 && minutesRemaining <= 10;
+    if (withinReminderWindow && remindedShiftKey !== shiftKey) {
+      setShowShiftReminder(true);
+    }
+  }, [minutesRemaining, shiftKey, remindedShiftKey, messengerOpen]);
+
+  const dismissShiftReminder = () => {
+    setShowShiftReminder(false);
+    if (shiftKey) {
+      setRemindedShiftKey(shiftKey);
     }
   };
 
@@ -936,6 +1035,16 @@ export default function ProductionScheduler() {
           </button>
         </div>
       </div>
+
+      {showShiftReminder && (
+        <div className="shift-reminder-toast" role="status" aria-live="polite">
+          <div className="shift-reminder-title">Shift Reminder</div>
+          <div className="shift-reminder-text">
+            Reminder: planned shift time is approaching.
+          </div>
+          <button className="shift-reminder-dismiss" onClick={dismissShiftReminder}>Dismiss</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="loading">Loading...</div>

@@ -175,6 +175,49 @@
   transform: translateY(-1px) !important;
 }
 
+.shift-reminder-toast {
+  position: fixed;
+  top: 92px;
+  left: 16px;
+  width: min(360px, calc(100vw - 32px));
+  background: linear-gradient(135deg, rgba(24, 28, 36, 0.97), rgba(35, 40, 55, 0.97));
+  border: 2px solid rgba(245, 158, 11, 0.85);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 24px rgba(245, 158, 11, 0.3);
+  padding: 12px 14px;
+  z-index: 9800;
+}
+
+.shift-reminder-title {
+  color: #f59e0b;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.shift-reminder-text {
+  color: #f3f6fa;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.shift-reminder-dismiss {
+  margin-top: 10px;
+  background: none;
+  color: #f59e0b;
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shift-reminder-dismiss:hover {
+  background: #f59e0b;
+  color: #000;
+}
+
 /* Downtime Button */
 .downtime-history-btn {
   background: none !important;

@@ -20,6 +20,13 @@ export default function ProductionDashboard() {
   const [searchParams] = useSearchParams();
   const lineParam = searchParams.get('line');
   const specificLine = lineParam ? parseInt(lineParam) : null;
+  interface CurrentShift {
+    shiftNumber: number;
+    shiftName: string;
+    startTime: string;
+    elapsedMinutes: number;
+    runningLaborCost: number;
+  }
   
   console.log('🔧 ProductionDashboard - Line filter from URL:', lineParam, '→ specificLine:', specificLine);
   
@@ -37,6 +44,11 @@ export default function ProductionDashboard() {
   const [hasDriverAlerts, setHasDriverAlerts] = useState(false);
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
+  const [plannedShiftEndTime, setPlannedShiftEndTime] = useState<string | null>(null);
+  const [endingShift, setEndingShift] = useState(false);
+  const [showShiftReminder, setShowShiftReminder] = useState(false);
+  const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -49,6 +61,18 @@ export default function ProductionDashboard() {
     }, 1000); // Refresh every second to show live updates
     return () => clearInterval(interval);
   }, [selectedDate]); // Re-run if date changes
+
+  useEffect(() => {
+    fetchCurrentShift();
+    fetchPlannerShiftWindow();
+
+    const interval = setInterval(() => {
+      fetchCurrentShift();
+      fetchPlannerShiftWindow();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [selectedDate]);
 
   const fetchWorkOrders = async () => {
     try {
@@ -77,6 +101,97 @@ export default function ProductionDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch check-ins:', error);
+    }
+  };
+
+  const fetchCurrentShift = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      if (!response.ok) {
+        setCurrentShift(null);
+        return;
+      }
+      const data = await response.json();
+      setCurrentShift(data);
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      setCurrentShift(null);
+    }
+  };
+
+  const fetchPlannerShiftWindow = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/production-labor-planner?startDate=${selectedDate}&endDate=${selectedDate}`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const endTime = data?.summary?.shiftEndTime || data?.plannerConfig?.shiftEndTime || null;
+      setPlannedShiftEndTime(endTime);
+    } catch (error) {
+      console.error('Failed to fetch labor planner shift window:', error);
+    }
+  };
+
+  const parseShiftTime = (baseDate: Date, timeLabel: string): Date | null => {
+    const match = String(timeLabel || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return null;
+
+    const hours12 = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridiem = match[3].toUpperCase();
+    let hours24 = hours12 % 12;
+    if (meridiem === 'PM') hours24 += 12;
+
+    const target = new Date(baseDate);
+    target.setHours(hours24, minutes, 0, 0);
+    return target;
+  };
+
+  const getShiftMinutesRemaining = (): number | null => {
+    if (!currentShift || !plannedShiftEndTime) return null;
+
+    const start = new Date(currentShift.startTime);
+    const plannedEnd = parseShiftTime(start, plannedShiftEndTime);
+    if (!plannedEnd) return null;
+
+    if (plannedEnd.getTime() < start.getTime()) {
+      plannedEnd.setDate(plannedEnd.getDate() + 1);
+    }
+
+    return Math.floor((plannedEnd.getTime() - Date.now()) / 60000);
+  };
+
+  const handleEndShift = async () => {
+    if (!currentShift) return;
+
+    const confirmEnd = window.confirm(
+      `End ${currentShift.shiftName} shift?\n\n` +
+      `Elapsed: ${Math.floor(currentShift.elapsedMinutes / 60)}h ${currentShift.elapsedMinutes % 60}m\n` +
+      `Running Cost: $${currentShift.runningLaborCost.toFixed(2)}`
+    );
+
+    if (!confirmEnd) return;
+
+    setEndingShift(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/${currentShift.shiftNumber}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endedBy: 'Scheduler Dashboard' }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to end shift');
+      }
+
+      await fetchCurrentShift();
+      alert(`${currentShift.shiftName} shift ended successfully.`);
+    } catch (error: any) {
+      console.error('Failed to end shift from production dashboard:', error);
+      alert(error.message || 'Failed to end shift');
+    } finally {
+      setEndingShift(false);
     }
   };
 
@@ -284,6 +399,26 @@ export default function ProductionDashboard() {
     : 'Production Dashboard';
 
   const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? 'single-line' : ''}`;
+  const minutesRemaining = getShiftMinutesRemaining();
+  const shiftKey = currentShift ? `${currentShift.shiftNumber}-${currentShift.startTime}` : null;
+  const showFlashingEndShift = !!currentShift && minutesRemaining !== null && minutesRemaining <= 15;
+
+  useEffect(() => {
+    if (specificLine || messengerOpen) return;
+    if (!shiftKey || minutesRemaining === null) return;
+
+    const withinReminderWindow = minutesRemaining >= 0 && minutesRemaining <= 10;
+    if (withinReminderWindow && remindedShiftKey !== shiftKey) {
+      setShowShiftReminder(true);
+    }
+  }, [minutesRemaining, shiftKey, remindedShiftKey, messengerOpen, specificLine]);
+
+  const dismissShiftReminder = () => {
+    setShowShiftReminder(false);
+    if (shiftKey) {
+      setRemindedShiftKey(shiftKey);
+    }
+  };
 
   return (
     <div className={dashboardClasses}>
@@ -300,6 +435,18 @@ export default function ProductionDashboard() {
         <h1>{pageTitle}</h1>
         <div className="header-controls">
           {!specificLine && <button className="schedule-btn" onClick={() => navigate('/production-scheduler')}>📋 Schedule</button>}
+          {!specificLine && currentShift && (
+            <button
+              className={`end-shift-btn ${showFlashingEndShift ? 'flash' : ''}`}
+              onClick={handleEndShift}
+              disabled={endingShift}
+              title={minutesRemaining !== null ? `Planned shift end in ${minutesRemaining} minute(s)` : 'End active shift'}
+            >
+              {endingShift
+                ? '⏳ Ending...'
+                : `🛑 End ${currentShift.shiftName}${minutesRemaining !== null ? ` (${minutesRemaining}m)` : ''}`}
+            </button>
+          )}
           {!specificLine && (
             <button 
               className="message-chat-btn" 
@@ -314,6 +461,16 @@ export default function ProductionDashboard() {
           <button className="refresh-btn" onClick={fetchWorkOrders}>🔄 Refresh</button>
         </div>
       </div>
+
+      {!specificLine && showShiftReminder && (
+        <div className="shift-reminder-toast" role="status" aria-live="polite">
+          <div className="shift-reminder-title">Shift Reminder</div>
+          <div className="shift-reminder-text">
+            Reminder: planned shift time is approaching.
+          </div>
+          <button className="shift-reminder-dismiss" onClick={dismissShiftReminder}>Dismiss</button>
+        </div>
+      )}
 
       <div className="lines-grid">
         {displayLines.map(line => {
