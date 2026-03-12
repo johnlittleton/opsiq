@@ -32,6 +32,7 @@ function getLocalISOString(date: Date = new Date()): string {
 
 export class DatabaseService implements IDatabaseService {
   private db: Database.Database;
+  private static readonly MAX_REASONABLE_PALLETS = 200;
 
   constructor(dbPath?: string) {
     const defaultPath = path.join(process.cwd(), 'opsiq.db');
@@ -59,6 +60,26 @@ export class DatabaseService implements IDatabaseService {
     if (!bagSize) return 1;
     const match = bagSize.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : 1;
+  }
+
+  // Reject impossible pallet counts that can skew analytics and KPIs.
+  private sanitizePalletCount(value: number | null | undefined, fieldName: string): number | undefined {
+    if (value === null || value === undefined) return undefined;
+    if (!Number.isFinite(value)) {
+      throw new Error(`${fieldName} must be a valid number`);
+    }
+
+    const rounded = Math.round(value);
+    if (rounded < 0 || rounded > DatabaseService.MAX_REASONABLE_PALLETS) {
+      throw new Error(`${fieldName} must be between 0 and ${DatabaseService.MAX_REASONABLE_PALLETS}`);
+    }
+
+    return rounded;
+  }
+
+  private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
+    const candidate = actualPallets ?? plannedPallets ?? 0;
+    return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
   }
 
   private initializeSync() {
@@ -538,6 +559,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   createCheckin(data: CreateCheckinRequest): DockDoorWithCheckin {
+    const sanitizedPlannedPallets = this.sanitizePalletCount(data.pallets, 'pallets');
     const now = getLocalISOString();
 
     // Check idempotency first
@@ -567,7 +589,7 @@ export class DatabaseService implements IDatabaseService {
           data.company,
           data.driverName,
           data.pickupNumber,
-          data.pallets,
+          sanitizedPlannedPallets,
           data.commodity,
           data.forkliftDriver,
           data.checker,
@@ -595,7 +617,7 @@ export class DatabaseService implements IDatabaseService {
           data.company,
           data.driverName,
           data.pickupNumber,
-          data.pallets,
+          sanitizedPlannedPallets,
           data.commodity,
           data.forkliftDriver,
           data.checker,
@@ -644,7 +666,7 @@ export class DatabaseService implements IDatabaseService {
           data.company,
           data.driverName,
           data.pickupNumber,
-          data.pallets,
+          sanitizedPlannedPallets,
           data.commodity,
           data.forkliftDriver,
           data.checker,
@@ -673,7 +695,7 @@ export class DatabaseService implements IDatabaseService {
           data.company,
           data.driverName,
           data.pickupNumber,
-          data.pallets,
+          sanitizedPlannedPallets,
           data.commodity,
           data.forkliftDriver,
           data.checker,
@@ -774,6 +796,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   clearDoor(data: ClearDoorRequest): DockDoorWithCheckin {
+    const sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
     const now = getLocalISOString();
     const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(data.doorId) as DockDoor;
 
@@ -791,7 +814,7 @@ export class DatabaseService implements IDatabaseService {
         console.log('Clearing door - Checkin data:', {
           id: checkin.id,
           loadStartTime: checkin.loadStartTime,
-          actualPallets: data.actualPallets,
+          actualPallets: sanitizedActualPallets,
           expectedPallets: checkin.pallets
         });
         
@@ -810,7 +833,7 @@ export class DatabaseService implements IDatabaseService {
             endMs,
             diffMs: endMs - startMs,
             totalMinutes,
-            actualPallets: data.actualPallets || checkin.pallets,
+            actualPallets: sanitizedActualPallets ?? checkin.pallets,
             checkinId: door.currentCheckinId
           });
           
@@ -818,7 +841,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
             WHERE id = ?
-          `).run(now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
+          `).run(now, now, sanitizedActualPallets ?? checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
           
           console.log('✅ UPDATE result:', updateResult);
           
@@ -832,7 +855,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?
             WHERE id = ?
-          `).run(now, now, data.actualPallets || checkin.pallets, door.currentCheckinId);
+          `).run(now, now, sanitizedActualPallets ?? checkin.pallets, door.currentCheckinId);
         }
       }
 
@@ -1559,20 +1582,27 @@ export class DatabaseService implements IDatabaseService {
 
     for (const [camelKey, value] of Object.entries(updates)) {
       if (value === undefined || camelKey === 'doorId' || !fieldMap[camelKey]) continue;
+
+      let normalizedValue: any = value;
+      if (camelKey === 'pallets') {
+        normalizedValue = this.sanitizePalletCount(value as number, 'pallets');
+      } else if (camelKey === 'actualPallets') {
+        normalizedValue = this.sanitizePalletCount(value as number, 'actualPallets');
+      }
       
       const fieldName = fieldMap[camelKey];
       const oldValue = current[fieldName];
       
       // Only update and log if value actually changed
-      if (oldValue !== value) {
+      if (oldValue !== normalizedValue) {
         updateFields.push(`${fieldName} = ?`);
-        updateValues.push(value);
+        updateValues.push(normalizedValue);
         
         // Log the change
         this.db.prepare(`
           INSERT INTO checkin_audit_log (checkinId, fieldName, oldValue, newValue, changedBy, changedAt)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).run(checkinId, camelKey, String(oldValue || ''), String(value || ''), updatedBy, now);
+        `).run(checkinId, camelKey, String(oldValue || ''), String(normalizedValue || ''), updatedBy, now);
       }
     }
 
@@ -1622,6 +1652,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   updateCheckinCompletion(checkinId: number, actualPallets: number): void {
+    const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets');
     const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(checkinId) as any;
     if (!checkin) {
       throw new Error(`Checkin ${checkinId} not found`);
@@ -1635,7 +1666,7 @@ export class DatabaseService implements IDatabaseService {
       UPDATE dock_checkins
       SET actualPallets = ?, loadEndTime = ?, totalMinutes = ?, updatedAt = ?
       WHERE id = ?
-    `).run(actualPallets, now, totalMinutes, now, checkinId);
+    `).run(sanitizedActualPallets, now, totalMinutes, now, checkinId);
   }
 
   markLoadStart(checkinId: number): void {
@@ -1671,8 +1702,8 @@ export class DatabaseService implements IDatabaseService {
     const inbound = completedCheckins.filter(c => c.inboundOutbound === 'Inbound');
     const outbound = completedCheckins.filter(c => c.inboundOutbound === 'Outbound');
 
-    const totalPalletsLoaded = outbound.reduce((sum, c) => sum + (c.actualPallets || c.pallets), 0);
-    const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + (c.actualPallets || c.pallets), 0);
+    const totalPalletsLoaded = outbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
+    const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
     const avgLoadTime = outbound.length > 0
       ? outbound.reduce((sum, c) => sum + c.totalMinutes, 0) / outbound.length
@@ -1725,7 +1756,7 @@ export class DatabaseService implements IDatabaseService {
         operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
       operatorStats[normalizedName].loads++;
-      operatorStats[normalizedName].pallets += (c.actualPallets || c.pallets);
+      operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
       operatorStats[normalizedName].totalMinutes += c.totalMinutes;
     });
 
@@ -2560,7 +2591,7 @@ export class DatabaseService implements IDatabaseService {
         driverStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
       driverStats[driver].loads++;
-      driverStats[driver].pallets += (c.actualPallets || c.pallets);
+      driverStats[driver].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
       driverStats[driver].totalMinutes += c.totalMinutes;
     });
 
@@ -2590,8 +2621,8 @@ export class DatabaseService implements IDatabaseService {
     const palletsFlow = this.db.prepare(`
       SELECT 
         DATE(closedAt) as date,
-        SUM(CASE WHEN inboundOutbound = 'Inbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) as received,
-        SUM(CASE WHEN inboundOutbound = 'Outbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) as shipped
+        SUM(CASE WHEN inboundOutbound = 'Inbound' AND COALESCE(actualPallets, pallets, 0) BETWEEN 0 AND 200 THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) as received,
+        SUM(CASE WHEN inboundOutbound = 'Outbound' AND COALESCE(actualPallets, pallets, 0) BETWEEN 0 AND 200 THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) as shipped
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND closedAt >= ? AND closedAt <= ?
