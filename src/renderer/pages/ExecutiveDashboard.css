@@ -356,6 +356,14 @@
   border-left: 4px solid #f59e0b;
 }
 
+.labor-card.ytd-card {
+  border-left: 4px solid #8b5cf6;
+}
+
+.labor-card.previous-card {
+  border-left: 4px solid #14b8a6;
+}
+
 .labor-header {
   display: flex;
   justify-content: space-between;
@@ -392,6 +400,14 @@
 
 .labor-card.total-card .labor-value {
   color: #f59e0b;
+}
+
+.labor-card.ytd-card .labor-value {
+  color: #8b5cf6;
+}
+
+.labor-card.previous-card .labor-value {
+  color: #14b8a6;
 }
 
 .labor-subtitle {
