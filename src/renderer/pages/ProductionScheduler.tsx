@@ -315,7 +315,6 @@ export default function ProductionScheduler() {
     
     const woData = {
       ...editingWorkOrder,
-      id: editingWorkOrder.id || Date.now().toString(),
       line: editingWorkOrder.line,
       slot: editingWorkOrder.slot,
       date: selectedDateStr,
@@ -323,6 +322,10 @@ export default function ProductionScheduler() {
       plannedRunRate: plannedRate,
       planned_run_rate: plannedRate
     };
+
+    if (!isExisting) {
+      delete woData.id;
+    }
 
     try {
       const url = isExisting 

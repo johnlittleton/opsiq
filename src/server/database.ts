@@ -80,6 +80,11 @@ export class DatabaseService implements IDatabaseService {
     return rounded;
   }
 
+  private generateWorkOrderId(): string {
+    // Timestamp + random suffix keeps IDs sortable while avoiding same-ms collisions.
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
     const candidate = actualPallets ?? plannedPallets ?? 0;
     return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
@@ -2152,8 +2157,6 @@ export class DatabaseService implements IDatabaseService {
     try {
       console.log('🔧 createWorkOrder called with:', JSON.stringify(workOrder, null, 2));
       const now = getLocalISOString();
-      const id = workOrder.id || Date.now().toString();
-      console.log('  Generated ID:', id);
       
       const stmt = this.db.prepare(`
         INSERT INTO work_orders (
@@ -2164,41 +2167,56 @@ export class DatabaseService implements IDatabaseService {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      console.log('  Executing INSERT...');
-      stmt.run(
-        id,
-        workOrder.line,
-        workOrder.slot,
-        workOrder.date,
-        workOrder.product || null,
-        workOrder.bagSize || null,
-        workOrder.plannedRunRate || null,
-        workOrder.customer || null,
-        workOrder.lead || null,
-        workOrder.countryOfOrigin || null,
-        workOrder.numPallets || null,
-        workOrder.labor || null,
-        workOrder.priority || null,
-        workOrder.lot1 || null,
-        workOrder.lot2 || null,
-        workOrder.lot3 || null,
-        workOrder.lot4 || null,
-        workOrder.notes || null,
-        workOrder.status || 'Scheduled',
-        workOrder.targetCases || null,
-        workOrder.completedCases || 0,
-        workOrder.startTimestamp || null,
-        workOrder.elapsedMs || 0,
-        workOrder.isPaused ? 1 : 0,
-        null, // elapsedDisplay
-        now,
-        now
-      );
+      const maxAttempts = 3;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const id = attempt === 0 && workOrder.id ? String(workOrder.id) : this.generateWorkOrderId();
+        try {
+          console.log('  Attempting INSERT with ID:', id);
+          stmt.run(
+            id,
+            workOrder.line,
+            workOrder.slot,
+            workOrder.date,
+            workOrder.product || null,
+            workOrder.bagSize || null,
+            workOrder.plannedRunRate || null,
+            workOrder.customer || null,
+            workOrder.lead || null,
+            workOrder.countryOfOrigin || null,
+            workOrder.numPallets || null,
+            workOrder.labor || null,
+            workOrder.priority || null,
+            workOrder.lot1 || null,
+            workOrder.lot2 || null,
+            workOrder.lot3 || null,
+            workOrder.lot4 || null,
+            workOrder.notes || null,
+            workOrder.status || 'Scheduled',
+            workOrder.targetCases || null,
+            workOrder.completedCases || 0,
+            workOrder.startTimestamp || null,
+            workOrder.elapsedMs || 0,
+            workOrder.isPaused ? 1 : 0,
+            null,
+            now,
+            now
+          );
 
-      console.log('  INSERT successful, fetching result...');
-      const result = this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id);
-      console.log('  ✓ Work order created:', result);
-      return result;
+          const result = this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id);
+          console.log('  ✓ Work order created:', result);
+          return result;
+        } catch (insertError: any) {
+          const isDuplicate = typeof insertError?.message === 'string'
+            && insertError.message.includes('UNIQUE constraint failed: work_orders.id');
+          if (isDuplicate && attempt < maxAttempts - 1) {
+            console.warn('  Duplicate work order ID detected, retrying with a new ID...');
+            continue;
+          }
+          throw insertError;
+        }
+      }
+
+      throw new Error('Failed to create work order after multiple ID generation attempts');
     } catch (error) {
       console.error('❌ Error in createWorkOrder:', error);
       throw error;
