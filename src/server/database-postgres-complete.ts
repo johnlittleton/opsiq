@@ -31,6 +31,8 @@ function getLocalISOString(date: Date = new Date()): string {
 export class DatabaseService implements IDatabaseService {
   private pool: Pool;
   private static readonly MAX_REASONABLE_PALLETS = 200;
+  private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
+  private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
 
   private readonly DEFAULT_PROD_HOURLY_WAGE = 24.5;
 
@@ -75,6 +77,27 @@ export class DatabaseService implements IDatabaseService {
   private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
     const candidate = actualPallets ?? plannedPallets ?? 0;
     return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
+  }
+
+  private getPaidShiftHours(elapsedMinutes: number): number {
+    const paidMinutes = Math.max(0, elapsedMinutes - DatabaseService.UNPAID_BREAK_AND_LUNCH_MINUTES);
+    return paidMinutes / 60;
+  }
+
+  private getHourlyLaborCosts(
+    latestSnapshot: any,
+    warehouseHeadcount: number,
+    productionHeadcount: number
+  ): { warehousePerHour: number; productionPerHour: number } {
+    const warehousePerHour =
+      latestSnapshot?.shippingReceivingLaborCost ??
+      warehouseHeadcount * DatabaseService.DEFAULT_SR_HOURLY_WAGE;
+
+    const productionPerHour =
+      latestSnapshot?.productionLaborCost ??
+      productionHeadcount * this.DEFAULT_PROD_HOURLY_WAGE;
+
+    return { warehousePerHour, productionPerHour };
   }
 
   async initialize() {
@@ -1637,12 +1660,13 @@ export class DatabaseService implements IDatabaseService {
     const currentWarehouseHeadcount = latestSnapshot?.shippingReceivingHeadcount || activeShift.startingWarehouseHeadcount || 0;
     const currentProductionHeadcount = latestSnapshot?.productionHeadcount || activeShift.startingProductionHeadcount || 0;
 
-    // Calculate running cost
-    const SR_HOURLY_WAGE = 27;
-    const PROD_HOURLY_WAGE = 24.50;
-    const elapsedHours = elapsedMinutes / 60;
-    const runningCost = (currentWarehouseHeadcount * SR_HOURLY_WAGE * elapsedHours) + 
-                        (currentProductionHeadcount * PROD_HOURLY_WAGE * elapsedHours);
+    const { warehousePerHour, productionPerHour } = this.getHourlyLaborCosts(
+      latestSnapshot,
+      currentWarehouseHeadcount,
+      currentProductionHeadcount
+    );
+    const paidHours = this.getPaidShiftHours(elapsedMinutes);
+    const runningCost = (warehousePerHour + productionPerHour) * paidHours;
 
     return {
       ...activeShift,
@@ -1689,16 +1713,14 @@ export class DatabaseService implements IDatabaseService {
     const finalWarehouseHeadcount = latestSnapshot?.shippingReceivingHeadcount || shift.startingWarehouseHeadcount;
     const finalProductionHeadcount = latestSnapshot?.productionHeadcount || shift.startingProductionHeadcount;
 
-    // Calculate total labor cost for the shift
-    const SR_HOURLY_WAGE = 27;
-    const PROD_HOURLY_WAGE = 24.50;
-    const elapsedHours = elapsedMinutes / 60;
-    
-    // Use average headcount throughout shift
-    const avgWarehouseHeadcount = (shift.startingWarehouseHeadcount + finalWarehouseHeadcount) / 2;
-    const avgProductionHeadcount = (shift.startingProductionHeadcount + finalProductionHeadcount) / 2;
-    const totalLaborCost = (avgWarehouseHeadcount * SR_HOURLY_WAGE * elapsedHours) + 
-                           (avgProductionHeadcount * PROD_HOURLY_WAGE * elapsedHours);
+    // Capture final shift labor as combined hourly department cost × paid shift hours.
+    const { warehousePerHour, productionPerHour } = this.getHourlyLaborCosts(
+      latestSnapshot,
+      finalWarehouseHeadcount,
+      finalProductionHeadcount
+    );
+    const paidHours = this.getPaidShiftHours(elapsedMinutes);
+    const totalLaborCost = (warehousePerHour + productionPerHour) * paidHours;
 
     // Update shift session
     const updateResult = await this.pool.query(`
@@ -1864,15 +1886,19 @@ export class DatabaseService implements IDatabaseService {
     const ytdStart = `${currentYear}-01-01T00:00:00`;
     const ytdEnd = `${today}T23:59:59`;
 
-    // Labor cost rollups from shift sessions.
-    const completedShiftRangeResult = await this.pool.query(`
-      SELECT COALESCE(SUM(total_labor_cost), 0) as total
+    // Current shift cost (or latest completed shift in range when no active shift).
+    const latestCompletedShiftResult = await this.pool.query(`
+      SELECT total_labor_cost
       FROM shift_sessions
       WHERE status = 'completed'
         AND end_time IS NOT NULL
         AND end_time >= $1 AND end_time <= $2
+      ORDER BY end_time DESC
+      LIMIT 1
     `, [start, end]);
-    let totalShiftLaborCost = parseFloat(completedShiftRangeResult.rows[0].total) || 0;
+    let totalShiftLaborCost = latestCompletedShiftResult.rows.length > 0
+      ? parseFloat(latestCompletedShiftResult.rows[0].total_labor_cost) || 0
+      : 0;
 
     // Get current shift session to calculate live running labor cost.
     const currentShift = await this.getCurrentShiftSession();
