@@ -30,6 +30,7 @@ function getLocalISOString(date: Date = new Date()): string {
 
 export class DatabaseService implements IDatabaseService {
   private pool: Pool;
+  private static readonly MAX_REASONABLE_PALLETS = 200;
 
   private readonly DEFAULT_PROD_HOURLY_WAGE = 24.5;
 
@@ -54,6 +55,26 @@ export class DatabaseService implements IDatabaseService {
     if (!bagSize) return 1;
     const match = bagSize.match(/^(\d+)/);
     return match ? parseInt(match[1], 10) : 1;
+  }
+
+  // Reject impossible pallet counts that can skew analytics and KPIs.
+  private sanitizePalletCount(value: number | null | undefined, fieldName: string): number | undefined {
+    if (value === null || value === undefined) return undefined;
+    if (!Number.isFinite(value)) {
+      throw new Error(`${fieldName} must be a valid number`);
+    }
+
+    const rounded = Math.round(value);
+    if (rounded < 0 || rounded > DatabaseService.MAX_REASONABLE_PALLETS) {
+      throw new Error(`${fieldName} must be between 0 and ${DatabaseService.MAX_REASONABLE_PALLETS}`);
+    }
+
+    return rounded;
+  }
+
+  private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
+    const candidate = actualPallets ?? plannedPallets ?? 0;
+    return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
   }
 
   async initialize() {
@@ -532,6 +553,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async createCheckin(data: CreateCheckinRequest): Promise<DockDoorWithCheckin> {
+    const sanitizedPlannedPallets = this.sanitizePalletCount(data.pallets, 'pallets');
     const client = await this.pool.connect();
     
     try {
@@ -565,7 +587,7 @@ export class DatabaseService implements IDatabaseService {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING *
           `, [
-            data.inboundOutbound, data.company, data.driverName, data.pickupNumber, data.pallets,
+            data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
             data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
             null, data.status, now, now, now, now, data.clientRequestId, data.hasAppointment
           ]);
@@ -578,7 +600,7 @@ export class DatabaseService implements IDatabaseService {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *
           `, [
-            data.inboundOutbound, data.company, data.driverName, data.pickupNumber, data.pallets,
+            data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
             data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
             null, data.status, now, now, now, data.clientRequestId, data.hasAppointment
           ]);
@@ -616,7 +638,7 @@ export class DatabaseService implements IDatabaseService {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
           RETURNING id
         `, [
-          data.inboundOutbound, data.company, data.driverName, data.pickupNumber, data.pallets,
+          data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
           data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
           data.doorId, data.status, now, now, now, now, data.clientRequestId, data.hasAppointment
         ]);
@@ -629,7 +651,7 @@ export class DatabaseService implements IDatabaseService {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
           RETURNING id
         `, [
-          data.inboundOutbound, data.company, data.driverName, data.pickupNumber, data.pallets,
+          data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
           data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
           data.doorId, data.status, now, now, now, data.clientRequestId, data.hasAppointment
         ]);
@@ -736,6 +758,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async clearDoor(data: ClearDoorRequest): Promise<DockDoorWithCheckin> {
+    const sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
     const client = await this.pool.connect();
     
     try {
@@ -763,7 +786,7 @@ export class DatabaseService implements IDatabaseService {
         console.log('🚪 Clearing door - Checkin data:', {
           id: checkin.id,
           loadStartTime: checkin.loadStartTime,
-          actualPallets: data.actualPallets,
+          actualPallets: sanitizedActualPallets,
           expectedPallets: checkin.pallets
         });
         
@@ -781,7 +804,7 @@ export class DatabaseService implements IDatabaseService {
             endMs,
             diffMs: endMs - startMs,
             totalMinutes,
-            actualPallets: data.actualPallets || checkin.pallets,
+            actualPallets: sanitizedActualPallets ?? checkin.pallets,
             checkinId: savedCheckinId,
             forkliftDriver: checkin.forkliftDriver
           });
@@ -790,7 +813,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closed_at = $1, updated_at = $2, actual_pallets = $3, load_end_time = $4, total_minutes = $5
             WHERE id = $6
-          `, [now, now, data.actualPallets || checkin.pallets, loadEndTime, totalMinutes, savedCheckinId]);
+          `, [now, now, sanitizedActualPallets ?? checkin.pallets, loadEndTime, totalMinutes, savedCheckinId]);
           
           // Verify the update
           const verifyResult = await client.query('SELECT id, total_minutes, actual_pallets, load_end_time, closed_at, forklift_driver FROM dock_checkins WHERE id = $1', [savedCheckinId]);
@@ -809,7 +832,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closed_at = $1, updated_at = $2, actual_pallets = $3
             WHERE id = $4
-          `, [now, now, data.actualPallets || checkin.pallets, savedCheckinId]);
+          `, [now, now, sanitizedActualPallets ?? checkin.pallets, savedCheckinId]);
         }
       }
 
@@ -1056,20 +1079,27 @@ export class DatabaseService implements IDatabaseService {
 
       for (const [camelKey, value] of Object.entries(updates)) {
         if (value === undefined || camelKey === 'doorId' || !fieldMap[camelKey]) continue;
+
+        let normalizedValue: any = value;
+        if (camelKey === 'pallets') {
+          normalizedValue = this.sanitizePalletCount(value as number, 'pallets');
+        } else if (camelKey === 'actualPallets') {
+          normalizedValue = this.sanitizePalletCount(value as number, 'actualPallets');
+        }
         
         const snakeKey = fieldMap[camelKey];
         const oldValue = current[snakeKey];
         
         // Only update and log if value actually changed
-        if (oldValue !== value) {
+        if (oldValue !== normalizedValue) {
           updateFields.push(`${snakeKey} = $${paramIndex++}`);
-          updateValues.push(value);
+          updateValues.push(normalizedValue);
           
           // Log the change
           await client.query(`
             INSERT INTO checkin_audit_log (checkin_id, field_name, old_value, new_value, changed_by, changed_at)
             VALUES ($1, $2, $3, $4, $5, $6)
-          `, [checkinId, camelKey, String(oldValue || ''), String(value || ''), updatedBy, now]);
+          `, [checkinId, camelKey, String(oldValue || ''), String(normalizedValue || ''), updatedBy, now]);
         }
       }
 
@@ -1700,6 +1730,7 @@ export class DatabaseService implements IDatabaseService {
   // ==================== PERFORMANCE TRACKING ====================
 
   async updateCheckinCompletion(checkinId: number, actualPallets: number): Promise<void> {
+    const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets');
     const checkinResult = await this.pool.query('SELECT * FROM dock_checkins WHERE id = $1', [checkinId]);
     if (checkinResult.rows.length === 0) {
       throw new Error(`Checkin ${checkinId} not found`);
@@ -1714,7 +1745,7 @@ export class DatabaseService implements IDatabaseService {
       UPDATE dock_checkins
       SET actual_pallets = $1, load_end_time = $2, total_minutes = $3, updated_at = $4
       WHERE id = $5
-    `, [actualPallets, now, totalMinutes, now, checkinId]);
+    `, [sanitizedActualPallets, now, totalMinutes, now, checkinId]);
   }
 
   async markLoadStart(checkinId: number): Promise<void> {
@@ -1752,8 +1783,8 @@ export class DatabaseService implements IDatabaseService {
     const inbound = completedCheckins.filter((c: any) => c.inboundOutbound === 'Inbound');
     const outbound = completedCheckins.filter((c: any) => c.inboundOutbound === 'Outbound');
 
-    const totalPalletsLoaded = outbound.reduce((sum: number, c: any) => sum + (c.actualPallets || c.pallets), 0);
-    const totalPalletsOffloaded = inbound.reduce((sum: number, c: any) => sum + (c.actualPallets || c.pallets), 0);
+    const totalPalletsLoaded = outbound.reduce((sum: number, c: any) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
+    const totalPalletsOffloaded = inbound.reduce((sum: number, c: any) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
     const avgLoadTime = outbound.length > 0
       ? outbound.reduce((sum: number, c: any) => sum + c.totalMinutes, 0) / outbound.length
@@ -1798,7 +1829,7 @@ export class DatabaseService implements IDatabaseService {
         operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
       operatorStats[normalizedName].loads++;
-      operatorStats[normalizedName].pallets += (c.actualPallets || c.pallets);
+      operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
       operatorStats[normalizedName].totalMinutes += c.totalMinutes;
     });
 
@@ -3159,7 +3190,7 @@ export class DatabaseService implements IDatabaseService {
         driverStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
       driverStats[driver].loads++;
-      driverStats[driver].pallets += (c.actualPallets || c.pallets);
+      driverStats[driver].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
       driverStats[driver].totalMinutes += c.totalMinutes;
     });
 
@@ -3195,8 +3226,8 @@ export class DatabaseService implements IDatabaseService {
     const palletsFlowResult = await this.pool.query(`
       SELECT 
         DATE(closed_at) as date,
-        SUM(CASE WHEN inbound_outbound = 'Inbound' THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) as received,
-        SUM(CASE WHEN inbound_outbound = 'Outbound' THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) as shipped
+        SUM(CASE WHEN inbound_outbound = 'Inbound' AND COALESCE(actual_pallets, pallets, 0) BETWEEN 0 AND 200 THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) as received,
+        SUM(CASE WHEN inbound_outbound = 'Outbound' AND COALESCE(actual_pallets, pallets, 0) BETWEEN 0 AND 200 THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) as shipped
       FROM dock_checkins
       WHERE closed_at IS NOT NULL
         AND closed_at >= $1 AND closed_at <= $2
