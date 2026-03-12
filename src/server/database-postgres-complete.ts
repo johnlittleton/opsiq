@@ -1670,8 +1670,9 @@ export class DatabaseService implements IDatabaseService {
       currentWarehouseHeadcount,
       currentProductionHeadcount
     );
-    const paidHours = this.getPaidShiftHours(elapsedMinutes);
-    const runningCost = (warehousePerHour + productionPerHour) * paidHours;
+    const elapsedHours = elapsedMinutes / 60;
+    // Live card should reflect current burn rate immediately; unpaid break is applied at shift end.
+    const runningCost = (warehousePerHour + productionPerHour) * elapsedHours;
 
     return {
       ...activeShift,
