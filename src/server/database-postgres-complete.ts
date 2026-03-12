@@ -1859,20 +1859,54 @@ export class DatabaseService implements IDatabaseService {
     // Get latest labor snapshot
     const latestLabor = await this.getLatestLaborSnapshot();
 
-    // Get current shift session to calculate running labor cost
+    // Shared date windows for labor and production aggregates.
+    const currentYear = new Date().getFullYear();
+    const ytdStart = `${currentYear}-01-01T00:00:00`;
+    const ytdEnd = `${today}T23:59:59`;
+
+    // Labor cost rollups from shift sessions.
+    const completedShiftRangeResult = await this.pool.query(`
+      SELECT COALESCE(SUM(total_labor_cost), 0) as total
+      FROM shift_sessions
+      WHERE status = 'completed'
+        AND end_time IS NOT NULL
+        AND end_time >= $1 AND end_time <= $2
+    `, [start, end]);
+    let totalShiftLaborCost = parseFloat(completedShiftRangeResult.rows[0].total) || 0;
+
+    // Get current shift session to calculate live running labor cost.
     const currentShift = await this.getCurrentShiftSession();
-    
-    // If there's an active shift today, use its running cost
-    // Otherwise, calculate from ended shifts in the date range
-    let totalShiftLaborCost = 0;
     if (currentShift && currentShift.status === 'active') {
-      totalShiftLaborCost = currentShift.runningLaborCost || 0;
-    } else {
-      // For historical dates or ended shifts, sum up final costs
-      // Note: This would require storing final shift costs when shifts end
-      // For now, use 0 for historical periods
-      totalShiftLaborCost = 0;
+      const runningCost = currentShift.runningLaborCost || 0;
+      const shiftStart = currentShift.startTime;
+      if (shiftStart >= start && shiftStart <= end) {
+        totalShiftLaborCost = runningCost;
+      }
     }
+
+    const laborCostYTDResult = await this.pool.query(`
+      SELECT COALESCE(SUM(total_labor_cost), 0) as total
+      FROM shift_sessions
+      WHERE status = 'completed'
+        AND end_time IS NOT NULL
+        AND end_time >= $1 AND end_time <= $2
+    `, [ytdStart, ytdEnd]);
+    let laborCostYTD = parseFloat(laborCostYTDResult.rows[0].total) || 0;
+    if (currentShift && currentShift.status === 'active') {
+      laborCostYTD += currentShift.runningLaborCost || 0;
+    }
+
+    const yesterday = getLocalISOString(new Date(Date.now() - 24 * 60 * 60 * 1000)).split('T')[0];
+    const previousDayStart = `${yesterday}T00:00:00`;
+    const previousDayEnd = `${yesterday}T23:59:59`;
+    const laborCostPreviousDayResult = await this.pool.query(`
+      SELECT COALESCE(SUM(total_labor_cost), 0) as total
+      FROM shift_sessions
+      WHERE status = 'completed'
+        AND end_time IS NOT NULL
+        AND end_time >= $1 AND end_time <= $2
+    `, [previousDayStart, previousDayEnd]);
+    const laborCostPreviousDay = parseFloat(laborCostPreviousDayResult.rows[0].total) || 0;
 
     // Production metrics - cases completed in date range
     const totalCasesResult = await this.pool.query(`
@@ -1897,10 +1931,6 @@ export class DatabaseService implements IDatabaseService {
     }, 0);
 
     // Production metrics - cases completed YTD (Jan 1 to today)
-    const currentYear = new Date().getFullYear();
-    const ytdStart = `${currentYear}-01-01T00:00:00`;
-    const ytdEnd = `${today}T23:59:59`;
-    
     const casesYTDResult = await this.pool.query(`
       SELECT COALESCE(SUM(completed_cases), 0) as total
       FROM work_orders
@@ -1950,6 +1980,8 @@ export class DatabaseService implements IDatabaseService {
       shippingReceivingLaborCostPerHour: latestLabor ? latestLabor.shippingReceivingLaborCost : 0,
       productionLaborCostPerHour: latestLabor ? latestLabor.productionLaborCost : 0,
       totalShiftLaborCost: Math.round(totalShiftLaborCost * 100) / 100,
+      laborCostYTD: Math.round(laborCostYTD * 100) / 100,
+      laborCostPreviousDay: Math.round(laborCostPreviousDay * 100) / 100,
       currentHeadcount: latestLabor ? latestLabor.totalHeadcount : 0,
       warehouseHeadcount: latestLabor ? latestLabor.shippingReceivingHeadcount : 0,
       productionHeadcount: latestLabor ? latestLabor.productionHeadcount : 0,

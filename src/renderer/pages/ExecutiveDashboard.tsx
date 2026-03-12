@@ -97,6 +97,8 @@ const ExecutiveDashboard: React.FC = () => {
         shippingReceivingLaborCostPerHour: 0,
         productionLaborCostPerHour: 0,
         totalShiftLaborCost: 0,
+        laborCostYTD: 0,
+        laborCostPreviousDay: 0,
         currentHeadcount: 0,
         warehouseHeadcount: 0,
         productionHeadcount: 0,
@@ -483,8 +485,26 @@ const ExecutiveDashboard: React.FC = () => {
                 <h3>Total Shift Labor Cost</h3>
                 <div className="icon">💰</div>
               </div>
-              <div className="labor-value">${(metrics.totalShiftLaborCost || 0).toFixed(2)}</div>
+              <div className="labor-value">${(currentShift?.runningLaborCost ?? metrics.totalShiftLaborCost ?? 0).toFixed(2)}</div>
               <div className="labor-subtitle">{metrics.currentHeadcount || 0} employees</div>
+            </div>
+
+            <div className="labor-card ytd-card">
+              <div className="labor-header">
+                <h3>Labor Cost YTD</h3>
+                <div className="icon">📅</div>
+              </div>
+              <div className="labor-value">${(metrics.laborCostYTD || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">Jan 1 - Today</div>
+            </div>
+
+            <div className="labor-card previous-card">
+              <div className="labor-header">
+                <h3>Labor Cost Previous Day</h3>
+                <div className="icon">🗓️</div>
+              </div>
+              <div className="labor-value">${(metrics.laborCostPreviousDay || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">Yesterday</div>
             </div>
           </div>
         </GlassPanel>

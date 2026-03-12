@@ -248,6 +248,8 @@ export interface ExecutiveMetrics {
   shippingReceivingLaborCostPerHour: number;
   productionLaborCostPerHour: number;
   totalShiftLaborCost: number;
+  laborCostYTD: number;
+  laborCostPreviousDay: number;
   currentHeadcount: number;
   warehouseHeadcount: number;
   productionHeadcount: number;
