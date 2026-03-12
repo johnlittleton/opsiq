@@ -786,7 +786,16 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async clearDoor(data: ClearDoorRequest): Promise<DockDoorWithCheckin> {
-    const sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+    let sanitizedActualPallets: number | undefined;
+    try {
+      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+    } catch (error) {
+      console.warn('Invalid actualPallets on clearDoor; falling back to safe pallet value.', {
+        doorId: data.doorId,
+        actualPallets: data.actualPallets,
+      });
+      sanitizedActualPallets = undefined;
+    }
     const client = await this.pool.connect();
     
     try {
@@ -810,6 +819,7 @@ export class DatabaseService implements IDatabaseService {
       if (savedCheckinId) {
         const checkinResult = await client.query('SELECT * FROM dock_checkins WHERE id = $1', [savedCheckinId]);
         const checkin = this.toCamelCase(checkinResult.rows[0]);
+        const effectiveActualPallets = this.getSafePalletCount(sanitizedActualPallets, checkin.pallets);
         
         console.log('🚪 Clearing door - Checkin data:', {
           id: checkin.id,
@@ -832,7 +842,7 @@ export class DatabaseService implements IDatabaseService {
             endMs,
             diffMs: endMs - startMs,
             totalMinutes,
-            actualPallets: sanitizedActualPallets ?? checkin.pallets,
+            actualPallets: effectiveActualPallets,
             checkinId: savedCheckinId,
             forkliftDriver: checkin.forkliftDriver
           });
@@ -841,7 +851,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closed_at = $1, updated_at = $2, actual_pallets = $3, load_end_time = $4, total_minutes = $5
             WHERE id = $6
-          `, [now, now, sanitizedActualPallets ?? checkin.pallets, loadEndTime, totalMinutes, savedCheckinId]);
+          `, [now, now, effectiveActualPallets, loadEndTime, totalMinutes, savedCheckinId]);
           
           // Verify the update
           const verifyResult = await client.query('SELECT id, total_minutes, actual_pallets, load_end_time, closed_at, forklift_driver FROM dock_checkins WHERE id = $1', [savedCheckinId]);
@@ -860,7 +870,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closed_at = $1, updated_at = $2, actual_pallets = $3
             WHERE id = $4
-          `, [now, now, sanitizedActualPallets ?? checkin.pallets, savedCheckinId]);
+          `, [now, now, effectiveActualPallets, savedCheckinId]);
         }
       }
 

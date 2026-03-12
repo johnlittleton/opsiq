@@ -825,7 +825,16 @@ export class DatabaseService implements IDatabaseService {
   }
 
   clearDoor(data: ClearDoorRequest): DockDoorWithCheckin {
-    const sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+    let sanitizedActualPallets: number | undefined;
+    try {
+      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+    } catch (error) {
+      console.warn('Invalid actualPallets on clearDoor; falling back to safe pallet value.', {
+        doorId: data.doorId,
+        actualPallets: data.actualPallets,
+      });
+      sanitizedActualPallets = undefined;
+    }
     const now = getLocalISOString();
     const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(data.doorId) as DockDoor;
 
@@ -839,6 +848,7 @@ export class DatabaseService implements IDatabaseService {
       // Close checkin if exists and record performance metrics
       if (door.currentCheckinId) {
         const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
+        const effectiveActualPallets = this.getSafePalletCount(sanitizedActualPallets, checkin.pallets);
         
         console.log('Clearing door - Checkin data:', {
           id: checkin.id,
@@ -862,7 +872,7 @@ export class DatabaseService implements IDatabaseService {
             endMs,
             diffMs: endMs - startMs,
             totalMinutes,
-            actualPallets: sanitizedActualPallets ?? checkin.pallets,
+            actualPallets: effectiveActualPallets,
             checkinId: door.currentCheckinId
           });
           
@@ -870,7 +880,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
             WHERE id = ?
-          `).run(now, now, sanitizedActualPallets ?? checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
+          `).run(now, now, effectiveActualPallets, loadEndTime, totalMinutes, door.currentCheckinId);
           
           console.log('✅ UPDATE result:', updateResult);
           
@@ -884,7 +894,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?
             WHERE id = ?
-          `).run(now, now, sanitizedActualPallets ?? checkin.pallets, door.currentCheckinId);
+          `).run(now, now, effectiveActualPallets, door.currentCheckinId);
         }
       }
 
