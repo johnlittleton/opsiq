@@ -33,6 +33,9 @@ function getLocalISOString(date: Date = new Date()): string {
 export class DatabaseService implements IDatabaseService {
   private db: Database.Database;
   private static readonly MAX_REASONABLE_PALLETS = 200;
+  private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
+  private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
+  private static readonly DEFAULT_PROD_HOURLY_WAGE = 24.5;
 
   constructor(dbPath?: string) {
     const defaultPath = path.join(process.cwd(), 'opsiq.db');
@@ -77,9 +80,35 @@ export class DatabaseService implements IDatabaseService {
     return rounded;
   }
 
+  private generateWorkOrderId(): string {
+    // Timestamp + random suffix keeps IDs sortable while avoiding same-ms collisions.
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
   private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
     const candidate = actualPallets ?? plannedPallets ?? 0;
     return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
+  }
+
+  private getPaidShiftHours(elapsedMinutes: number): number {
+    const paidMinutes = Math.max(0, elapsedMinutes - DatabaseService.UNPAID_BREAK_AND_LUNCH_MINUTES);
+    return paidMinutes / 60;
+  }
+
+  private getHourlyLaborCosts(
+    latestSnapshot: any,
+    warehouseHeadcount: number,
+    productionHeadcount: number
+  ): { warehousePerHour: number; productionPerHour: number } {
+    const warehousePerHour =
+      latestSnapshot?.shippingReceivingLaborCost ??
+      warehouseHeadcount * DatabaseService.DEFAULT_SR_HOURLY_WAGE;
+
+    const productionPerHour =
+      latestSnapshot?.productionLaborCost ??
+      productionHeadcount * DatabaseService.DEFAULT_PROD_HOURLY_WAGE;
+
+    return { warehousePerHour, productionPerHour };
   }
 
   private initializeSync() {
@@ -796,7 +825,16 @@ export class DatabaseService implements IDatabaseService {
   }
 
   clearDoor(data: ClearDoorRequest): DockDoorWithCheckin {
-    const sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+    let sanitizedActualPallets: number | undefined;
+    try {
+      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+    } catch (error) {
+      console.warn('Invalid actualPallets on clearDoor; falling back to safe pallet value.', {
+        doorId: data.doorId,
+        actualPallets: data.actualPallets,
+      });
+      sanitizedActualPallets = undefined;
+    }
     const now = getLocalISOString();
     const door = this.db.prepare('SELECT * FROM dock_doors WHERE doorId = ?').get(data.doorId) as DockDoor;
 
@@ -810,6 +848,7 @@ export class DatabaseService implements IDatabaseService {
       // Close checkin if exists and record performance metrics
       if (door.currentCheckinId) {
         const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
+        const effectiveActualPallets = this.getSafePalletCount(sanitizedActualPallets, checkin.pallets);
         
         console.log('Clearing door - Checkin data:', {
           id: checkin.id,
@@ -833,7 +872,7 @@ export class DatabaseService implements IDatabaseService {
             endMs,
             diffMs: endMs - startMs,
             totalMinutes,
-            actualPallets: sanitizedActualPallets ?? checkin.pallets,
+            actualPallets: effectiveActualPallets,
             checkinId: door.currentCheckinId
           });
           
@@ -841,7 +880,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
             WHERE id = ?
-          `).run(now, now, sanitizedActualPallets ?? checkin.pallets, loadEndTime, totalMinutes, door.currentCheckinId);
+          `).run(now, now, effectiveActualPallets, loadEndTime, totalMinutes, door.currentCheckinId);
           
           console.log('✅ UPDATE result:', updateResult);
           
@@ -855,7 +894,7 @@ export class DatabaseService implements IDatabaseService {
             UPDATE dock_checkins
             SET closedAt = ?, updatedAt = ?, actualPallets = ?
             WHERE id = ?
-          `).run(now, now, sanitizedActualPallets ?? checkin.pallets, door.currentCheckinId);
+          `).run(now, now, effectiveActualPallets, door.currentCheckinId);
         }
       }
 
@@ -1423,12 +1462,14 @@ export class DatabaseService implements IDatabaseService {
     const currentWarehouseHeadcount = latestSnapshot?.shippingReceivingHeadcount || activeShift.startingWarehouseHeadcount || 0;
     const currentProductionHeadcount = latestSnapshot?.productionHeadcount || activeShift.startingProductionHeadcount || 0;
 
-    // Calculate running cost
-    const SR_HOURLY_WAGE = 27;
-    const PROD_HOURLY_WAGE = 24.50;
+    const { warehousePerHour, productionPerHour } = this.getHourlyLaborCosts(
+      latestSnapshot,
+      currentWarehouseHeadcount,
+      currentProductionHeadcount
+    );
     const elapsedHours = elapsedMinutes / 60;
-    const runningCost = (currentWarehouseHeadcount * SR_HOURLY_WAGE * elapsedHours) + 
-                        (currentProductionHeadcount * PROD_HOURLY_WAGE * elapsedHours);
+    // Live card should reflect current burn rate immediately; unpaid break is applied at shift end.
+    const runningCost = (warehousePerHour + productionPerHour) * elapsedHours;
 
     return {
       ...activeShift,
@@ -1471,16 +1512,14 @@ export class DatabaseService implements IDatabaseService {
     const finalWarehouseHeadcount = latestSnapshot?.shippingReceivingHeadcount || shift.startingWarehouseHeadcount;
     const finalProductionHeadcount = latestSnapshot?.productionHeadcount || shift.startingProductionHeadcount;
 
-    // Calculate total labor cost for the shift
-    const SR_HOURLY_WAGE = 27;
-    const PROD_HOURLY_WAGE = 24.50;
-    const elapsedHours = elapsedMinutes / 60;
-    
-    // Use average headcount throughout shift
-    const avgWarehouseHeadcount = (shift.startingWarehouseHeadcount + finalWarehouseHeadcount) / 2;
-    const avgProductionHeadcount = (shift.startingProductionHeadcount + finalProductionHeadcount) / 2;
-    const totalLaborCost = (avgWarehouseHeadcount * SR_HOURLY_WAGE * elapsedHours) + 
-                           (avgProductionHeadcount * PROD_HOURLY_WAGE * elapsedHours);
+    // Capture final shift labor as combined hourly department cost × paid shift hours.
+    const { warehousePerHour, productionPerHour } = this.getHourlyLaborCosts(
+      latestSnapshot,
+      finalWarehouseHeadcount,
+      finalProductionHeadcount
+    );
+    const paidHours = this.getPaidShiftHours(elapsedMinutes);
+    const totalLaborCost = (warehousePerHour + productionPerHour) * paidHours;
 
     // Update shift session
     this.db.prepare(`
@@ -1678,20 +1717,20 @@ export class DatabaseService implements IDatabaseService {
     `).run(now, now, checkinId);
   }
 
-  getExecutiveMetrics(startDate?: string, endDate?: string): any {
+  getExecutiveMetrics(startDate?: string, endDate?: string, allTime?: boolean): any {
     const today = getLocalISOString().split('T')[0];
-    const start = startDate ? `${startDate}T00:00:00` : `${today}T00:00:00`;
-    // Always append time to end date to include full day
-    const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
+    // When allTime=true, use a very wide date window so all date-filtered queries return all data.
+    // activeNow query has no date filter and is always live regardless of mode.
+    const start = allTime ? '1970-01-01T00:00:00' : (startDate ? `${startDate}T00:00:00` : `${today}T00:00:00`);
+    const end = allTime ? '2099-12-31T23:59:59' : (endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`);
 
     console.log('📊 getExecutiveMetrics query:', { start, end });
 
-    // Get completed checkins for the period
+    // Get completed checkins for the period (all closed records, regardless of totalMinutes)
     const completedCheckins = this.db.prepare(`
       SELECT * FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND closedAt >= ? AND closedAt <= ?
-        AND totalMinutes IS NOT NULL
     `).all(start, end) as any[];
     
     console.log('📊 Found completed checkins:', completedCheckins.length);
@@ -1705,24 +1744,26 @@ export class DatabaseService implements IDatabaseService {
     const totalPalletsLoaded = outbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
     const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
-    const avgLoadTime = outbound.length > 0
-      ? outbound.reduce((sum, c) => sum + c.totalMinutes, 0) / outbound.length
+    // Avg load/offload time only from records that have totalMinutes recorded
+    const outboundTimed = outbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
+    const inboundTimed = inbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
+    const avgLoadTime = outboundTimed.length > 0
+      ? outboundTimed.reduce((sum, c) => sum + c.totalMinutes, 0) / outboundTimed.length
       : 0;
 
-    const avgOffloadTime = inbound.length > 0
-      ? inbound.reduce((sum, c) => sum + c.totalMinutes, 0) / inbound.length
+    const avgOffloadTime = inboundTimed.length > 0
+      ? inboundTimed.reduce((sum, c) => sum + c.totalMinutes, 0) / inboundTimed.length
       : 0;
 
     const avgPallets = completedCheckins.length > 0
       ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
       : 0;
 
-    // Top operators - ALL TIME (not filtered by date range)
+    // Top operators - ALL TIME (not filtered by date range), all closed records counted
     const allCompletedCheckins = this.db.prepare(`
       SELECT forkliftDriver, actualPallets, pallets, totalMinutes
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
-        AND totalMinutes IS NOT NULL
         AND forkliftDriver IS NOT NULL
     `).all() as any[];
     
@@ -1738,6 +1779,9 @@ export class DatabaseService implements IDatabaseService {
       
       // Combine LINWOOD variants
       if (n === 'LENNY' || n === 'LINDWOOD' || n === 'LYNWOOD') return 'LINWOOD';
+
+      // Combine CESAR variants
+      if (n === 'CEASAR' || n === 'CAESAR') return 'CESAR';
       
       // Whitelist of approved drivers (case-normalized)
       const approved = ['LINWOOD', 'JAN CARLOS', 'SANCHEZ', 'DRE', 'KYLE', 'BRIAN', 'CESAR', 'MIKE', 'CARLOS', 'ERIC', 'NOE'];
@@ -1746,18 +1790,22 @@ export class DatabaseService implements IDatabaseService {
       return null; // Filter out non-approved drivers
     };
     
-    const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
+    // Track timedLoads separately so avgTimeMinutes only averages records that have time data
+    const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number; timedLoads: number }> = {};
     
     allCompletedCheckins.forEach(c => {
       const normalizedName = normalizeDriverName(c.forkliftDriver);
       if (!normalizedName) return; // Skip non-approved drivers
       
       if (!operatorStats[normalizedName]) {
-        operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0 };
+        operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0, timedLoads: 0 };
       }
       operatorStats[normalizedName].loads++;
       operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      operatorStats[normalizedName].totalMinutes += c.totalMinutes;
+      if (c.totalMinutes != null && c.totalMinutes > 0) {
+        operatorStats[normalizedName].totalMinutes += c.totalMinutes;
+        operatorStats[normalizedName].timedLoads++;
+      }
     });
 
     console.log('📊 Raw operator stats:', operatorStats);
@@ -1767,13 +1815,67 @@ export class DatabaseService implements IDatabaseService {
         operatorName: name,
         totalLoads: stats.loads,
         totalPallets: stats.pallets,
-        avgTimeMinutes: Math.round(stats.totalMinutes / stats.loads),
+        avgTimeMinutes: stats.timedLoads > 0 ? Math.round(stats.totalMinutes / stats.timedLoads) : 0,
         avgPalletsPerLoad: Math.round((stats.pallets / stats.loads) * 10) / 10,
       }))
       .sort((a, b) => b.totalLoads - a.totalLoads)
       .slice(0, 15); // 3 columns × 5 rows
 
     console.log('📊 Top operators after filtering:', topOperators);
+
+    const normalizeLeadName = (name: string): string | null => {
+      if (!name || typeof name !== 'string') return null;
+      const trimmed = name.trim();
+      if (!trimmed) return null;
+
+      const upper = trimmed.toUpperCase();
+      if (upper === 'TBD' || upper === 'UNKNOWN' || upper === 'N/A' || upper === 'NA') {
+        return null;
+      }
+
+      return trimmed
+        .toLowerCase()
+        .split(/\s+/)
+        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
+    };
+
+    const completedLeadWorkOrders = this.db.prepare(`
+      SELECT lead, bagSize, completedCases
+      FROM work_orders
+      WHERE completedCases > 0
+        AND status = 'Completed'
+        AND lead IS NOT NULL
+    `).all() as any[];
+
+    const lineLeadStats: Record<string, { totalCases: number; totalBags: number; completedWorkOrders: number }> = {};
+
+    completedLeadWorkOrders.forEach(workOrder => {
+      const normalizedLead = normalizeLeadName(workOrder.lead);
+      if (!normalizedLead) return;
+
+      if (!lineLeadStats[normalizedLead]) {
+        lineLeadStats[normalizedLead] = { totalCases: 0, totalBags: 0, completedWorkOrders: 0 };
+      }
+
+      const completedCases = Number(workOrder.completedCases) || 0;
+      lineLeadStats[normalizedLead].totalCases += completedCases;
+      lineLeadStats[normalizedLead].totalBags += completedCases * this.parseBagsPerCase(workOrder.bagSize);
+      lineLeadStats[normalizedLead].completedWorkOrders += 1;
+    });
+
+    const topLineLeads = Object.entries(lineLeadStats)
+      .map(([leadName, stats]) => ({
+        leadName,
+        totalCases: stats.totalCases,
+        totalBags: stats.totalBags,
+        completedWorkOrders: stats.completedWorkOrders,
+      }))
+      .sort((a, b) => {
+        if (b.totalCases !== a.totalCases) return b.totalCases - a.totalCases;
+        return b.completedWorkOrders - a.completedWorkOrders;
+      })
+      .slice(0, 15);
 
     // Current active count
     const activeNow = this.db.prepare(
@@ -1792,15 +1894,17 @@ export class DatabaseService implements IDatabaseService {
     const ytdStart = `${currentYear}-01-01T00:00:00`;
     const ytdEnd = `${today}T23:59:59`;
 
-    // Labor cost rollups from shift sessions.
-    const completedShiftRange = this.db.prepare(`
-      SELECT COALESCE(SUM(totalLaborCost), 0) as total
+    // Current shift cost (or latest completed shift in range when no active shift).
+    const latestCompletedShift = this.db.prepare(`
+      SELECT totalLaborCost
       FROM shift_sessions
       WHERE status = 'completed'
         AND endTime IS NOT NULL
         AND endTime >= ? AND endTime <= ?
+      ORDER BY endTime DESC
+      LIMIT 1
     `).get(start, end) as any;
-    let totalShiftLaborCost = completedShiftRange.total || 0;
+    let totalShiftLaborCost = latestCompletedShift?.totalLaborCost || 0;
 
     // Get current shift session to calculate live running labor cost.
     const currentShift = this.getCurrentShiftSession();
@@ -1901,6 +2005,7 @@ export class DatabaseService implements IDatabaseService {
       avgOffloadTimeMinutes: Math.round(avgOffloadTime),
       avgPalletsPerTruck: Math.round(avgPallets * 10) / 10,
       topOperators,
+      topLineLeads,
       totalDockTimeHours: Math.round(totalDockHours * 10) / 10,
       dockUtilization: 0, // Calculate based on active doors
       completedToday: completedCheckins.length,
@@ -1929,6 +2034,7 @@ export class DatabaseService implements IDatabaseService {
   // Production Costing Analytics
   getProductionCostingAnalytics(startDate?: string, endDate?: string): any {
     const PROD_HOURLY_WAGE = 24.50;
+    const SHARED_SUPPORT_HEADCOUNT = 6; // 2 taggers + 2 strappers + 1 floor lead + 1 lumper
     const today = getLocalISOString().split('T')[0];
     const start = startDate || today;
     const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
@@ -1941,10 +2047,22 @@ export class DatabaseService implements IDatabaseService {
         AND updatedAt >= ? AND updatedAt <= ?
     `).all(start, end) as any[];
 
+    const activeLines = new Set<number>();
+    workOrders.forEach(wo => {
+      const lineNumber = Number(wo.line);
+      if (Number.isFinite(lineNumber) && lineNumber > 0) {
+        activeLines.add(lineNumber);
+      }
+    });
+    const activeLineCount = activeLines.size > 0 ? activeLines.size : 1;
+    const supportWorkersPerLine = SHARED_SUPPORT_HEADCOUNT / activeLineCount;
+
     // Aggregate by commodity/product
     const productBreakdown: Record<string, {
       product: string;
       totalCases: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
       totalOrders: number;
@@ -1958,6 +2076,8 @@ export class DatabaseService implements IDatabaseService {
     const bagSizeBreakdown: Record<string, {
       bagSize: string;
       totalCases: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
     }> = {};
@@ -1966,6 +2086,8 @@ export class DatabaseService implements IDatabaseService {
     const customerBreakdown: Record<string, {
       customer: string;
       totalCases: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
     }> = {};
@@ -1975,6 +2097,8 @@ export class DatabaseService implements IDatabaseService {
       lineNumber: number;
       totalCases: number;
       totalBags: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
       totalTimeHours: number;
@@ -1986,7 +2110,9 @@ export class DatabaseService implements IDatabaseService {
       // Calculate labor cost for this work order
       // labor = number of workers, elapsedMs = time spent
       const timeHours = (wo.elapsedMs || 0) / (1000 * 60 * 60);
-      const laborCost = (wo.labor || 0) * timeHours * PROD_HOURLY_WAGE;
+      const directLaborCost = (wo.labor || 0) * timeHours * PROD_HOURLY_WAGE;
+      const supportLaborCost = supportWorkersPerLine * timeHours * PROD_HOURLY_WAGE;
+      const laborCost = directLaborCost + supportLaborCost;
 
       // Product aggregation
       const productKey = wo.product || 'Unknown Product';
@@ -1994,6 +2120,8 @@ export class DatabaseService implements IDatabaseService {
         productBreakdown[productKey] = {
           product: productKey,
           totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
           totalOrders: 0,
@@ -2004,6 +2132,8 @@ export class DatabaseService implements IDatabaseService {
         };
       }
       productBreakdown[productKey].totalCases += wo.completedCases;
+      productBreakdown[productKey].directLaborCost += directLaborCost;
+      productBreakdown[productKey].supportLaborCost += supportLaborCost;
       productBreakdown[productKey].totalLaborCost += laborCost;
       productBreakdown[productKey].totalOrders++;
       productBreakdown[productKey].totalWorkers += (wo.labor || 0);
@@ -2015,11 +2145,15 @@ export class DatabaseService implements IDatabaseService {
         bagSizeBreakdown[bagKey] = {
           bagSize: bagKey,
           totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
         };
       }
       bagSizeBreakdown[bagKey].totalCases += wo.completedCases;
+      bagSizeBreakdown[bagKey].directLaborCost += directLaborCost;
+      bagSizeBreakdown[bagKey].supportLaborCost += supportLaborCost;
       bagSizeBreakdown[bagKey].totalLaborCost += laborCost;
 
       // Customer aggregation
@@ -2028,11 +2162,15 @@ export class DatabaseService implements IDatabaseService {
         customerBreakdown[customerKey] = {
           customer: customerKey,
           totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
         };
       }
       customerBreakdown[customerKey].totalCases += wo.completedCases;
+      customerBreakdown[customerKey].directLaborCost += directLaborCost;
+      customerBreakdown[customerKey].supportLaborCost += supportLaborCost;
       customerBreakdown[customerKey].totalLaborCost += laborCost;
 
       // Line aggregation
@@ -2041,6 +2179,8 @@ export class DatabaseService implements IDatabaseService {
           lineNumber: wo.line,
           totalCases: 0,
           totalBags: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
           totalTimeHours: 0,
@@ -2051,6 +2191,8 @@ export class DatabaseService implements IDatabaseService {
       const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
       lineBreakdown[wo.line].totalCases += wo.completedCases;
       lineBreakdown[wo.line].totalBags += wo.completedCases * bagsPerCase;
+      lineBreakdown[wo.line].directLaborCost += directLaborCost;
+      lineBreakdown[wo.line].supportLaborCost += supportLaborCost;
       lineBreakdown[wo.line].totalLaborCost += laborCost;
       lineBreakdown[wo.line].totalTimeHours += timeHours;
     });
@@ -2084,7 +2226,9 @@ export class DatabaseService implements IDatabaseService {
 
     // Overall totals
     const totalCases = workOrders.reduce((sum, wo) => sum + wo.completedCases, 0);
-    const totalLaborCost = Object.values(productBreakdown).reduce((sum, p) => sum + p.totalLaborCost, 0);
+    const totalDirectLaborCost = Object.values(productBreakdown).reduce((sum, p) => sum + p.directLaborCost, 0);
+    const totalSupportLaborCost = Object.values(productBreakdown).reduce((sum, p) => sum + p.supportLaborCost, 0);
+    const totalLaborCost = totalDirectLaborCost + totalSupportLaborCost;
     const avgCostPerCase = totalCases > 0 ? totalLaborCost / totalCases : 0;
 
     // Best/worst performers by cost efficiency
@@ -2095,9 +2239,13 @@ export class DatabaseService implements IDatabaseService {
       dateRange: { start: startDate || today, end: endDate || today },
       totals: {
         totalCases,
+        directLaborCost: Math.round(totalDirectLaborCost * 100) / 100,
+        supportLaborCost: Math.round(totalSupportLaborCost * 100) / 100,
         totalLaborCost: Math.round(totalLaborCost * 100) / 100,
         avgCostPerCase: Math.round(avgCostPerCase * 100) / 100,
         totalOrders: workOrders.length,
+        activeLineCount,
+        supportHeadcount: SHARED_SUPPORT_HEADCOUNT,
       },
       byProduct: products,
       byBagSize: bagSizes,
@@ -2127,8 +2275,6 @@ export class DatabaseService implements IDatabaseService {
     try {
       console.log('🔧 createWorkOrder called with:', JSON.stringify(workOrder, null, 2));
       const now = getLocalISOString();
-      const id = workOrder.id || Date.now().toString();
-      console.log('  Generated ID:', id);
       
       const stmt = this.db.prepare(`
         INSERT INTO work_orders (
@@ -2139,41 +2285,56 @@ export class DatabaseService implements IDatabaseService {
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
-      console.log('  Executing INSERT...');
-      stmt.run(
-        id,
-        workOrder.line,
-        workOrder.slot,
-        workOrder.date,
-        workOrder.product || null,
-        workOrder.bagSize || null,
-        workOrder.plannedRunRate || null,
-        workOrder.customer || null,
-        workOrder.lead || null,
-        workOrder.countryOfOrigin || null,
-        workOrder.numPallets || null,
-        workOrder.labor || null,
-        workOrder.priority || null,
-        workOrder.lot1 || null,
-        workOrder.lot2 || null,
-        workOrder.lot3 || null,
-        workOrder.lot4 || null,
-        workOrder.notes || null,
-        workOrder.status || 'Scheduled',
-        workOrder.targetCases || null,
-        workOrder.completedCases || 0,
-        workOrder.startTimestamp || null,
-        workOrder.elapsedMs || 0,
-        workOrder.isPaused ? 1 : 0,
-        null, // elapsedDisplay
-        now,
-        now
-      );
+      const maxAttempts = 3;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const id = attempt === 0 && workOrder.id ? String(workOrder.id) : this.generateWorkOrderId();
+        try {
+          console.log('  Attempting INSERT with ID:', id);
+          stmt.run(
+            id,
+            workOrder.line,
+            workOrder.slot,
+            workOrder.date,
+            workOrder.product || null,
+            workOrder.bagSize || null,
+            workOrder.plannedRunRate || null,
+            workOrder.customer || null,
+            workOrder.lead || null,
+            workOrder.countryOfOrigin || null,
+            workOrder.numPallets || null,
+            workOrder.labor || null,
+            workOrder.priority || null,
+            workOrder.lot1 || null,
+            workOrder.lot2 || null,
+            workOrder.lot3 || null,
+            workOrder.lot4 || null,
+            workOrder.notes || null,
+            workOrder.status || 'Scheduled',
+            workOrder.targetCases || null,
+            workOrder.completedCases || 0,
+            workOrder.startTimestamp || null,
+            workOrder.elapsedMs || 0,
+            workOrder.isPaused ? 1 : 0,
+            null,
+            now,
+            now
+          );
 
-      console.log('  INSERT successful, fetching result...');
-      const result = this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id);
-      console.log('  ✓ Work order created:', result);
-      return result;
+          const result = this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id);
+          console.log('  ✓ Work order created:', result);
+          return result;
+        } catch (insertError: any) {
+          const isDuplicate = typeof insertError?.message === 'string'
+            && insertError.message.includes('UNIQUE constraint failed: work_orders.id');
+          if (isDuplicate && attempt < maxAttempts - 1) {
+            console.warn('  Duplicate work order ID detected, retrying with a new ID...');
+            continue;
+          }
+          throw insertError;
+        }
+      }
+
+      throw new Error('Failed to create work order after multiple ID generation attempts');
     } catch (error) {
       console.error('❌ Error in createWorkOrder:', error);
       throw error;

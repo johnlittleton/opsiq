@@ -223,6 +223,13 @@ export interface OperatorPerformance {
   avgPalletsPerLoad: number;
 }
 
+export interface LineLeadPerformance {
+  leadName: string;
+  totalCases: number;
+  totalBags: number;
+  completedWorkOrders: number;
+}
+
 export interface ExecutiveMetrics {
   // Time period summary
   totalTrucksLoaded: number;
@@ -237,6 +244,7 @@ export interface ExecutiveMetrics {
   
   // Top performers
   topOperators: OperatorPerformance[];
+  topLineLeads: LineLeadPerformance[];
   
   // Additional insights
   totalDockTimeHours: number;
