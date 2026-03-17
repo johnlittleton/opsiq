@@ -1726,12 +1726,11 @@ export class DatabaseService implements IDatabaseService {
 
     console.log('📊 getExecutiveMetrics query:', { start, end });
 
-    // Get completed checkins for the period
+    // Get completed checkins for the period (all closed records, regardless of totalMinutes)
     const completedCheckins = this.db.prepare(`
       SELECT * FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND closedAt >= ? AND closedAt <= ?
-        AND totalMinutes IS NOT NULL
     `).all(start, end) as any[];
     
     console.log('📊 Found completed checkins:', completedCheckins.length);
@@ -1745,24 +1744,26 @@ export class DatabaseService implements IDatabaseService {
     const totalPalletsLoaded = outbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
     const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
-    const avgLoadTime = outbound.length > 0
-      ? outbound.reduce((sum, c) => sum + c.totalMinutes, 0) / outbound.length
+    // Avg load/offload time only from records that have totalMinutes recorded
+    const outboundTimed = outbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
+    const inboundTimed = inbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
+    const avgLoadTime = outboundTimed.length > 0
+      ? outboundTimed.reduce((sum, c) => sum + c.totalMinutes, 0) / outboundTimed.length
       : 0;
 
-    const avgOffloadTime = inbound.length > 0
-      ? inbound.reduce((sum, c) => sum + c.totalMinutes, 0) / inbound.length
+    const avgOffloadTime = inboundTimed.length > 0
+      ? inboundTimed.reduce((sum, c) => sum + c.totalMinutes, 0) / inboundTimed.length
       : 0;
 
     const avgPallets = completedCheckins.length > 0
       ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
       : 0;
 
-    // Top operators - ALL TIME (not filtered by date range)
+    // Top operators - ALL TIME (not filtered by date range), all closed records counted
     const allCompletedCheckins = this.db.prepare(`
       SELECT forkliftDriver, actualPallets, pallets, totalMinutes
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
-        AND totalMinutes IS NOT NULL
         AND forkliftDriver IS NOT NULL
     `).all() as any[];
     
@@ -1778,6 +1779,9 @@ export class DatabaseService implements IDatabaseService {
       
       // Combine LINWOOD variants
       if (n === 'LENNY' || n === 'LINDWOOD' || n === 'LYNWOOD') return 'LINWOOD';
+
+      // Combine CESAR variants
+      if (n === 'CEASAR' || n === 'CAESAR') return 'CESAR';
       
       // Whitelist of approved drivers (case-normalized)
       const approved = ['LINWOOD', 'JAN CARLOS', 'SANCHEZ', 'DRE', 'KYLE', 'BRIAN', 'CESAR', 'MIKE', 'CARLOS', 'ERIC', 'NOE'];
@@ -1786,18 +1790,22 @@ export class DatabaseService implements IDatabaseService {
       return null; // Filter out non-approved drivers
     };
     
-    const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
+    // Track timedLoads separately so avgTimeMinutes only averages records that have time data
+    const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number; timedLoads: number }> = {};
     
     allCompletedCheckins.forEach(c => {
       const normalizedName = normalizeDriverName(c.forkliftDriver);
       if (!normalizedName) return; // Skip non-approved drivers
       
       if (!operatorStats[normalizedName]) {
-        operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0 };
+        operatorStats[normalizedName] = { loads: 0, pallets: 0, totalMinutes: 0, timedLoads: 0 };
       }
       operatorStats[normalizedName].loads++;
       operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      operatorStats[normalizedName].totalMinutes += c.totalMinutes;
+      if (c.totalMinutes != null && c.totalMinutes > 0) {
+        operatorStats[normalizedName].totalMinutes += c.totalMinutes;
+        operatorStats[normalizedName].timedLoads++;
+      }
     });
 
     console.log('📊 Raw operator stats:', operatorStats);
@@ -1807,7 +1815,7 @@ export class DatabaseService implements IDatabaseService {
         operatorName: name,
         totalLoads: stats.loads,
         totalPallets: stats.pallets,
-        avgTimeMinutes: Math.round(stats.totalMinutes / stats.loads),
+        avgTimeMinutes: stats.timedLoads > 0 ? Math.round(stats.totalMinutes / stats.timedLoads) : 0,
         avgPalletsPerLoad: Math.round((stats.pallets / stats.loads) * 10) / 10,
       }))
       .sort((a, b) => b.totalLoads - a.totalLoads)
