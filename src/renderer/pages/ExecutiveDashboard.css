@@ -229,9 +229,16 @@
   margin-bottom: 12px;
 }
 
+.performance-cards-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+
 /* Wide card for Top Operator */
 .top-operator-card {
-  grid-column: span 4;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -241,7 +248,6 @@
 }
 
 .top-line-leads-card {
-  grid-column: span 4;
   min-width: 0;
 }
 
@@ -261,12 +267,12 @@
 
 .top-operator-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(5, auto);
   grid-auto-flow: column;
   gap: 3px;
-  max-height: 180px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .top-line-leads-list {
@@ -303,9 +309,9 @@
   font-weight: 600;
   color: var(--text);
   flex: 1;
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 9px;
   min-width: 0;
 }
@@ -657,8 +663,8 @@
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
 
-  .top-operator-card {
-    grid-column: span 2;
+  .performance-cards-row {
+    grid-template-columns: minmax(0, 1.5fr) minmax(240px, 0.95fr);
   }
 }
 
@@ -676,8 +682,8 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .top-operator-card {
-    grid-column: 1 / -1;
+  .performance-cards-row {
+    grid-template-columns: 1fr;
   }
 }
 
