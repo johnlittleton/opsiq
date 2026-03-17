@@ -43,7 +43,7 @@ workflows:
         script: |
           set -euo pipefail
           mkdir -p build/ios/archive build/ios/ipa
-          APP_VERSION="$(node -p \"require('./package.json').version\")"
+          APP_VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
           RAW_BUILD_ID="${CM_BUILD_ID:-}"
           BUILD_NUMBER="${RAW_BUILD_ID//[^0-9]/}"
           if [[ -z "$BUILD_NUMBER" ]]; then
