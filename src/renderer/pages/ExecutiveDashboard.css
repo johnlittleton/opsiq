@@ -221,14 +221,26 @@
   margin-bottom: 12px;
 }
 
+.performance-cards-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+
 /* Wide card for Top Operator */
 .top-operator-card {
-  grid-column: span 4;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px;
   backdrop-filter: blur(10px);
+  min-width: 0;
+}
+
+.top-line-leads-card {
+  min-width: 0;
 }
 
 .top-operator-header {
@@ -247,23 +259,30 @@
 
 .top-operator-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   grid-template-rows: repeat(5, auto);
   grid-auto-flow: column;
   gap: 3px;
-  max-height: 180px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.top-line-leads-list {
+  grid-template-columns: 1fr;
+  grid-template-rows: repeat(15, auto);
+  grid-auto-flow: row;
 }
 
 .operator-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   padding: 3px 6px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 4px;
   font-size: 9px;
-  width: fit-content;
+  min-width: 0;
+  width: 100%;
 }
 
 .operator-rank {
@@ -634,6 +653,10 @@
   .kpi-grid {
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   }
+
+  .performance-cards-row {
+    grid-template-columns: minmax(0, 1.5fr) minmax(240px, 0.95fr);
+  }
 }
 
 @media (max-width: 1200px) {
@@ -648,6 +671,10 @@
   
   .labor-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .performance-cards-row {
+    grid-template-columns: 1fr;
   }
 }
 

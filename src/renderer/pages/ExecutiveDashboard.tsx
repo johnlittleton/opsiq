@@ -346,33 +346,63 @@ const ExecutiveDashboard: React.FC = () => {
             icon="📥"
             compact
           />
-          {/* Top Operators Card - Wide */}
-          <div className="top-operator-card">
-            <div className="top-operator-header">
-              <div className="top-operator-title">🏆 Top Operators</div>
+          <div className="performance-cards-row">
+            {/* Top Operators Card - Wide */}
+            <div className="top-operator-card">
+              <div className="top-operator-header">
+                <div className="top-operator-title">🏆 Top Operators</div>
+              </div>
+              <div className="top-operator-list">
+                {metrics.topOperators && metrics.topOperators.length > 0 ? (
+                  metrics.topOperators.map((operator, index) => {
+                    let medal = '';
+                    if (index === 0) medal = '🥇';
+                    else if (index === 1) medal = '🥈';
+                    else if (index === 2) medal = '🥉';
+                    else if (index === 3 || index === 4) medal = '👍';
+                    
+                    return (
+                      <div key={operator.operatorName} className="operator-row">
+                        <span className="operator-rank">#{index + 1}</span>
+                        {medal && <span className="operator-medal">{medal}</span>}
+                        <span className="operator-name-stats">
+                          {operator.operatorName} - {operator.totalLoads} Load{operator.totalLoads !== 1 ? 's' : ''} • {operator.totalPallets} Pallet{operator.totalPallets !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="no-data-small">No data</div>
+                )}
+              </div>
             </div>
-            <div className="top-operator-list">
-              {metrics.topOperators && metrics.topOperators.length > 0 ? (
-                metrics.topOperators.map((operator, index) => {
-                  let medal = '';
-                  if (index === 0) medal = '🥇';
-                  else if (index === 1) medal = '🥈';
-                  else if (index === 2) medal = '🥉';
-                  else if (index === 3 || index === 4) medal = '👍';
-                  
-                  return (
-                    <div key={operator.operatorName} className="operator-row">
-                      <span className="operator-rank">#{index + 1}</span>
-                      {medal && <span className="operator-medal">{medal}</span>}
-                      <span className="operator-name-stats">
-                        {operator.operatorName} - {operator.totalLoads} Load{operator.totalLoads !== 1 ? 's' : ''} • {operator.totalPallets} Pallet{operator.totalPallets !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="no-data-small">No data</div>
-              )}
+            <div className="top-operator-card top-line-leads-card">
+              <div className="top-operator-header">
+                <div className="top-operator-title">🏭 Line Lead Performance</div>
+              </div>
+              <div className="top-operator-list top-line-leads-list">
+                {metrics.topLineLeads && metrics.topLineLeads.length > 0 ? (
+                  metrics.topLineLeads.map((lead, index) => {
+                    let medal = '';
+                    if (index === 0) medal = '🥇';
+                    else if (index === 1) medal = '🥈';
+                    else if (index === 2) medal = '🥉';
+                    else if (index === 3 || index === 4) medal = '👍';
+
+                    return (
+                      <div key={lead.leadName} className="operator-row">
+                        <span className="operator-rank">#{index + 1}</span>
+                        {medal && <span className="operator-medal">{medal}</span>}
+                        <span className="operator-name-stats">
+                          {lead.leadName} - {lead.totalCases.toLocaleString()} Cases • {lead.totalBags.toLocaleString()} Bags
+                        </span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="no-data-small">No data</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
