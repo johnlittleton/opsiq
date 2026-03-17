@@ -1795,23 +1795,25 @@ export class DatabaseService implements IDatabaseService {
     `, [now, now, checkinId]);
   }
 
-  async getExecutiveMetrics(startDate?: string, endDate?: string): Promise<any> {
+  async getExecutiveMetrics(startDate?: string, endDate?: string, allTime?: boolean): Promise<any> {
     const today = getLocalISOString().split('T')[0];
-    const start = startDate ? `${startDate}T00:00:00` : `${today}T00:00:00`;
-    // Always append time to end date to include full day
-    const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
+    // When allTime=true, use a very wide date window so all date-filtered queries return all data.
+    // activeNow query has no date filter and is always live regardless of mode.
+    const start = allTime ? '1970-01-01T00:00:00' : (startDate ? `${startDate}T00:00:00` : `${today}T00:00:00`);
+    const end = allTime ? '2099-12-31T23:59:59' : (endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`);
 
     console.log('📊 getExecutiveMetrics query:', { start, end });
 
-    // Get ALL completed checkins (all-time data for trucks and operators)
+    // Get completed checkins for the selected date range (or all-time when allTime=true)
     const completedResult = await this.pool.query(`
       SELECT * FROM dock_checkins
       WHERE closed_at IS NOT NULL
         AND total_minutes IS NOT NULL
-    `);
+        AND closed_at >= $1 AND closed_at <= $2
+    `, [start, end]);
     
     const completedCheckins = this.toCamelCase(completedResult.rows);
-    console.log('📊 Found ALL-TIME completed checkins:', completedCheckins.length);
+    console.log('📊 Found completed checkins:', completedCheckins.length);
     if (completedCheckins.length > 0) {
       console.log('📊 Sample checkin:', completedCheckins[0]);
       console.log('📊 First 3 forklift drivers:', completedCheckins.slice(0, 3).map((c: any) => c.forkliftDriver));
@@ -1836,8 +1838,8 @@ export class DatabaseService implements IDatabaseService {
       ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
       : 0;
 
-    // Top operators - using same all-time data as truck totals
-    console.log('📊 Calculating top operators from all-time checkins:', completedCheckins.length);
+    // Top operators - derived from the same date-range (or all-time) completedCheckins
+    console.log('📊 Calculating top operators from checkins:', completedCheckins.length);
     
     // Normalize driver names to combine variants
     const normalizeDriverName = (name: string): string | null => {
@@ -2006,6 +2008,41 @@ export class DatabaseService implements IDatabaseService {
       LIMIT 1
     `, [ytdStart, ytdEnd]);
 
+    // Line lead performance for the selected date range
+    const normalizeLeadName = (name: string): string | null => {
+      if (!name || typeof name !== 'string') return null;
+      const trimmed = name.trim();
+      if (!trimmed) return null;
+      const upper = trimmed.toUpperCase();
+      if (upper === 'TBD' || upper === 'UNKNOWN' || upper === 'N/A' || upper === 'NA') return null;
+      return trimmed.toLowerCase().split(/\s+/).map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    };
+
+    const leadWOResult = await this.pool.query(`
+      SELECT lead, bag_size, completed_cases
+      FROM work_orders
+      WHERE completed_cases > 0
+        AND status = 'Completed'
+        AND lead IS NOT NULL
+        AND updated_at >= $1 AND updated_at <= $2
+    `, [start, end]);
+
+    const lineLeadStats: Record<string, { totalCases: number; totalBags: number; completedWorkOrders: number }> = {};
+    leadWOResult.rows.forEach((row: any) => {
+      const leadName = normalizeLeadName(row.lead);
+      if (!leadName) return;
+      if (!lineLeadStats[leadName]) lineLeadStats[leadName] = { totalCases: 0, totalBags: 0, completedWorkOrders: 0 };
+      const cases = parseInt(row.completed_cases) || 0;
+      lineLeadStats[leadName].totalCases += cases;
+      lineLeadStats[leadName].totalBags += cases * this.parseBagsPerCase(row.bag_size);
+      lineLeadStats[leadName].completedWorkOrders += 1;
+    });
+
+    const topLineLeads = Object.entries(lineLeadStats)
+      .map(([leadName, stats]) => ({ leadName, ...stats }))
+      .sort((a, b) => b.totalCases !== a.totalCases ? b.totalCases - a.totalCases : b.completedWorkOrders - a.completedWorkOrders)
+      .slice(0, 15);
+
     return {
       totalTrucksLoaded: outbound.length,
       totalTrucksOffloaded: inbound.length,
@@ -2015,6 +2052,7 @@ export class DatabaseService implements IDatabaseService {
       avgOffloadTimeMinutes: Math.round(avgOffloadTime),
       avgPalletsPerTruck: Math.round(avgPallets * 10) / 10,
       topOperators,
+      topLineLeads,
       totalDockTimeHours: Math.round(totalDockHours * 10) / 10,
       dockUtilization: 0, // Calculate based on active doors
       completedToday: completedCheckins.length,
@@ -2043,6 +2081,7 @@ export class DatabaseService implements IDatabaseService {
   // Production Costing Analytics
   async getProductionCostingAnalytics(startDate?: string, endDate?: string): Promise<any> {
     const today = getLocalISOString().split('T')[0];
+    const SHARED_SUPPORT_HEADCOUNT = 6; // 2 taggers + 2 strappers + 1 floor lead + 1 lumper
     const start = startDate || today;
     const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
 
@@ -2074,10 +2113,22 @@ export class DatabaseService implements IDatabaseService {
     
     const workOrders = this.toCamelCase(result.rows);
 
+    const activeLines = new Set<number>();
+    workOrders.forEach((wo: any) => {
+      const lineNumber = Number(wo.line);
+      if (Number.isFinite(lineNumber) && lineNumber > 0) {
+        activeLines.add(lineNumber);
+      }
+    });
+    const activeLineCount = activeLines.size > 0 ? activeLines.size : 1;
+    const supportWorkersPerLine = SHARED_SUPPORT_HEADCOUNT / activeLineCount;
+
     // Aggregate by commodity/product
     const productBreakdown: Record<string, {
       product: string;
       totalCases: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
       totalOrders: number;
@@ -2091,6 +2142,8 @@ export class DatabaseService implements IDatabaseService {
     const bagSizeBreakdown: Record<string, {
       bagSize: string;
       totalCases: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
     }> = {};
@@ -2099,6 +2152,8 @@ export class DatabaseService implements IDatabaseService {
     const customerBreakdown: Record<string, {
       customer: string;
       totalCases: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
     }> = {};
@@ -2108,6 +2163,8 @@ export class DatabaseService implements IDatabaseService {
       lineNumber: number;
       totalCases: number;
       totalBags: number;
+      directLaborCost: number;
+      supportLaborCost: number;
       totalLaborCost: number;
       costPerCase: number;
       totalTimeHours: number;
@@ -2119,7 +2176,9 @@ export class DatabaseService implements IDatabaseService {
       // Calculate labor cost for this work order
       // labor = number of workers, elapsedMs = time spent
       const timeHours = (wo.elapsedMs || 0) / (1000 * 60 * 60);
-      const laborCost = (wo.labor || 0) * timeHours * productionHourlyWage;
+      const directLaborCost = (wo.labor || 0) * timeHours * productionHourlyWage;
+      const supportLaborCost = supportWorkersPerLine * timeHours * productionHourlyWage;
+      const laborCost = directLaborCost + supportLaborCost;
 
       // Product aggregation
       const productKey = wo.product || 'Unknown Product';
@@ -2127,6 +2186,8 @@ export class DatabaseService implements IDatabaseService {
         productBreakdown[productKey] = {
           product: productKey,
           totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
           totalOrders: 0,
@@ -2137,6 +2198,8 @@ export class DatabaseService implements IDatabaseService {
         };
       }
       productBreakdown[productKey].totalCases += wo.completedCases;
+      productBreakdown[productKey].directLaborCost += directLaborCost;
+      productBreakdown[productKey].supportLaborCost += supportLaborCost;
       productBreakdown[productKey].totalLaborCost += laborCost;
       productBreakdown[productKey].totalOrders++;
       productBreakdown[productKey].totalWorkers += (wo.labor || 0);
@@ -2148,11 +2211,15 @@ export class DatabaseService implements IDatabaseService {
         bagSizeBreakdown[bagKey] = {
           bagSize: bagKey,
           totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
         };
       }
       bagSizeBreakdown[bagKey].totalCases += wo.completedCases;
+      bagSizeBreakdown[bagKey].directLaborCost += directLaborCost;
+      bagSizeBreakdown[bagKey].supportLaborCost += supportLaborCost;
       bagSizeBreakdown[bagKey].totalLaborCost += laborCost;
 
       // Customer aggregation
@@ -2161,11 +2228,15 @@ export class DatabaseService implements IDatabaseService {
         customerBreakdown[customerKey] = {
           customer: customerKey,
           totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
         };
       }
       customerBreakdown[customerKey].totalCases += wo.completedCases;
+      customerBreakdown[customerKey].directLaborCost += directLaborCost;
+      customerBreakdown[customerKey].supportLaborCost += supportLaborCost;
       customerBreakdown[customerKey].totalLaborCost += laborCost;
 
       // Line aggregation
@@ -2174,6 +2245,8 @@ export class DatabaseService implements IDatabaseService {
           lineNumber: wo.line,
           totalCases: 0,
           totalBags: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
           totalLaborCost: 0,
           costPerCase: 0,
           totalTimeHours: 0,
@@ -2184,6 +2257,8 @@ export class DatabaseService implements IDatabaseService {
       const bagsPerCase = this.parseBagsPerCase(wo.bagSize);
       lineBreakdown[wo.line].totalCases += wo.completedCases;
       lineBreakdown[wo.line].totalBags += wo.completedCases * bagsPerCase;
+      lineBreakdown[wo.line].directLaborCost += directLaborCost;
+      lineBreakdown[wo.line].supportLaborCost += supportLaborCost;
       lineBreakdown[wo.line].totalLaborCost += laborCost;
       lineBreakdown[wo.line].totalTimeHours += timeHours;
     });
@@ -2217,7 +2292,9 @@ export class DatabaseService implements IDatabaseService {
 
     // Overall totals
     const totalCases = workOrders.reduce((sum: number, wo: any) => sum + wo.completedCases, 0);
-    const totalLaborCost = Object.values(productBreakdown).reduce((sum, p) => sum + p.totalLaborCost, 0);
+    const totalDirectLaborCost = Object.values(productBreakdown).reduce((sum, p) => sum + p.directLaborCost, 0);
+    const totalSupportLaborCost = Object.values(productBreakdown).reduce((sum, p) => sum + p.supportLaborCost, 0);
+    const totalLaborCost = totalDirectLaborCost + totalSupportLaborCost;
     const avgCostPerCase = totalCases > 0 ? totalLaborCost / totalCases : 0;
 
     // Best/worst performers by cost efficiency
@@ -2228,9 +2305,13 @@ export class DatabaseService implements IDatabaseService {
       dateRange: { start: startDate || today, end: endDate || today },
       totals: {
         totalCases,
+        directLaborCost: Math.round(totalDirectLaborCost * 100) / 100,
+        supportLaborCost: Math.round(totalSupportLaborCost * 100) / 100,
         totalLaborCost: Math.round(totalLaborCost * 100) / 100,
         avgCostPerCase: Math.round(avgCostPerCase * 100) / 100,
         totalOrders: workOrders.length,
+        activeLineCount,
+        supportHeadcount: SHARED_SUPPORT_HEADCOUNT,
       },
       byProduct: products,
       byBagSize: bagSizes,

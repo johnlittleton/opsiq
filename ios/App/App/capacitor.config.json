@@ -1,0 +1,5 @@
+{
+	"appId": "com.slingshot.opsiq.mobile",
+	"appName": "OpsIQ Mobile",
+	"webDir": "dist/renderer"
+}

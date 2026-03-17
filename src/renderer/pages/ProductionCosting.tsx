@@ -10,13 +10,19 @@ interface CostingData {
   dateRange: { start: string; end: string };
   totals: {
     totalCases: number;
+    directLaborCost: number;
+    supportLaborCost: number;
     totalLaborCost: number;
     avgCostPerCase: number;
     totalOrders: number;
+    activeLineCount: number;
+    supportHeadcount: number;
   };
   byProduct: Array<{
     product: string;
     totalCases: number;
+    directLaborCost: number;
+    supportLaborCost: number;
     totalLaborCost: number;
     costPerCase: number;
     totalOrders: number;
@@ -28,12 +34,16 @@ interface CostingData {
   byBagSize: Array<{
     bagSize: string;
     totalCases: number;
+    directLaborCost: number;
+    supportLaborCost: number;
     totalLaborCost: number;
     costPerCase: number;
   }>;
   byCustomer: Array<{
     customer: string;
     totalCases: number;
+    directLaborCost: number;
+    supportLaborCost: number;
     totalLaborCost: number;
     costPerCase: number;
   }>;
@@ -41,6 +51,8 @@ interface CostingData {
     lineNumber: number;
     totalCases: number;
     totalBags: number;
+    directLaborCost: number;
+    supportLaborCost: number;
     totalLaborCost: number;
     costPerCase: number;
     totalTimeHours: number;
@@ -94,7 +106,16 @@ const ProductionCosting: React.FC = () => {
       console.error('Failed to load production costing data:', error);
       setCostingData({
         dateRange: { start: dateRange.startDate, end: dateRange.endDate },
-        totals: { totalCases: 0, totalLaborCost: 0, avgCostPerCase: 0, totalOrders: 0 },
+        totals: {
+          totalCases: 0,
+          directLaborCost: 0,
+          supportLaborCost: 0,
+          totalLaborCost: 0,
+          avgCostPerCase: 0,
+          totalOrders: 0,
+          activeLineCount: 0,
+          supportHeadcount: 6,
+        },
         byProduct: [],
         byBagSize: [],
         byCustomer: [],
@@ -220,19 +241,26 @@ const ProductionCosting: React.FC = () => {
                 variant="green"
               />
               <StatPanel
+                title="Direct Labor Cost"
+                value={`$${(costingData.totals.directLaborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                variant="blue"
+              />
+              <StatPanel
+                title="Support Labor Cost"
+                value={`$${(costingData.totals.supportLaborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                subtitle={`${costingData.totals.supportHeadcount || 6} shared support staff across ${costingData.totals.activeLineCount || 0} line(s)`}
+                variant="yellow"
+              />
+              <StatPanel
                 title="Total Labor Cost"
                 value={`$${(costingData.totals.totalLaborCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                variant="blue"
+                variant="purple"
               />
               <StatPanel
                 title="Avg Cost Per Case"
                 value={`$${(costingData.totals.avgCostPerCase || 0).toFixed(3)}`}
-                variant="purple"
-              />
-              <StatPanel
-                title="Work Orders"
-                value={(costingData.totals.totalOrders || 0).toLocaleString()}
-                variant="yellow"
+                subtitle={`${(costingData.totals.totalOrders || 0).toLocaleString()} work orders`}
+                variant="green"
               />
             </div>
 
@@ -269,7 +297,9 @@ const ProductionCosting: React.FC = () => {
                       <th className="align-right">Total Cases</th>
                       <th className="align-right">Avg Workers/Order</th>
                       <th className="align-right">Total Labor Hours</th>
-                      <th className="align-right">Total Labor Cost</th>
+                      <th className="align-right">Direct Labor</th>
+                      <th className="align-right">Support Labor</th>
+                      <th className="align-right">Total Labor</th>
                       <th className="align-right">Cost Per Case</th>
                       <th className="align-right">Orders</th>
                     </tr>
@@ -281,6 +311,8 @@ const ProductionCosting: React.FC = () => {
                         <td className="number">{item.totalCases.toLocaleString()}</td>
                         <td className="number">{(item.avgWorkersPerOrder || 0).toFixed(1)} workers</td>
                         <td className="number">{(item.totalLaborHours || 0).toFixed(1)} hrs</td>
+                        <td className="currency">${(item.directLaborCost || 0).toFixed(2)}</td>
+                        <td className="currency">${(item.supportLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.totalLaborCost || 0).toFixed(2)}</td>
                         <td className="currency highlight">${(item.costPerCase || 0).toFixed(3)}</td>
                         <td className="number">{item.totalOrders}</td>
@@ -300,7 +332,9 @@ const ProductionCosting: React.FC = () => {
                     <tr>
                       <th>Bag Size</th>
                       <th className="align-right">Total Cases</th>
-                      <th className="align-right">Total Labor Cost</th>
+                      <th className="align-right">Direct Labor</th>
+                      <th className="align-right">Support Labor</th>
+                      <th className="align-right">Total Labor</th>
                       <th className="align-right">Cost Per Case</th>
                     </tr>
                   </thead>
@@ -309,6 +343,8 @@ const ProductionCosting: React.FC = () => {
                       <tr key={idx}>
                         <td>{item.bagSize}</td>
                         <td className="number">{item.totalCases.toLocaleString()}</td>
+                        <td className="currency">${(item.directLaborCost || 0).toFixed(2)}</td>
+                        <td className="currency">${(item.supportLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.totalLaborCost || 0).toFixed(2)}</td>
                         <td className="currency highlight">${(item.costPerCase || 0).toFixed(3)}</td>
                       </tr>
@@ -327,7 +363,9 @@ const ProductionCosting: React.FC = () => {
                     <tr>
                       <th>Customer</th>
                       <th className="align-right">Total Cases</th>
-                      <th className="align-right">Total Labor Cost</th>
+                      <th className="align-right">Direct Labor</th>
+                      <th className="align-right">Support Labor</th>
+                      <th className="align-right">Total Labor</th>
                       <th className="align-right">Cost Per Case</th>
                     </tr>
                   </thead>
@@ -336,6 +374,8 @@ const ProductionCosting: React.FC = () => {
                       <tr key={idx}>
                         <td className="customer-name">{item.customer}</td>
                         <td className="number">{item.totalCases.toLocaleString()}</td>
+                        <td className="currency">${(item.directLaborCost || 0).toFixed(2)}</td>
+                        <td className="currency">${(item.supportLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.totalLaborCost || 0).toFixed(2)}</td>
                         <td className="currency highlight">${(item.costPerCase || 0).toFixed(3)}</td>
                       </tr>
@@ -358,7 +398,9 @@ const ProductionCosting: React.FC = () => {
                       <th className="align-right">Labor Hours</th>
                       <th className="align-right">Cases/Hour</th>
                       <th className="align-right">Bags/Hour</th>
-                      <th className="align-right">Total Labor Cost</th>
+                      <th className="align-right">Direct Labor</th>
+                      <th className="align-right">Support Labor</th>
+                      <th className="align-right">Total Labor</th>
                       <th className="align-right">Cost Per Case</th>
                     </tr>
                   </thead>
@@ -371,6 +413,8 @@ const ProductionCosting: React.FC = () => {
                         <td className="number">{(item.totalTimeHours || 0).toFixed(1)}</td>
                         <td className="number highlight">{(item.casesPerHour || 0).toFixed(0)}</td>
                         <td className="number highlight">{(item.bagsPerHour || 0).toFixed(0)}</td>
+                        <td className="currency">${(item.directLaborCost || 0).toFixed(2)}</td>
+                        <td className="currency">${(item.supportLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.totalLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.costPerCase || 0).toFixed(3)}</td>
                       </tr>
@@ -384,8 +428,9 @@ const ProductionCosting: React.FC = () => {
             <GlassPanel className="usage-notes">
               <h3>📋 Pricing Guidance</h3>
               <ul>
-                <li><strong>Labor Cost Calculation:</strong> Workers per line × Hours worked × $24.50/hr. Example: Line 1 with 9 workers running Lemons 10x3 for 2 hours = 9 × 2 × $24.50 = $441.</li>
-                <li><strong>Cost Per Case:</strong> Total labor cost ÷ Total cases produced. This is LABOR ONLY - add materials, overhead, and profit margin for customer pricing.</li>
+                <li><strong>Direct Labor:</strong> Assigned workers per work order × elapsed hours × hourly wage.</li>
+                <li><strong>Support Labor:</strong> Fixed shared crew of 6 people (2 taggers, 2 strappers, 1 floor lead, 1 lumper) allocated across active lines for the selected period.</li>
+                <li><strong>Cost Per Case:</strong> (Direct + Support labor) ÷ total cases produced. This is labor-only costing.</li>
                 <li><strong>Historical Averages:</strong> Use these metrics as baseline for quoting new customers with similar products.</li>
                 <li><strong>Efficiency Analysis:</strong> Lower cost per case = more efficient production. Consider when negotiating pricing.</li>
                 <li><strong>Line Performance:</strong> Cases/hour shows throughput. Higher is better for capacity planning.</li>

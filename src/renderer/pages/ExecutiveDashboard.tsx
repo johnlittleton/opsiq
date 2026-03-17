@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
@@ -45,20 +45,29 @@ const ExecutiveDashboard: React.FC = () => {
     endDate: getLocalDateString(new Date()),
   });
 
+  const [viewMode, setViewMode] = useState<'selected' | 'alltime'>('selected');
+
+  // Refs so the 60s interval always reads the latest state without stale closures
+  const viewModeRef = useRef<'selected' | 'alltime'>('selected');
+  const dateRangeRef = useRef(dateRange);
+  viewModeRef.current = viewMode;
+  dateRangeRef.current = dateRange;
+
   // Load metrics
   useEffect(() => {
     console.log('ExecutiveDashboard useEffect triggered, loading metrics...');
     loadMetrics();
-  }, [dateRange]);
+  }, [dateRange, viewMode]);
 
   const loadMetrics = async () => {
     try {
       setLoading(true);
       console.log('📅 Date Range Query:', { startDate: dateRange.startDate, endDate: dateRange.endDate });
       console.log('Fetching executive metrics from:', `${API_BASE}/api/executive/metrics`);
-      const response = await fetch(
-        `${API_BASE}/api/executive/metrics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-      );
+      const url = viewMode === 'alltime'
+        ? `${API_BASE}/api/executive/metrics?allTime=true`
+        : `${API_BASE}/api/executive/metrics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
+      const response = await fetch(url);
       console.log('Response status:', response.status);
       if (!response.ok) throw new Error('Failed to load metrics');
       const data = await response.json();
@@ -82,6 +91,7 @@ const ExecutiveDashboard: React.FC = () => {
         avgOffloadTimeMinutes: 0,
         avgPalletsPerTruck: 0,
         topOperators: [],
+        topLineLeads: [],
         totalDockTimeHours: 0,
         dockUtilization: 0,
         completedToday: 0,
@@ -95,7 +105,9 @@ const ExecutiveDashboard: React.FC = () => {
         warehouseHeadcount: 0,
         productionHeadcount: 0,
         totalCasesCompleted: 0,
+        totalBagsCompleted: 0,
         casesCompletedYTD: 0,
+        bagsCompletedYTD: 0,
         bestPerformingLine: null,
       });
     } finally {
@@ -105,7 +117,12 @@ const ExecutiveDashboard: React.FC = () => {
 
   const setToday = () => {
     const today = getLocalDateString(new Date());
+    setViewMode('selected');
     setDateRange({ startDate: today, endDate: today });
+  };
+
+  const setAllTime = () => {
+    setViewMode('alltime');
   };
 
   // Load current active shift
@@ -138,17 +155,29 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
-  // Auto-update shift every minute (without reloading all metrics)
+  // Auto-update shift and silently refresh activeNow every minute
   useEffect(() => {
-    // Initial fetch for shift only (metrics already loaded by dateRange useEffect)
     fetchCurrentShift();
-    
-    // Set up interval to update shift only every 60 seconds
+
     const interval = setInterval(() => {
-      fetchCurrentShift(); // Only update shift, not metrics
+      fetchCurrentShift();
+      // Silently refresh activeNow — always live regardless of mode
+      // Uses refs to read current viewMode/dateRange without stale closures
+      (async () => {
+        try {
+          const vMode = viewModeRef.current;
+          const dRange = dateRangeRef.current;
+          const url = vMode === 'alltime'
+            ? `${API_BASE}/api/executive/metrics?allTime=true`
+            : `${API_BASE}/api/executive/metrics?startDate=${dRange.startDate}&endDate=${dRange.endDate}`;
+          const resp = await fetch(url);
+          if (!resp.ok) return;
+          const data = await resp.json();
+          setMetrics(prev => prev ? { ...prev, activeNow: data.activeNow } : prev);
+        } catch {}
+      })();
     }, 60000);
-    
-    // Cleanup
+
     return () => clearInterval(interval);
   }, []);
 
@@ -205,13 +234,13 @@ const ExecutiveDashboard: React.FC = () => {
           </div>
           
           <div className="header-actions">
-            <div className="date-selector">
+              <div className="date-selector">
               <div className="date-field">
                 <label>Start Date</label>
                 <input
                   type="date"
                   value={dateRange.startDate}
-                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                  onChange={(e) => { setViewMode('selected'); setDateRange({ ...dateRange, startDate: e.target.value }); }}
                 />
               </div>
               <div className="date-field">
@@ -219,7 +248,7 @@ const ExecutiveDashboard: React.FC = () => {
                 <input
                   type="date"
                   value={dateRange.endDate}
-                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                  onChange={(e) => { setViewMode('selected'); setDateRange({ ...dateRange, endDate: e.target.value }); }}
                 />
               </div>
             </div>
@@ -231,6 +260,10 @@ const ExecutiveDashboard: React.FC = () => {
               }
             }}>🖨️ Print</button>
             <button className="today-btn" onClick={setToday}>📅 Today</button>
+            <button
+              className={`alltime-btn${viewMode === 'alltime' ? ' alltime-btn--active' : ''}`}
+              onClick={setAllTime}
+            >🌐 All Time</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
@@ -325,6 +358,34 @@ const ExecutiveDashboard: React.FC = () => {
                       {medal && <span className="operator-medal">{medal}</span>}
                       <span className="operator-name-stats">
                         {operator.operatorName} - {operator.totalLoads} Load{operator.totalLoads !== 1 ? 's' : ''} • {operator.totalPallets} Pallet{operator.totalPallets !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="no-data-small">No data</div>
+              )}
+            </div>
+          </div>
+          <div className="top-operator-card top-line-leads-card">
+            <div className="top-operator-header">
+              <div className="top-operator-title">🏭 Line Lead Performance</div>
+            </div>
+            <div className="top-operator-list top-line-leads-list">
+              {metrics.topLineLeads && metrics.topLineLeads.length > 0 ? (
+                metrics.topLineLeads.map((lead, index) => {
+                  let medal = '';
+                  if (index === 0) medal = '🥇';
+                  else if (index === 1) medal = '🥈';
+                  else if (index === 2) medal = '🥉';
+                  else if (index === 3 || index === 4) medal = '👍';
+
+                  return (
+                    <div key={lead.leadName} className="operator-row">
+                      <span className="operator-rank">#{index + 1}</span>
+                      {medal && <span className="operator-medal">{medal}</span>}
+                      <span className="operator-name-stats">
+                        {lead.leadName} - {lead.totalCases.toLocaleString()} Cases • {lead.totalBags.toLocaleString()} Bags
                       </span>
                     </div>
                   );

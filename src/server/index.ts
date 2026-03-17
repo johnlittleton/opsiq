@@ -597,8 +597,9 @@ app.get('/api/executive/metrics', async (req, res) => {
   try {
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
-    console.log('📊 GET /api/executive/metrics called with:', { startDate, endDate });
-    const metrics = await db.getExecutiveMetrics(startDate, endDate);
+    const allTime = req.query.allTime === 'true';
+    console.log('📊 GET /api/executive/metrics called with:', { startDate, endDate, allTime });
+    const metrics = await db.getExecutiveMetrics(startDate, endDate, allTime);
     console.log('📊 Returning metrics - topOperators:', metrics.topOperators?.length || 0);
     if (metrics.topOperators?.length > 0) {
       console.log('📊 Top operator:', metrics.topOperators[0]);
