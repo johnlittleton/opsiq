@@ -231,7 +231,7 @@
 
 /* Wide card for Top Operator */
 .top-operator-card {
-  grid-column: span 5;
+  grid-column: span 4;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -241,7 +241,7 @@
 }
 
 .top-line-leads-card {
-  grid-column: span 5;
+  grid-column: span 4;
   min-width: 0;
 }
 
@@ -261,7 +261,7 @@
 
 .top-operator-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(5, auto);
   grid-auto-flow: column;
   gap: 3px;
@@ -277,13 +277,14 @@
 
 .operator-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   padding: 3px 6px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 4px;
   font-size: 9px;
   min-width: 0;
+  width: 100%;
 }
 
 .operator-rank {
@@ -302,9 +303,9 @@
   font-weight: 600;
   color: var(--text);
   flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
   font-size: 9px;
   min-width: 0;
 }
