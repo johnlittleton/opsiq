@@ -2836,61 +2836,60 @@ export class DatabaseService implements IDatabaseService {
 
   async createWorkOrder(workOrder: any): Promise<any> {
     const now = getLocalISOString();
-    const maxAttempts = 3;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const id = attempt === 0 && workOrder.id ? String(workOrder.id) : this.generateWorkOrderId();
-      try {
-        const result = await this.pool.query(`
-          INSERT INTO work_orders (
-            id, line, slot, date, product, bag_size, planned_run_rate, customer, lead, country_of_origin, num_pallets, 
-            labor, priority, lot1, lot2, lot3, lot4, notes, status, 
-            target_cases, completed_cases, start_timestamp, elapsed_ms, 
-            is_paused, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-          RETURNING *
-        `, [
-          id,
-          workOrder.line,
-          workOrder.slot,
-          workOrder.date,
-          workOrder.product || null,
-          workOrder.bagSize || null,
-          workOrder.plannedRunRate || null,
-          workOrder.customer || null,
-          workOrder.lead || null,
-          workOrder.countryOfOrigin || null,
-          workOrder.numPallets || null,
-          workOrder.labor || null,
-          workOrder.priority || null,
-          workOrder.lot1 || null,
-          workOrder.lot2 || null,
-          workOrder.lot3 || null,
-          workOrder.lot4 || null,
-          workOrder.notes || null,
-          workOrder.status || 'Scheduled',
-          workOrder.targetCases || null,
-          workOrder.completedCases || 0,
-          workOrder.startTimestamp || null,
-          workOrder.elapsedMs || 0,
-          workOrder.isPaused || false,
-          now,
-          now
-        ]);
+    const id = String(workOrder.id || '').trim();
 
-        return this.toCamelCase(result.rows[0]);
-      } catch (insertError: any) {
-        const isDuplicate = insertError?.code === '23505'
-          && typeof insertError?.constraint === 'string'
-          && insertError.constraint.includes('work_orders_pkey');
-        if (isDuplicate && attempt < maxAttempts - 1) {
-          console.warn('Duplicate work order ID detected, retrying with a new ID...');
-          continue;
-        }
-        throw insertError;
-      }
+    if (!id) {
+      throw new Error('Sales Order Number is required');
     }
 
-    throw new Error('Failed to create work order after multiple ID generation attempts');
+    try {
+      const result = await this.pool.query(`
+        INSERT INTO work_orders (
+          id, line, slot, date, product, bag_size, planned_run_rate, customer, lead, country_of_origin, num_pallets, 
+          labor, priority, lot1, lot2, lot3, lot4, notes, status, 
+          target_cases, completed_cases, start_timestamp, elapsed_ms, 
+          is_paused, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        RETURNING *
+      `, [
+        id,
+        workOrder.line,
+        workOrder.slot,
+        workOrder.date,
+        workOrder.product || null,
+        workOrder.bagSize || null,
+        workOrder.plannedRunRate || null,
+        workOrder.customer || null,
+        workOrder.lead || null,
+        workOrder.countryOfOrigin || null,
+        workOrder.numPallets || null,
+        workOrder.labor || null,
+        workOrder.priority || null,
+        workOrder.lot1 || null,
+        workOrder.lot2 || null,
+        workOrder.lot3 || null,
+        workOrder.lot4 || null,
+        workOrder.notes || null,
+        workOrder.status || 'Scheduled',
+        workOrder.targetCases || null,
+        workOrder.completedCases || 0,
+        workOrder.startTimestamp || null,
+        workOrder.elapsedMs || 0,
+        workOrder.isPaused || false,
+        now,
+        now
+      ]);
+
+      return this.toCamelCase(result.rows[0]);
+    } catch (insertError: any) {
+      const isDuplicate = insertError?.code === '23505'
+        && typeof insertError?.constraint === 'string'
+        && insertError.constraint.includes('work_orders_pkey');
+      if (isDuplicate) {
+        throw new Error(`Work order ${id} already exists`);
+      }
+      throw insertError;
+    }
   }
 
   async updateWorkOrder(id: string, updates: any): Promise<any> {

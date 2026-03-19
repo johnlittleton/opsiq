@@ -691,7 +691,12 @@ app.post('/api/production/work-orders', async (req, res) => {
     res.json(workOrder);
   } catch (error: any) {
     console.error('❌ Error in POST /api/production/work-orders:', error);
-    res.status(400).json({ error: error.message });
+    const message = String(error?.message || 'Failed to create work order');
+    if (message.includes('already exists')) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    res.status(400).json({ error: message });
   }
 });
 

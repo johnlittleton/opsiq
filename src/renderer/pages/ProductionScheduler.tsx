@@ -304,8 +304,14 @@ export default function ProductionScheduler() {
   const saveWorkOrder = async () => {
     if (!editingWorkOrder) return;
 
+    const enteredId = (editingWorkOrder.id || '').toString().trim();
+    if (!enteredId) {
+      alert('Sales Order Number is required.');
+      return;
+    }
+
     // Check if this is an existing work order (has an id from the database)
-    const isExisting = editingWorkOrder.id && workOrders.some(wo => wo.id === editingWorkOrder.id);
+    const isExisting = workOrders.some(wo => wo.id === enteredId);
     const plannedRate = Number(editingWorkOrder.plannedRunRate);
 
     if (!Number.isFinite(plannedRate) || plannedRate <= 0) {
@@ -315,6 +321,7 @@ export default function ProductionScheduler() {
     
     const woData = {
       ...editingWorkOrder,
+      id: enteredId,
       line: editingWorkOrder.line,
       slot: editingWorkOrder.slot,
       date: selectedDateStr,
@@ -322,10 +329,6 @@ export default function ProductionScheduler() {
       plannedRunRate: plannedRate,
       planned_run_rate: plannedRate
     };
-
-    if (!isExisting) {
-      delete woData.id;
-    }
 
     try {
       const url = isExisting 
