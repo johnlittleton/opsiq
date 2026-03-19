@@ -6,12 +6,21 @@
 // Hard-coded Railway URL for Electron builds
 const RAILWAY_URL = 'https://opsiq-production.up.railway.app';
 
+const isElectronRenderer = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const electronWindow = window as typeof window & { electron?: unknown };
+  return Boolean(electronWindow.electron) || navigator.userAgent.includes('Electron');
+};
+
 export const getApiBase = (): string => {
   if (typeof window !== 'undefined') {
     const { protocol, origin } = window.location;
 
     // Packaged desktop/mobile shells do not host the API locally.
-    if (protocol === 'file:' || protocol === 'capacitor:') {
+    if (protocol === 'file:' || protocol === 'capacitor:' || isElectronRenderer()) {
       return RAILWAY_URL;
     }
 

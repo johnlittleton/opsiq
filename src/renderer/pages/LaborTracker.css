@@ -128,6 +128,300 @@
   font-size: 14px;
 }
 
+.department-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.department-top-nav {
+  position: sticky;
+  top: 8px;
+  z-index: 12;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(8, 12, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+}
+
+.department-top-nav-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.department-top-nav .department-tab-bar {
+  margin-bottom: 0;
+}
+
+.department-tab-btn,
+.department-action-btn {
+  background: none !important;
+  border: 3px solid currentColor !important;
+  padding: 6px 12px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  font-weight: 700 !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s !important;
+}
+
+.department-tab-btn.active,
+.department-tab-btn:hover,
+.department-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px) !important;
+}
+
+.department-tab-btn:disabled,
+.department-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+.dept-production { color: #2ecc71 !important; }
+.dept-production.active, .dept-production:hover, .department-action-btn.dept-production:hover:not(:disabled) {
+  background: #2ecc71 !important;
+  color: #000 !important;
+}
+
+.dept-warehouse { color: #3498db !important; }
+.dept-warehouse.active, .dept-warehouse:hover, .department-action-btn.dept-warehouse:hover:not(:disabled) {
+  background: #3498db !important;
+  color: #000 !important;
+}
+
+.dept-qc { color: #f1c40f !important; }
+.dept-qc.active, .dept-qc:hover, .department-action-btn.dept-qc:hover:not(:disabled) {
+  background: #f1c40f !important;
+  color: #000 !important;
+}
+
+.dept-maintenance { color: #e67e22 !important; }
+.dept-maintenance.active, .dept-maintenance:hover, .department-action-btn.dept-maintenance:hover:not(:disabled) {
+  background: #e67e22 !important;
+  color: #000 !important;
+}
+
+.dept-food-safety { color: #16a085 !important; }
+.dept-food-safety.active, .dept-food-safety:hover, .department-action-btn.dept-food-safety:hover:not(:disabled) {
+  background: #16a085 !important;
+  color: #000 !important;
+}
+
+.dept-housekeeping { color: #9b59b6 !important; }
+.dept-housekeeping.active, .dept-housekeeping:hover, .department-action-btn.dept-housekeeping:hover:not(:disabled) {
+  background: #9b59b6 !important;
+  color: #000 !important;
+}
+
+.warehouse-shift-active-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(52, 152, 219, 0.15);
+  border: 1px solid rgba(52, 152, 219, 0.4);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #3498db;
+}
+
+.warehouse-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+}
+
+.warehouse-roster-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.warehouse-roster-header {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.warehouse-roster-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.warehouse-roster-role {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.warehouse-roster-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.warehouse-off-label {
+  font-size: 11px;
+  color: #95a5a6;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.department-session-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.department-session-section--history {
+  margin-top: 20px;
+}
+
+.department-session-section__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.department-session-section__header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.department-session-section__header span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.department-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.department-session-card {
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.department-session-card.active {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.department-session-card.completed {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.department-session-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.department-session-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.department-session-card__time {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.department-session-card__status {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.department-session-card__status.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.department-session-card__status.completed {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+}
+
+.department-session-card__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.department-session-card__stats .preview-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.department-session-card__stats .preview-item .label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.department-session-card__stats .preview-item .value {
+  font-size: 15px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.department-session-card__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.department-session-card__end-btn {
+  width: auto;
+}
+
+.department-session-empty {
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* Active Shift Panel */
 .labor-tracker__shift-panel {
   margin-bottom: 24px;
@@ -471,6 +765,24 @@
 .labor-tracker__submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .department-session-card__header,
+  .department-session-section__header,
+  .warehouse-shift-active-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .department-session-card__actions {
+    flex-direction: column;
+  }
+
+  .department-session-card__end-btn,
+  .department-session-card__actions .labor-tracker__history-btn {
+    width: 100%;
+  }
 }
 
 .labor-tracker__history {

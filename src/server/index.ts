@@ -567,6 +567,129 @@ app.get('/api/labor/shifts', async (req, res) => {
   }
 });
 
+// Department labor live summary (new tracker)
+app.get('/api/labor/departments/live', async (req, res) => {
+  try {
+    const date = req.query.date as string | undefined;
+    const summary = await db.getDepartmentLaborLive(date);
+    res.json(summary);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Department shift sessions list (new tracker)
+app.get('/api/labor/departments/sessions', async (req, res) => {
+  try {
+    const date = req.query.date as string | undefined;
+    const sessions = await db.getDepartmentShiftSessions(date);
+    res.json(sessions);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Start department shift
+app.post('/api/labor/departments/:department/start', async (req, res) => {
+  try {
+    const department = req.params.department;
+    const result = await db.startDepartmentShift({
+      department,
+      startedBy: req.body.startedBy || 'Manager',
+      headcount: Number(req.body.headcount || 0),
+      teamName: req.body.teamName,
+      notes: req.body.notes,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// End department shift
+app.post('/api/labor/departments/:department/:sessionId/end', async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const result = await db.endDepartmentShift(sessionId, {
+      endedBy: req.body.endedBy || 'Manager',
+      endHeadcount: req.body.endHeadcount,
+      overtimeHours: req.body.overtimeHours,
+      notes: req.body.notes,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update department overtime after shift
+app.post('/api/labor/departments/:department/:sessionId/overtime', async (req, res) => {
+  try {
+    const sessionId = parseInt(req.params.sessionId);
+    const result = await db.updateDepartmentShiftOvertime(sessionId, {
+      overtimeHours: Number(req.body.overtimeHours || 0),
+      updatedBy: req.body.updatedBy || 'Manager',
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Warehouse employee shifts list (new tracker)
+app.get('/api/labor/warehouse/employees', async (req, res) => {
+  try {
+    const date = req.query.date as string | undefined;
+    const shifts = await db.getWarehouseEmployeeShifts(date);
+    res.json(shifts);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Start warehouse employee shift
+app.post('/api/labor/warehouse/employees/start', async (req, res) => {
+  try {
+    const result = await db.startWarehouseEmployeeShift({
+      employeeName: req.body.employeeName,
+      startedBy: req.body.startedBy || 'Manager',
+      notes: req.body.notes,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// End warehouse employee shift
+app.post('/api/labor/warehouse/employees/:shiftId/end', async (req, res) => {
+  try {
+    const shiftId = parseInt(req.params.shiftId);
+    const result = await db.endWarehouseEmployeeShift(shiftId, {
+      endedBy: req.body.endedBy || 'Manager',
+      overtimeHours: req.body.overtimeHours,
+      notes: req.body.notes,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update warehouse employee overtime
+app.post('/api/labor/warehouse/employees/:shiftId/overtime', async (req, res) => {
+  try {
+    const shiftId = parseInt(req.params.shiftId);
+    const result = await db.updateWarehouseEmployeeOvertime(shiftId, {
+      overtimeHours: Number(req.body.overtimeHours || 0),
+      updatedBy: req.body.updatedBy || 'Manager',
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // ==================== PERFORMANCE TRACKING API ====================
 
 // Mark load start for a checkin
@@ -691,7 +814,12 @@ app.post('/api/production/work-orders', async (req, res) => {
     res.json(workOrder);
   } catch (error: any) {
     console.error('❌ Error in POST /api/production/work-orders:', error);
-    res.status(400).json({ error: error.message });
+    const message = String(error?.message || 'Failed to create work order');
+    if (message.includes('already exists')) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    res.status(400).json({ error: message });
   }
 });
 

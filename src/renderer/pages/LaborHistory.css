@@ -127,6 +127,103 @@
   flex: 1;
 }
 
+.tracker-history-panel {
+  margin-top: 20px;
+}
+
+.tracker-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tracker-history-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tracker-history-meta {
+  display: flex;
+  gap: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tracker-history-list {
+  gap: 12px;
+}
+
+.tracker-history-item {
+  padding: 16px;
+}
+
+.tracker-type-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.tracker-type-badge.department {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #3b82f6;
+}
+
+.tracker-type-badge.warehouse-employee {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #22c55e;
+}
+
+.tracker-history-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tracker-history-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tracker-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.tracker-history-row span {
+  white-space: nowrap;
+}
+
+.tracker-history-byline {
+  font-size: 12px;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.tracker-cost {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tracker-history-notes {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .labor-history__loading,
 .labor-history__empty {
   text-align: center;
@@ -333,5 +430,16 @@
   
   .snapshot-data {
     grid-template-columns: 1fr;
+  }
+
+  .tracker-history-header,
+  .tracker-history-row,
+  .tracker-history-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tracker-history-row span {
+    white-space: normal;
   }
 }

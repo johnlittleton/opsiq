@@ -224,6 +224,45 @@ export class DatabaseService implements IDatabaseService {
           ended_by TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS department_shift_sessions (
+          id SERIAL PRIMARY KEY,
+          date TEXT NOT NULL,
+          department TEXT NOT NULL,
+          team_name TEXT,
+          status TEXT NOT NULL,
+          start_time TIMESTAMP NOT NULL,
+          end_time TIMESTAMP,
+          start_headcount INTEGER NOT NULL,
+          end_headcount INTEGER,
+          overtime_hours REAL DEFAULT 0,
+          hourly_rate REAL NOT NULL,
+          overtime_multiplier REAL DEFAULT 1.5,
+          regular_labor_cost REAL DEFAULT 0,
+          overtime_labor_cost REAL DEFAULT 0,
+          total_labor_cost REAL DEFAULT 0,
+          started_by TEXT NOT NULL,
+          ended_by TEXT,
+          notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS warehouse_employee_shifts (
+          id SERIAL PRIMARY KEY,
+          date TEXT NOT NULL,
+          employee_name TEXT NOT NULL,
+          status TEXT NOT NULL,
+          start_time TIMESTAMP NOT NULL,
+          end_time TIMESTAMP,
+          overtime_hours REAL DEFAULT 0,
+          hourly_rate REAL NOT NULL,
+          overtime_multiplier REAL DEFAULT 1.5,
+          regular_labor_cost REAL DEFAULT 0,
+          overtime_labor_cost REAL DEFAULT 0,
+          total_labor_cost REAL DEFAULT 0,
+          started_by TEXT NOT NULL,
+          ended_by TEXT,
+          notes TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS checkin_audit_log (
           id SERIAL PRIMARY KEY,
           checkin_id INTEGER NOT NULL,
@@ -369,6 +408,11 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
         CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
+        CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
+        CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
+        CREATE INDEX IF NOT EXISTS idx_dept_shifts_status ON department_shift_sessions(status);
+        CREATE INDEX IF NOT EXISTS idx_warehouse_emp_date ON warehouse_employee_shifts(date);
+        CREATE INDEX IF NOT EXISTS idx_warehouse_emp_status ON warehouse_employee_shifts(status);
         
         -- Partial unique index: only one active shift per date/shift_number
         CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
@@ -1542,10 +1586,14 @@ export class DatabaseService implements IDatabaseService {
     `, [today]);
     
     const hasActiveShift = activeShiftResult.rows.length > 0;
+    const departmentLive = await this.getDepartmentLaborLive(today);
+    const productionLive = departmentLive.departments.find((row: any) => row.department === 'production');
+    const warehouseLive = departmentLive.departments.find((row: any) => row.department === 'warehouse');
+    const hasDepartmentTrackerData = departmentLive.departments.some((row: any) => row.status !== 'not-started');
     
     const latest = await this.getLatestLaborSnapshot();
     
-    if (!latest) {
+    if (!latest && !hasDepartmentTrackerData) {
       return {
         currentShippingReceivingHeadcount: 0,
         currentProductionHeadcount: 0,
@@ -1587,10 +1635,18 @@ export class DatabaseService implements IDatabaseService {
 
     return {
       // If no active shift, show 0 for current headcounts (reset after shift ends)
-      currentShippingReceivingHeadcount: hasActiveShift ? latest.shippingReceivingHeadcount : 0,
-      currentProductionHeadcount: hasActiveShift ? latest.productionHeadcount : 0,
-      currentTotalHeadcount: hasActiveShift ? latest.totalHeadcount : 0,
-      currentHourlyLaborCost: hasActiveShift ? latest.totalLaborCost : 0,
+      currentShippingReceivingHeadcount: hasDepartmentTrackerData
+        ? (warehouseLive?.activeHeadcount || 0)
+        : (hasActiveShift ? latest.shippingReceivingHeadcount : 0),
+      currentProductionHeadcount: hasDepartmentTrackerData
+        ? (productionLive?.activeHeadcount || 0)
+        : (hasActiveShift ? latest.productionHeadcount : 0),
+      currentTotalHeadcount: hasDepartmentTrackerData
+        ? (departmentLive.totals.activeHeadcount || 0)
+        : (hasActiveShift ? latest.totalHeadcount : 0),
+      currentHourlyLaborCost: hasDepartmentTrackerData
+        ? (departmentLive.totals.currentHourlyLaborCost || 0)
+        : (hasActiveShift ? latest.totalLaborCost : 0),
       dailyLaborCost,
       weeklyLaborCost,
       averageShippingReceivingHeadcount: Math.round(avgSR * 10) / 10,
@@ -1682,15 +1738,32 @@ export class DatabaseService implements IDatabaseService {
     );
     const elapsedHours = elapsedMinutes / 60;
     // Live card should reflect current burn rate immediately; unpaid break is applied at shift end.
-    const runningCost = (warehousePerHour + productionPerHour) * elapsedHours;
+    const runningWarehouseCost = warehousePerHour * elapsedHours;
+    const runningProductionCost = productionPerHour * elapsedHours;
+    const runningCost = runningWarehouseCost + runningProductionCost;
+
+    const departmentLive = await this.getDepartmentLaborLive(today);
+    const productionLive = departmentLive.departments.find((row: any) => row.department === 'production');
+    const warehouseLive = departmentLive.departments.find((row: any) => row.department === 'warehouse');
+    const hasDepartmentTrackerData = departmentLive.departments.some((row: any) => row.status !== 'not-started');
 
     return {
       ...activeShift,
       elapsedMinutes,
-      currentWarehouseHeadcount,
-      currentProductionHeadcount,
-      currentTotalHeadcount: currentWarehouseHeadcount + currentProductionHeadcount,
-      runningLaborCost: Math.round(runningCost * 100) / 100,
+      currentWarehouseHeadcount: hasDepartmentTrackerData ? (warehouseLive?.activeHeadcount || 0) : currentWarehouseHeadcount,
+      currentProductionHeadcount: hasDepartmentTrackerData ? (productionLive?.activeHeadcount || 0) : currentProductionHeadcount,
+      currentTotalHeadcount: hasDepartmentTrackerData
+        ? (departmentLive.totals.activeHeadcount || 0)
+        : (currentWarehouseHeadcount + currentProductionHeadcount),
+      currentWarehouseLaborCost: hasDepartmentTrackerData
+        ? (warehouseLive?.totalLaborCost || 0)
+        : Math.round(runningWarehouseCost * 100) / 100,
+      currentProductionLaborCost: hasDepartmentTrackerData
+        ? (productionLive?.totalLaborCost || 0)
+        : Math.round(runningProductionCost * 100) / 100,
+      runningLaborCost: hasDepartmentTrackerData
+        ? (departmentLive.totals.totalLaborCost || 0)
+        : Math.round(runningCost * 100) / 100,
     };
   }
 
@@ -1763,6 +1836,443 @@ export class DatabaseService implements IDatabaseService {
 
     const result = await this.pool.query(query, params);
     return this.toCamelCase(result.rows);
+  }
+
+  private normalizeDepartmentName(department: string): string {
+    const normalized = (department || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
+    const aliases: Record<string, string> = {
+      'shipping-receiving': 'warehouse',
+      'shippingreceiving': 'warehouse',
+      'foodsafety': 'food-safety',
+      'food-safety': 'food-safety',
+    };
+    return aliases[normalized] || normalized;
+  }
+
+  private getDepartmentHourlyRate(department: string): number {
+    return department === 'production'
+      ? this.DEFAULT_PROD_HOURLY_WAGE
+      : DatabaseService.DEFAULT_SR_HOURLY_WAGE;
+  }
+
+  async startDepartmentShift(data: {
+    department: string;
+    startedBy: string;
+    headcount: number;
+    teamName?: string;
+    notes?: string;
+  }): Promise<any> {
+    const now = getLocalISOString();
+    const date = now.split('T')[0];
+    const department = this.normalizeDepartmentName(data.department);
+    const teamName = department === 'production' ? (data.teamName || null) : null;
+    const headcount = Math.max(0, Math.floor(data.headcount || 0));
+
+    if (!data.startedBy) {
+      throw new Error('startedBy is required');
+    }
+
+    if (headcount <= 0) {
+      throw new Error('headcount must be greater than 0');
+    }
+
+    const validDepartments = new Set([
+      'production',
+      'warehouse',
+      'qc',
+      'maintenance',
+      'food-safety',
+      'housekeeping',
+    ]);
+
+    if (!validDepartments.has(department)) {
+      throw new Error(`Unsupported department: ${department}`);
+    }
+
+    if (department === 'production' && !teamName) {
+      throw new Error('Production shifts require teamName (Group A/Group B)');
+    }
+
+    let existingResult;
+    if (department === 'production') {
+      existingResult = await this.pool.query(`
+        SELECT id FROM department_shift_sessions
+        WHERE date = $1 AND department = $2 AND team_name = $3 AND status = 'active'
+        LIMIT 1
+      `, [date, department, teamName]);
+    } else {
+      existingResult = await this.pool.query(`
+        SELECT id FROM department_shift_sessions
+        WHERE date = $1 AND department = $2 AND status = 'active'
+        LIMIT 1
+      `, [date, department]);
+    }
+
+    if (existingResult.rows.length > 0) {
+      throw new Error(`${department} shift is already active${teamName ? ` for ${teamName}` : ''}`);
+    }
+
+    const hourlyRate = this.getDepartmentHourlyRate(department);
+    const result = await this.pool.query(`
+      INSERT INTO department_shift_sessions (
+        date, department, team_name, status, start_time,
+        start_headcount, hourly_rate, started_by, notes
+      ) VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      date,
+      department,
+      teamName,
+      now,
+      headcount,
+      hourlyRate,
+      data.startedBy,
+      data.notes || null,
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async endDepartmentShift(sessionId: number, data: {
+    endedBy: string;
+    endHeadcount?: number;
+    overtimeHours?: number;
+    notes?: string;
+  }): Promise<any> {
+    const sessionResult = await this.pool.query(`
+      SELECT * FROM department_shift_sessions
+      WHERE id = $1
+      LIMIT 1
+    `, [sessionId]);
+
+    if (sessionResult.rows.length === 0) {
+      throw new Error('Department shift session not found');
+    }
+
+    const session = this.toCamelCase(sessionResult.rows[0]);
+    if (session.status !== 'active') {
+      throw new Error('Department shift session is not active');
+    }
+
+    const now = getLocalISOString();
+    const endHeadcount = data.endHeadcount !== undefined
+      ? Math.max(0, Math.floor(data.endHeadcount))
+      : session.startHeadcount;
+    const overtimeHours = Math.max(0, Number(data.overtimeHours ?? session.overtimeHours ?? 0));
+    const elapsedHours = Math.max(0, (new Date(now).getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60));
+    const effectiveHeadcount = endHeadcount || session.startHeadcount || 0;
+
+    const regularLaborCost = elapsedHours * session.hourlyRate * effectiveHeadcount;
+    const overtimeLaborCost = overtimeHours * session.hourlyRate * effectiveHeadcount * (session.overtimeMultiplier || 1.5);
+    const totalLaborCost = regularLaborCost + overtimeLaborCost;
+
+    const updateResult = await this.pool.query(`
+      UPDATE department_shift_sessions
+      SET status = 'completed',
+          end_time = $1,
+          end_headcount = $2,
+          overtime_hours = $3,
+          regular_labor_cost = $4,
+          overtime_labor_cost = $5,
+          total_labor_cost = $6,
+          ended_by = $7,
+          notes = $8
+      WHERE id = $9
+      RETURNING *
+    `, [
+      now,
+      endHeadcount,
+      overtimeHours,
+      Math.round(regularLaborCost * 100) / 100,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.endedBy || 'Manager',
+      data.notes || session.notes,
+      sessionId,
+    ]);
+
+    return this.toCamelCase(updateResult.rows[0]);
+  }
+
+  async updateDepartmentShiftOvertime(sessionId: number, data: {
+    overtimeHours: number;
+    updatedBy: string;
+  }): Promise<any> {
+    const sessionResult = await this.pool.query('SELECT * FROM department_shift_sessions WHERE id = $1', [sessionId]);
+
+    if (sessionResult.rows.length === 0) {
+      throw new Error('Department shift session not found');
+    }
+
+    const session = this.toCamelCase(sessionResult.rows[0]);
+    const overtimeHours = Math.max(0, Number(data.overtimeHours || 0));
+    const effectiveHeadcount = session.endHeadcount || session.startHeadcount || 0;
+    const overtimeLaborCost = overtimeHours * session.hourlyRate * effectiveHeadcount * (session.overtimeMultiplier || 1.5);
+    const totalLaborCost = (session.regularLaborCost || 0) + overtimeLaborCost;
+
+    const updateResult = await this.pool.query(`
+      UPDATE department_shift_sessions
+      SET overtime_hours = $1,
+          overtime_labor_cost = $2,
+          total_labor_cost = $3,
+          ended_by = $4
+      WHERE id = $5
+      RETURNING *
+    `, [
+      overtimeHours,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.updatedBy || session.endedBy,
+      sessionId,
+    ]);
+
+    return this.toCamelCase(updateResult.rows[0]);
+  }
+
+  async getDepartmentShiftSessions(date?: string): Promise<any[]> {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    const result = await this.pool.query(`
+      SELECT * FROM department_shift_sessions
+      WHERE date = $1
+      ORDER BY department ASC, team_name ASC, start_time ASC
+    `, [targetDate]);
+    return this.toCamelCase(result.rows);
+  }
+
+  async startWarehouseEmployeeShift(data: {
+    employeeName: string;
+    startedBy: string;
+    notes?: string;
+  }): Promise<any> {
+    const now = getLocalISOString();
+    const date = now.split('T')[0];
+
+    if (!data.employeeName?.trim()) {
+      throw new Error('employeeName is required');
+    }
+
+    const activeDeptResult = await this.pool.query(`
+      SELECT id FROM department_shift_sessions
+      WHERE date = $1 AND department = 'warehouse' AND status = 'active'
+      LIMIT 1
+    `, [date]);
+
+    if (activeDeptResult.rows.length === 0) {
+      throw new Error('Start Warehouse department shift before starting employee shifts');
+    }
+
+    const existingResult = await this.pool.query(`
+      SELECT id FROM warehouse_employee_shifts
+      WHERE date = $1 AND employee_name = $2 AND status = 'active'
+      LIMIT 1
+    `, [date, data.employeeName.trim()]);
+
+    if (existingResult.rows.length > 0) {
+      throw new Error(`${data.employeeName} already has an active warehouse shift`);
+    }
+
+    const result = await this.pool.query(`
+      INSERT INTO warehouse_employee_shifts (
+        date, employee_name, status, start_time, hourly_rate, started_by, notes
+      ) VALUES ($1, $2, 'active', $3, $4, $5, $6)
+      RETURNING *
+    `, [
+      date,
+      data.employeeName.trim(),
+      now,
+      DatabaseService.DEFAULT_SR_HOURLY_WAGE,
+      data.startedBy || 'Manager',
+      data.notes || null,
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async endWarehouseEmployeeShift(shiftId: number, data: {
+    endedBy: string;
+    overtimeHours?: number;
+    notes?: string;
+  }): Promise<any> {
+    const shiftResult = await this.pool.query('SELECT * FROM warehouse_employee_shifts WHERE id = $1', [shiftId]);
+
+    if (shiftResult.rows.length === 0) {
+      throw new Error('Warehouse employee shift not found');
+    }
+
+    const shift = this.toCamelCase(shiftResult.rows[0]);
+    if (shift.status !== 'active') {
+      throw new Error('Warehouse employee shift is not active');
+    }
+
+    const now = getLocalISOString();
+    const overtimeHours = Math.max(0, Number(data.overtimeHours ?? shift.overtimeHours ?? 0));
+    const elapsedHours = Math.max(0, (new Date(now).getTime() - new Date(shift.startTime).getTime()) / (1000 * 60 * 60));
+    const regularLaborCost = elapsedHours * shift.hourlyRate;
+    const overtimeLaborCost = overtimeHours * shift.hourlyRate * (shift.overtimeMultiplier || 1.5);
+    const totalLaborCost = regularLaborCost + overtimeLaborCost;
+
+    const updateResult = await this.pool.query(`
+      UPDATE warehouse_employee_shifts
+      SET status = 'completed',
+          end_time = $1,
+          overtime_hours = $2,
+          regular_labor_cost = $3,
+          overtime_labor_cost = $4,
+          total_labor_cost = $5,
+          ended_by = $6,
+          notes = $7
+      WHERE id = $8
+      RETURNING *
+    `, [
+      now,
+      overtimeHours,
+      Math.round(regularLaborCost * 100) / 100,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.endedBy || 'Manager',
+      data.notes || shift.notes,
+      shiftId,
+    ]);
+
+    return this.toCamelCase(updateResult.rows[0]);
+  }
+
+  async updateWarehouseEmployeeOvertime(shiftId: number, data: {
+    overtimeHours: number;
+    updatedBy: string;
+  }): Promise<any> {
+    const shiftResult = await this.pool.query('SELECT * FROM warehouse_employee_shifts WHERE id = $1', [shiftId]);
+
+    if (shiftResult.rows.length === 0) {
+      throw new Error('Warehouse employee shift not found');
+    }
+
+    const shift = this.toCamelCase(shiftResult.rows[0]);
+    const overtimeHours = Math.max(0, Number(data.overtimeHours || 0));
+    const overtimeLaborCost = overtimeHours * shift.hourlyRate * (shift.overtimeMultiplier || 1.5);
+    const totalLaborCost = (shift.regularLaborCost || 0) + overtimeLaborCost;
+
+    const updateResult = await this.pool.query(`
+      UPDATE warehouse_employee_shifts
+      SET overtime_hours = $1,
+          overtime_labor_cost = $2,
+          total_labor_cost = $3,
+          ended_by = $4
+      WHERE id = $5
+      RETURNING *
+    `, [
+      overtimeHours,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.updatedBy || shift.endedBy,
+      shiftId,
+    ]);
+
+    return this.toCamelCase(updateResult.rows[0]);
+  }
+
+  async getWarehouseEmployeeShifts(date?: string): Promise<any[]> {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    const result = await this.pool.query(`
+      SELECT * FROM warehouse_employee_shifts
+      WHERE date = $1
+      ORDER BY status ASC, employee_name ASC, start_time ASC
+    `, [targetDate]);
+    return this.toCamelCase(result.rows);
+  }
+
+  async getDepartmentLaborLive(date?: string): Promise<any> {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    const departments = ['production', 'warehouse', 'qc', 'maintenance', 'food-safety', 'housekeeping'];
+    const now = new Date();
+
+    const sessionsResult = await this.pool.query(`
+      SELECT * FROM department_shift_sessions
+      WHERE date = $1
+    `, [targetDate]);
+    const employeeResult = await this.pool.query(`
+      SELECT * FROM warehouse_employee_shifts
+      WHERE date = $1
+    `, [targetDate]);
+
+    const departmentSessions = this.toCamelCase(sessionsResult.rows);
+    const warehouseEmployeeShifts = this.toCamelCase(employeeResult.rows);
+
+    const departmentSummaries = departments.map((department) => {
+      const deptSessions = departmentSessions.filter((s: any) => s.department === department);
+      const activeSessions = deptSessions.filter((s: any) => s.status === 'active');
+      const completedSessions = deptSessions.filter((s: any) => s.status === 'completed');
+
+      let runningCost = 0;
+      let completedCost = completedSessions.reduce((sum: number, s: any) => sum + (s.totalLaborCost || 0), 0);
+      let activeHeadcount = activeSessions.reduce((sum: number, s: any) => sum + (s.startHeadcount || 0), 0);
+      let currentHourlyLaborCost = 0;
+
+      if (department === 'warehouse') {
+        const activeEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'active');
+        const completedEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'completed');
+
+        activeHeadcount = activeEmployees.length;
+        completedCost += completedEmployees.reduce((sum: number, s: any) => sum + (s.totalLaborCost || 0), 0);
+        currentHourlyLaborCost = activeEmployees.reduce((sum: number, shift: any) => {
+          return sum + (shift.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE);
+        }, 0);
+
+        runningCost = activeEmployees.reduce((sum: number, shift: any) => {
+          const elapsedHours = Math.max(0, (now.getTime() - new Date(shift.startTime).getTime()) / (1000 * 60 * 60));
+          return sum + (elapsedHours * (shift.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE));
+        }, 0);
+      } else {
+        currentHourlyLaborCost = activeSessions.reduce((sum: number, session: any) => {
+          return sum + ((session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
+        }, 0);
+        runningCost = activeSessions.reduce((sum: number, session: any) => {
+          const elapsedHours = Math.max(0, (now.getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60));
+          return sum + (elapsedHours * (session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
+        }, 0);
+      }
+
+      const hasAnySession = deptSessions.length > 0 || (department === 'warehouse' && warehouseEmployeeShifts.length > 0);
+      const status = activeSessions.length > 0 || (department === 'warehouse' && activeHeadcount > 0)
+        ? 'active'
+        : hasAnySession
+          ? 'ended'
+          : 'not-started';
+
+      const totalLaborCost = completedCost + runningCost;
+
+      return {
+        department,
+        status,
+        activeHeadcount,
+        currentHourlyLaborCost: Math.round(currentHourlyLaborCost * 100) / 100,
+        runningLaborCost: Math.round(runningCost * 100) / 100,
+        completedLaborCost: Math.round(completedCost * 100) / 100,
+        totalLaborCost: Math.round(totalLaborCost * 100) / 100,
+      };
+    });
+
+    const totals = departmentSummaries.reduce(
+      (acc, row) => {
+        acc.activeHeadcount += row.activeHeadcount;
+        acc.currentHourlyLaborCost += row.currentHourlyLaborCost;
+        acc.runningLaborCost += row.runningLaborCost;
+        acc.totalLaborCost += row.totalLaborCost;
+        return acc;
+      },
+      { activeHeadcount: 0, currentHourlyLaborCost: 0, runningLaborCost: 0, totalLaborCost: 0 }
+    );
+
+    return {
+      date: targetDate,
+      departments: departmentSummaries,
+      totals: {
+        activeHeadcount: totals.activeHeadcount,
+        currentHourlyLaborCost: Math.round(totals.currentHourlyLaborCost * 100) / 100,
+        runningLaborCost: Math.round(totals.runningLaborCost * 100) / 100,
+        totalLaborCost: Math.round(totals.totalLaborCost * 100) / 100,
+      },
+    };
   }
 
   // ==================== PERFORMANCE TRACKING ====================
@@ -2066,14 +2576,24 @@ export class DatabaseService implements IDatabaseService {
       dockUtilization: 0, // Calculate based on active doors
       completedToday: completedCheckins.length,
       activeNow,
-      shippingReceivingLaborCostPerHour: latestLabor ? latestLabor.shippingReceivingLaborCost : 0,
-      productionLaborCostPerHour: latestLabor ? latestLabor.productionLaborCost : 0,
+      shippingReceivingLaborCostPerHour: currentShift && currentShift.status === 'active'
+        ? ((await this.getDepartmentLaborLive(today)).departments.find((row: any) => row.department === 'warehouse')?.currentHourlyLaborCost || 0)
+        : (latestLabor ? latestLabor.shippingReceivingLaborCost : 0),
+      productionLaborCostPerHour: currentShift && currentShift.status === 'active'
+        ? ((await this.getDepartmentLaborLive(today)).departments.find((row: any) => row.department === 'production')?.currentHourlyLaborCost || 0)
+        : (latestLabor ? latestLabor.productionLaborCost : 0),
       totalShiftLaborCost: Math.round(totalShiftLaborCost * 100) / 100,
       laborCostYTD: Math.round(laborCostYTD * 100) / 100,
       laborCostPreviousDay: Math.round(laborCostPreviousDay * 100) / 100,
-      currentHeadcount: latestLabor ? latestLabor.totalHeadcount : 0,
-      warehouseHeadcount: latestLabor ? latestLabor.shippingReceivingHeadcount : 0,
-      productionHeadcount: latestLabor ? latestLabor.productionHeadcount : 0,
+      currentHeadcount: currentShift && currentShift.status === 'active'
+        ? (currentShift.currentTotalHeadcount || 0)
+        : (latestLabor ? latestLabor.totalHeadcount : 0),
+      warehouseHeadcount: currentShift && currentShift.status === 'active'
+        ? (currentShift.currentWarehouseHeadcount || 0)
+        : (latestLabor ? latestLabor.shippingReceivingHeadcount : 0),
+      productionHeadcount: currentShift && currentShift.status === 'active'
+        ? (currentShift.currentProductionHeadcount || 0)
+        : (latestLabor ? latestLabor.productionHeadcount : 0),
       totalCasesCompleted: parseInt(totalCasesResult.rows[0].total) || 0,
       totalBagsCompleted: totalBags,
       casesCompletedYTD: parseInt(casesYTDResult.rows[0].total) || 0,
@@ -2836,61 +3356,60 @@ export class DatabaseService implements IDatabaseService {
 
   async createWorkOrder(workOrder: any): Promise<any> {
     const now = getLocalISOString();
-    const maxAttempts = 3;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const id = attempt === 0 && workOrder.id ? String(workOrder.id) : this.generateWorkOrderId();
-      try {
-        const result = await this.pool.query(`
-          INSERT INTO work_orders (
-            id, line, slot, date, product, bag_size, planned_run_rate, customer, lead, country_of_origin, num_pallets, 
-            labor, priority, lot1, lot2, lot3, lot4, notes, status, 
-            target_cases, completed_cases, start_timestamp, elapsed_ms, 
-            is_paused, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
-          RETURNING *
-        `, [
-          id,
-          workOrder.line,
-          workOrder.slot,
-          workOrder.date,
-          workOrder.product || null,
-          workOrder.bagSize || null,
-          workOrder.plannedRunRate || null,
-          workOrder.customer || null,
-          workOrder.lead || null,
-          workOrder.countryOfOrigin || null,
-          workOrder.numPallets || null,
-          workOrder.labor || null,
-          workOrder.priority || null,
-          workOrder.lot1 || null,
-          workOrder.lot2 || null,
-          workOrder.lot3 || null,
-          workOrder.lot4 || null,
-          workOrder.notes || null,
-          workOrder.status || 'Scheduled',
-          workOrder.targetCases || null,
-          workOrder.completedCases || 0,
-          workOrder.startTimestamp || null,
-          workOrder.elapsedMs || 0,
-          workOrder.isPaused || false,
-          now,
-          now
-        ]);
+    const id = String(workOrder.id || '').trim();
 
-        return this.toCamelCase(result.rows[0]);
-      } catch (insertError: any) {
-        const isDuplicate = insertError?.code === '23505'
-          && typeof insertError?.constraint === 'string'
-          && insertError.constraint.includes('work_orders_pkey');
-        if (isDuplicate && attempt < maxAttempts - 1) {
-          console.warn('Duplicate work order ID detected, retrying with a new ID...');
-          continue;
-        }
-        throw insertError;
-      }
+    if (!id) {
+      throw new Error('Sales Order Number is required');
     }
 
-    throw new Error('Failed to create work order after multiple ID generation attempts');
+    try {
+      const result = await this.pool.query(`
+        INSERT INTO work_orders (
+          id, line, slot, date, product, bag_size, planned_run_rate, customer, lead, country_of_origin, num_pallets, 
+          labor, priority, lot1, lot2, lot3, lot4, notes, status, 
+          target_cases, completed_cases, start_timestamp, elapsed_ms, 
+          is_paused, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+        RETURNING *
+      `, [
+        id,
+        workOrder.line,
+        workOrder.slot,
+        workOrder.date,
+        workOrder.product || null,
+        workOrder.bagSize || null,
+        workOrder.plannedRunRate || null,
+        workOrder.customer || null,
+        workOrder.lead || null,
+        workOrder.countryOfOrigin || null,
+        workOrder.numPallets || null,
+        workOrder.labor || null,
+        workOrder.priority || null,
+        workOrder.lot1 || null,
+        workOrder.lot2 || null,
+        workOrder.lot3 || null,
+        workOrder.lot4 || null,
+        workOrder.notes || null,
+        workOrder.status || 'Scheduled',
+        workOrder.targetCases || null,
+        workOrder.completedCases || 0,
+        workOrder.startTimestamp || null,
+        workOrder.elapsedMs || 0,
+        workOrder.isPaused || false,
+        now,
+        now
+      ]);
+
+      return this.toCamelCase(result.rows[0]);
+    } catch (insertError: any) {
+      const isDuplicate = insertError?.code === '23505'
+        && typeof insertError?.constraint === 'string'
+        && insertError.constraint.includes('work_orders_pkey');
+      if (isDuplicate) {
+        throw new Error(`Work order ${id} already exists`);
+      }
+      throw insertError;
+    }
   }
 
   async updateWorkOrder(id: string, updates: any): Promise<any> {
