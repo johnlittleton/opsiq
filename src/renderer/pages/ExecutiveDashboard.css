@@ -791,6 +791,87 @@
   gap: 8px;
 }
 
+.department-labor-strip {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.department-labor-strip-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+.department-labor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.department-labor-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 8px;
+  min-width: 0;
+}
+
+.department-labor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.department-labor-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.department-labor-status {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.department-labor-status.active {
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.16);
+}
+
+.department-labor-status.inactive {
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.department-labor-value {
+  font-size: 17px;
+  font-weight: 700;
+  color: #10b981;
+  line-height: 1.2;
+}
+
+.department-labor-meta {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .shift-metric {
   display: flex;
   align-items: center;
@@ -865,6 +946,10 @@
   }
   
   .shift-tracker-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .department-labor-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -253,6 +253,51 @@ export class DatabaseService implements IDatabaseService {
         endedBy TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS department_shift_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        department TEXT NOT NULL,
+        teamName TEXT,
+        status TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT,
+        startHeadcount INTEGER NOT NULL,
+        endHeadcount INTEGER,
+        overtimeHours REAL DEFAULT 0,
+        hourlyRate REAL NOT NULL,
+        overtimeMultiplier REAL DEFAULT 1.5,
+        regularLaborCost REAL DEFAULT 0,
+        overtimeLaborCost REAL DEFAULT 0,
+        totalLaborCost REAL DEFAULT 0,
+        startedBy TEXT NOT NULL,
+        endedBy TEXT,
+        notes TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS warehouse_employee_shifts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        employeeName TEXT NOT NULL,
+        status TEXT NOT NULL,
+        startTime TEXT NOT NULL,
+        endTime TEXT,
+        overtimeHours REAL DEFAULT 0,
+        hourlyRate REAL NOT NULL,
+        overtimeMultiplier REAL DEFAULT 1.5,
+        regularLaborCost REAL DEFAULT 0,
+        overtimeLaborCost REAL DEFAULT 0,
+        totalLaborCost REAL DEFAULT 0,
+        startedBy TEXT NOT NULL,
+        endedBy TEXT,
+        notes TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
+      CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
+      CREATE INDEX IF NOT EXISTS idx_dept_shifts_status ON department_shift_sessions(status);
+      CREATE INDEX IF NOT EXISTS idx_warehouse_emp_date ON warehouse_employee_shifts(date);
+      CREATE INDEX IF NOT EXISTS idx_warehouse_emp_status ON warehouse_employee_shifts(status);
+
       CREATE TABLE IF NOT EXISTS work_orders (
         id TEXT PRIMARY KEY,
         line INTEGER NOT NULL,
@@ -427,6 +472,15 @@ export class DatabaseService implements IDatabaseService {
       if (!laborColumnNames.includes('productionOvertimeHours')) {
         console.log('Adding productionOvertimeHours column to labor_snapshots...');
         this.db.exec('ALTER TABLE labor_snapshots ADD COLUMN productionOvertimeHours REAL DEFAULT 0');
+      }
+
+      // Migration: Add role column to executives for older local databases
+      const executiveColumns = this.db.pragma('table_info(executives)') as any[];
+      const executiveColumnNames = executiveColumns.map(c => c.name);
+
+      if (!executiveColumnNames.includes('role')) {
+        console.log('Adding role column to executives...');
+        this.db.exec("ALTER TABLE executives ADD COLUMN role TEXT NOT NULL DEFAULT 'manager'");
       }
       
       // Migration: Remove NOT NULL constraint from doorId to support parked trucks
@@ -1352,10 +1406,14 @@ export class DatabaseService implements IDatabaseService {
     `).get(today);
     
     const hasActiveShift = !!activeShift;
+    const departmentLive = this.getDepartmentLaborLive(today);
+    const productionLive = departmentLive.departments.find((row: any) => row.department === 'production');
+    const warehouseLive = departmentLive.departments.find((row: any) => row.department === 'warehouse');
+    const hasDepartmentTrackerData = departmentLive.departments.some((row: any) => row.status !== 'not-started');
     
     const latest = this.getLatestLaborSnapshot() as any;
-    
-    if (!latest) {
+
+    if (!latest && !hasDepartmentTrackerData) {
       return {
         currentShippingReceivingHeadcount: 0,
         currentProductionHeadcount: 0,
@@ -1391,10 +1449,18 @@ export class DatabaseService implements IDatabaseService {
 
     return {
       // If no active shift, show 0 for current headcounts (reset after shift ends)
-      currentShippingReceivingHeadcount: hasActiveShift ? latest.shippingReceivingHeadcount : 0,
-      currentProductionHeadcount: hasActiveShift ? latest.productionHeadcount : 0,
-      currentTotalHeadcount: hasActiveShift ? latest.totalHeadcount : 0,
-      currentHourlyLaborCost: hasActiveShift ? latest.totalLaborCost : 0,
+      currentShippingReceivingHeadcount: hasDepartmentTrackerData
+        ? (warehouseLive?.activeHeadcount || 0)
+        : (hasActiveShift ? latest.shippingReceivingHeadcount : 0),
+      currentProductionHeadcount: hasDepartmentTrackerData
+        ? (productionLive?.activeHeadcount || 0)
+        : (hasActiveShift ? latest.productionHeadcount : 0),
+      currentTotalHeadcount: hasDepartmentTrackerData
+        ? (departmentLive.totals.activeHeadcount || 0)
+        : (hasActiveShift ? latest.totalHeadcount : 0),
+      currentHourlyLaborCost: hasDepartmentTrackerData
+        ? (departmentLive.totals.currentHourlyLaborCost || 0)
+        : (hasActiveShift ? latest.totalLaborCost : 0),
       dailyLaborCost,
       weeklyLaborCost,
       averageShippingReceivingHeadcount: Math.round(avgSR * 10) / 10,
@@ -1469,15 +1535,32 @@ export class DatabaseService implements IDatabaseService {
     );
     const elapsedHours = elapsedMinutes / 60;
     // Live card should reflect current burn rate immediately; unpaid break is applied at shift end.
-    const runningCost = (warehousePerHour + productionPerHour) * elapsedHours;
+    const runningWarehouseCost = warehousePerHour * elapsedHours;
+    const runningProductionCost = productionPerHour * elapsedHours;
+    const runningCost = runningWarehouseCost + runningProductionCost;
+
+    const departmentLive = this.getDepartmentLaborLive(today);
+    const productionLive = departmentLive.departments.find((row: any) => row.department === 'production');
+    const warehouseLive = departmentLive.departments.find((row: any) => row.department === 'warehouse');
+    const hasDepartmentTrackerData = departmentLive.departments.some((row: any) => row.status !== 'not-started');
 
     return {
       ...activeShift,
       elapsedMinutes,
-      currentWarehouseHeadcount,
-      currentProductionHeadcount,
-      currentTotalHeadcount: currentWarehouseHeadcount + currentProductionHeadcount,
-      runningLaborCost: Math.round(runningCost * 100) / 100,
+      currentWarehouseHeadcount: hasDepartmentTrackerData ? (warehouseLive?.activeHeadcount || 0) : currentWarehouseHeadcount,
+      currentProductionHeadcount: hasDepartmentTrackerData ? (productionLive?.activeHeadcount || 0) : currentProductionHeadcount,
+      currentTotalHeadcount: hasDepartmentTrackerData
+        ? (departmentLive.totals.activeHeadcount || 0)
+        : (currentWarehouseHeadcount + currentProductionHeadcount),
+      currentWarehouseLaborCost: hasDepartmentTrackerData
+        ? (warehouseLive?.totalLaborCost || 0)
+        : Math.round(runningWarehouseCost * 100) / 100,
+      currentProductionLaborCost: hasDepartmentTrackerData
+        ? (productionLive?.totalLaborCost || 0)
+        : Math.round(runningProductionCost * 100) / 100,
+      runningLaborCost: hasDepartmentTrackerData
+        ? (departmentLive.totals.totalLaborCost || 0)
+        : Math.round(runningCost * 100) / 100,
     };
   }
 
@@ -1544,6 +1627,423 @@ export class DatabaseService implements IDatabaseService {
     }
 
     return this.db.prepare(query).all(...params) as any[];
+  }
+
+  private normalizeDepartmentName(department: string): string {
+    const normalized = (department || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
+    const aliases: Record<string, string> = {
+      'shipping-receiving': 'warehouse',
+      'shippingreceiving': 'warehouse',
+      'foodsafety': 'food-safety',
+      'food-safety': 'food-safety',
+    };
+    return aliases[normalized] || normalized;
+  }
+
+  private getDepartmentHourlyRate(department: string): number {
+    return department === 'production'
+      ? DatabaseService.DEFAULT_PROD_HOURLY_WAGE
+      : DatabaseService.DEFAULT_SR_HOURLY_WAGE;
+  }
+
+  startDepartmentShift(data: {
+    department: string;
+    startedBy: string;
+    headcount: number;
+    teamName?: string;
+    notes?: string;
+  }): any {
+    const now = getLocalISOString();
+    const date = now.split('T')[0];
+    const department = this.normalizeDepartmentName(data.department);
+    const teamName = department === 'production' ? (data.teamName || null) : null;
+    const headcount = Math.max(0, Math.floor(data.headcount || 0));
+
+    if (!data.startedBy) {
+      throw new Error('startedBy is required');
+    }
+
+    if (headcount <= 0) {
+      throw new Error('headcount must be greater than 0');
+    }
+
+    const validDepartments = new Set([
+      'production',
+      'warehouse',
+      'qc',
+      'maintenance',
+      'food-safety',
+      'housekeeping',
+    ]);
+
+    if (!validDepartments.has(department)) {
+      throw new Error(`Unsupported department: ${department}`);
+    }
+
+    if (department === 'production' && !teamName) {
+      throw new Error('Production shifts require teamName (Group A/Group B)');
+    }
+
+    let existing: any;
+    if (department === 'production') {
+      existing = this.db.prepare(`
+        SELECT id FROM department_shift_sessions
+        WHERE date = ? AND department = ? AND teamName = ? AND status = 'active'
+        LIMIT 1
+      `).get(date, department, teamName);
+    } else {
+      existing = this.db.prepare(`
+        SELECT id FROM department_shift_sessions
+        WHERE date = ? AND department = ? AND status = 'active'
+        LIMIT 1
+      `).get(date, department);
+    }
+
+    if (existing) {
+      throw new Error(`${department} shift is already active${teamName ? ` for ${teamName}` : ''}`);
+    }
+
+    const hourlyRate = this.getDepartmentHourlyRate(department);
+    const result = this.db.prepare(`
+      INSERT INTO department_shift_sessions (
+        date, department, teamName, status, startTime,
+        startHeadcount, hourlyRate, startedBy, notes
+      ) VALUES (?, ?, ?, 'active', ?, ?, ?, ?, ?)
+    `).run(date, department, teamName, now, headcount, hourlyRate, data.startedBy, data.notes || null);
+
+    return this.db.prepare('SELECT * FROM department_shift_sessions WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  endDepartmentShift(sessionId: number, data: {
+    endedBy: string;
+    endHeadcount?: number;
+    overtimeHours?: number;
+    notes?: string;
+  }): any {
+    const session = this.db.prepare(`
+      SELECT * FROM department_shift_sessions
+      WHERE id = ?
+      LIMIT 1
+    `).get(sessionId) as any;
+
+    if (!session) {
+      throw new Error('Department shift session not found');
+    }
+
+    if (session.status !== 'active') {
+      throw new Error('Department shift session is not active');
+    }
+
+    const now = getLocalISOString();
+    const endHeadcount = data.endHeadcount !== undefined
+      ? Math.max(0, Math.floor(data.endHeadcount))
+      : session.startHeadcount;
+    const overtimeHours = Math.max(0, Number(data.overtimeHours ?? session.overtimeHours ?? 0));
+
+    const startTime = new Date(session.startTime);
+    const endTime = new Date(now);
+    const elapsedHours = Math.max(0, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60));
+    const effectiveHeadcount = endHeadcount || session.startHeadcount || 0;
+
+    const regularLaborCost = elapsedHours * session.hourlyRate * effectiveHeadcount;
+    const overtimeLaborCost = overtimeHours * session.hourlyRate * effectiveHeadcount * (session.overtimeMultiplier || 1.5);
+    const totalLaborCost = regularLaborCost + overtimeLaborCost;
+
+    this.db.prepare(`
+      UPDATE department_shift_sessions
+      SET status = 'completed',
+          endTime = ?,
+          endHeadcount = ?,
+          overtimeHours = ?,
+          regularLaborCost = ?,
+          overtimeLaborCost = ?,
+          totalLaborCost = ?,
+          endedBy = ?,
+          notes = ?
+      WHERE id = ?
+    `).run(
+      now,
+      endHeadcount,
+      overtimeHours,
+      Math.round(regularLaborCost * 100) / 100,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.endedBy || 'Manager',
+      data.notes || session.notes,
+      sessionId
+    );
+
+    return this.db.prepare('SELECT * FROM department_shift_sessions WHERE id = ?').get(sessionId);
+  }
+
+  updateDepartmentShiftOvertime(sessionId: number, data: {
+    overtimeHours: number;
+    updatedBy: string;
+  }): any {
+    const session = this.db.prepare('SELECT * FROM department_shift_sessions WHERE id = ?').get(sessionId) as any;
+
+    if (!session) {
+      throw new Error('Department shift session not found');
+    }
+
+    const overtimeHours = Math.max(0, Number(data.overtimeHours || 0));
+    const effectiveHeadcount = session.endHeadcount || session.startHeadcount || 0;
+    const overtimeLaborCost = overtimeHours * session.hourlyRate * effectiveHeadcount * (session.overtimeMultiplier || 1.5);
+    const totalLaborCost = (session.regularLaborCost || 0) + overtimeLaborCost;
+
+    this.db.prepare(`
+      UPDATE department_shift_sessions
+      SET overtimeHours = ?,
+          overtimeLaborCost = ?,
+          totalLaborCost = ?,
+          endedBy = ?
+      WHERE id = ?
+    `).run(
+      overtimeHours,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.updatedBy || session.endedBy,
+      sessionId
+    );
+
+    return this.db.prepare('SELECT * FROM department_shift_sessions WHERE id = ?').get(sessionId);
+  }
+
+  getDepartmentShiftSessions(date?: string): any[] {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    return this.db.prepare(`
+      SELECT * FROM department_shift_sessions
+      WHERE date = ?
+      ORDER BY department ASC, teamName ASC, startTime ASC
+    `).all(targetDate) as any[];
+  }
+
+  startWarehouseEmployeeShift(data: {
+    employeeName: string;
+    startedBy: string;
+    notes?: string;
+  }): any {
+    const now = getLocalISOString();
+    const date = now.split('T')[0];
+
+    if (!data.employeeName?.trim()) {
+      throw new Error('employeeName is required');
+    }
+
+    const activeWarehouseDept = this.db.prepare(`
+      SELECT id FROM department_shift_sessions
+      WHERE date = ? AND department = 'warehouse' AND status = 'active'
+      LIMIT 1
+    `).get(date);
+
+    if (!activeWarehouseDept) {
+      throw new Error('Start Warehouse department shift before starting employee shifts');
+    }
+
+    const existing = this.db.prepare(`
+      SELECT id FROM warehouse_employee_shifts
+      WHERE date = ? AND employeeName = ? AND status = 'active'
+      LIMIT 1
+    `).get(date, data.employeeName.trim());
+
+    if (existing) {
+      throw new Error(`${data.employeeName} already has an active warehouse shift`);
+    }
+
+    const result = this.db.prepare(`
+      INSERT INTO warehouse_employee_shifts (
+        date, employeeName, status, startTime, hourlyRate, startedBy, notes
+      ) VALUES (?, ?, 'active', ?, ?, ?, ?)
+    `).run(
+      date,
+      data.employeeName.trim(),
+      now,
+      DatabaseService.DEFAULT_SR_HOURLY_WAGE,
+      data.startedBy || 'Manager',
+      data.notes || null
+    );
+
+    return this.db.prepare('SELECT * FROM warehouse_employee_shifts WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  endWarehouseEmployeeShift(shiftId: number, data: {
+    endedBy: string;
+    overtimeHours?: number;
+    notes?: string;
+  }): any {
+    const shift = this.db.prepare('SELECT * FROM warehouse_employee_shifts WHERE id = ?').get(shiftId) as any;
+
+    if (!shift) {
+      throw new Error('Warehouse employee shift not found');
+    }
+
+    if (shift.status !== 'active') {
+      throw new Error('Warehouse employee shift is not active');
+    }
+
+    const now = getLocalISOString();
+    const overtimeHours = Math.max(0, Number(data.overtimeHours ?? shift.overtimeHours ?? 0));
+    const elapsedHours = Math.max(0, (new Date(now).getTime() - new Date(shift.startTime).getTime()) / (1000 * 60 * 60));
+    const regularLaborCost = elapsedHours * shift.hourlyRate;
+    const overtimeLaborCost = overtimeHours * shift.hourlyRate * (shift.overtimeMultiplier || 1.5);
+    const totalLaborCost = regularLaborCost + overtimeLaborCost;
+
+    this.db.prepare(`
+      UPDATE warehouse_employee_shifts
+      SET status = 'completed',
+          endTime = ?,
+          overtimeHours = ?,
+          regularLaborCost = ?,
+          overtimeLaborCost = ?,
+          totalLaborCost = ?,
+          endedBy = ?,
+          notes = ?
+      WHERE id = ?
+    `).run(
+      now,
+      overtimeHours,
+      Math.round(regularLaborCost * 100) / 100,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.endedBy || 'Manager',
+      data.notes || shift.notes,
+      shiftId
+    );
+
+    return this.db.prepare('SELECT * FROM warehouse_employee_shifts WHERE id = ?').get(shiftId);
+  }
+
+  updateWarehouseEmployeeOvertime(shiftId: number, data: {
+    overtimeHours: number;
+    updatedBy: string;
+  }): any {
+    const shift = this.db.prepare('SELECT * FROM warehouse_employee_shifts WHERE id = ?').get(shiftId) as any;
+
+    if (!shift) {
+      throw new Error('Warehouse employee shift not found');
+    }
+
+    const overtimeHours = Math.max(0, Number(data.overtimeHours || 0));
+    const overtimeLaborCost = overtimeHours * shift.hourlyRate * (shift.overtimeMultiplier || 1.5);
+    const totalLaborCost = (shift.regularLaborCost || 0) + overtimeLaborCost;
+
+    this.db.prepare(`
+      UPDATE warehouse_employee_shifts
+      SET overtimeHours = ?,
+          overtimeLaborCost = ?,
+          totalLaborCost = ?,
+          endedBy = ?
+      WHERE id = ?
+    `).run(
+      overtimeHours,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.updatedBy || shift.endedBy,
+      shiftId
+    );
+
+    return this.db.prepare('SELECT * FROM warehouse_employee_shifts WHERE id = ?').get(shiftId);
+  }
+
+  getWarehouseEmployeeShifts(date?: string): any[] {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    return this.db.prepare(`
+      SELECT * FROM warehouse_employee_shifts
+      WHERE date = ?
+      ORDER BY status ASC, employeeName ASC, startTime ASC
+    `).all(targetDate) as any[];
+  }
+
+  getDepartmentLaborLive(date?: string): any {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    const departments = ['production', 'warehouse', 'qc', 'maintenance', 'food-safety', 'housekeeping'];
+    const now = new Date();
+
+    const departmentSessions = this.db.prepare(`
+      SELECT * FROM department_shift_sessions
+      WHERE date = ?
+    `).all(targetDate) as any[];
+
+    const warehouseEmployeeShifts = this.db.prepare(`
+      SELECT * FROM warehouse_employee_shifts
+      WHERE date = ?
+    `).all(targetDate) as any[];
+
+    const departmentSummaries = departments.map((department) => {
+      const deptSessions = departmentSessions.filter((s) => s.department === department);
+      const activeSessions = deptSessions.filter((s) => s.status === 'active');
+      const completedSessions = deptSessions.filter((s) => s.status === 'completed');
+
+      let runningCost = 0;
+      let completedCost = completedSessions.reduce((sum, s) => sum + (s.totalLaborCost || 0), 0);
+      let activeHeadcount = activeSessions.reduce((sum, s) => sum + (s.startHeadcount || 0), 0);
+      let currentHourlyLaborCost = 0;
+
+      if (department === 'warehouse') {
+        const activeEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'active');
+        const completedEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'completed');
+
+        activeHeadcount = activeEmployees.length;
+        completedCost += completedEmployees.reduce((sum, s) => sum + (s.totalLaborCost || 0), 0);
+        currentHourlyLaborCost = activeEmployees.reduce((sum, shift) => {
+          return sum + (shift.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE);
+        }, 0);
+
+        runningCost = activeEmployees.reduce((sum, shift) => {
+          const elapsedHours = Math.max(0, (now.getTime() - new Date(shift.startTime).getTime()) / (1000 * 60 * 60));
+          return sum + (elapsedHours * (shift.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE));
+        }, 0);
+      } else {
+        currentHourlyLaborCost = activeSessions.reduce((sum, session) => {
+          return sum + ((session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
+        }, 0);
+        runningCost = activeSessions.reduce((sum, session) => {
+          const elapsedHours = Math.max(0, (now.getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60));
+          return sum + (elapsedHours * (session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
+        }, 0);
+      }
+
+      const hasAnySession = deptSessions.length > 0 || (department === 'warehouse' && warehouseEmployeeShifts.length > 0);
+      const status = activeSessions.length > 0 || (department === 'warehouse' && activeHeadcount > 0)
+        ? 'active'
+        : hasAnySession
+          ? 'ended'
+          : 'not-started';
+
+      const totalLaborCost = completedCost + runningCost;
+
+      return {
+        department,
+        status,
+        activeHeadcount,
+        currentHourlyLaborCost: Math.round(currentHourlyLaborCost * 100) / 100,
+        runningLaborCost: Math.round(runningCost * 100) / 100,
+        completedLaborCost: Math.round(completedCost * 100) / 100,
+        totalLaborCost: Math.round(totalLaborCost * 100) / 100,
+      };
+    });
+
+    const totals = departmentSummaries.reduce(
+      (acc, row) => {
+        acc.activeHeadcount += row.activeHeadcount;
+        acc.currentHourlyLaborCost += row.currentHourlyLaborCost;
+        acc.runningLaborCost += row.runningLaborCost;
+        acc.totalLaborCost += row.totalLaborCost;
+        return acc;
+      },
+      { activeHeadcount: 0, currentHourlyLaborCost: 0, runningLaborCost: 0, totalLaborCost: 0 }
+    );
+
+    return {
+      date: targetDate,
+      departments: departmentSummaries,
+      totals: {
+        activeHeadcount: totals.activeHeadcount,
+        currentHourlyLaborCost: Math.round(totals.currentHourlyLaborCost * 100) / 100,
+        runningLaborCost: Math.round(totals.runningLaborCost * 100) / 100,
+        totalLaborCost: Math.round(totals.totalLaborCost * 100) / 100,
+      },
+    };
   }
 
   // ==================== PERFORMANCE TRACKING ====================
@@ -2010,14 +2510,24 @@ export class DatabaseService implements IDatabaseService {
       dockUtilization: 0, // Calculate based on active doors
       completedToday: completedCheckins.length,
       activeNow: activeNow.count,
-      shippingReceivingLaborCostPerHour: latestLabor ? latestLabor.shippingReceivingLaborCost : 0,
-      productionLaborCostPerHour: latestLabor ? latestLabor.productionLaborCost : 0,
+      shippingReceivingLaborCostPerHour: currentShift && currentShift.status === 'active'
+        ? ((this.getDepartmentLaborLive(today).departments.find((row: any) => row.department === 'warehouse')?.currentHourlyLaborCost) || 0)
+        : (latestLabor ? latestLabor.shippingReceivingLaborCost : 0),
+      productionLaborCostPerHour: currentShift && currentShift.status === 'active'
+        ? ((this.getDepartmentLaborLive(today).departments.find((row: any) => row.department === 'production')?.currentHourlyLaborCost) || 0)
+        : (latestLabor ? latestLabor.productionLaborCost : 0),
       totalShiftLaborCost: Math.round(totalShiftLaborCost * 100) / 100,
       laborCostYTD: Math.round(laborCostYTD * 100) / 100,
       laborCostPreviousDay: Math.round(laborCostPreviousDay * 100) / 100,
-      currentHeadcount: latestLabor ? latestLabor.totalHeadcount : 0,
-      warehouseHeadcount: latestLabor ? latestLabor.shippingReceivingHeadcount : 0,
-      productionHeadcount: latestLabor ? latestLabor.productionHeadcount : 0,
+      currentHeadcount: currentShift && currentShift.status === 'active'
+        ? (currentShift.currentTotalHeadcount || 0)
+        : (latestLabor ? latestLabor.totalHeadcount : 0),
+      warehouseHeadcount: currentShift && currentShift.status === 'active'
+        ? (currentShift.currentWarehouseHeadcount || 0)
+        : (latestLabor ? latestLabor.shippingReceivingHeadcount : 0),
+      productionHeadcount: currentShift && currentShift.status === 'active'
+        ? (currentShift.currentProductionHeadcount || 0)
+        : (latestLabor ? latestLabor.productionHeadcount : 0),
       totalCasesCompleted: totalCasesCompleted.total || 0,
       totalBagsCompleted: totalBags,
       casesCompletedYTD: casesCompletedYTD.total || 0,
