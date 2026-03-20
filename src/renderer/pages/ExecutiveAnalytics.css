@@ -30,6 +30,48 @@
   color: var(--text-muted);
 }
 
+.header-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.date-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-field label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.date-field input {
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.date-field input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+}
+
 /* Today Button - Blue */
 .today-btn {
   background: none !important;
@@ -223,5 +265,27 @@
   .chart-panel.labor-costs,
   .chart-panel.appointments {
     grid-column: span 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .analytics-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .date-selector {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .date-field {
+    flex: 1;
+    min-width: 140px;
   }
 }

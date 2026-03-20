@@ -569,6 +569,57 @@ const ExecutiveDashboard: React.FC = () => {
           </GlassPanel>
         )}
 
+        {/* Labor Cost Summary */}
+        <GlassPanel className="labor-summary">
+          <h2>Labor Cost Summary</h2>
+          <div className="labor-grid">
+            <div className="labor-card sr-card">
+              <div className="labor-header">
+                <h3>Shipping / Receiving</h3>
+                <span className="icon">📦</span>
+              </div>
+              <div className="labor-value">${(metrics.shippingReceivingLaborCostPerHour || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">Per hour</div>
+            </div>
+
+            <div className="labor-card prod-card">
+              <div className="labor-header">
+                <h3>Production</h3>
+                <span className="icon">🏭</span>
+              </div>
+              <div className="labor-value">${(metrics.productionLaborCostPerHour || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">Per hour</div>
+            </div>
+
+            <div className="labor-card total-card">
+              <div className="labor-header">
+                <h3>Total Shift</h3>
+                <span className="icon">💰</span>
+              </div>
+              <div className="labor-value">${(metrics.totalShiftLaborCost || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">Selected range</div>
+            </div>
+
+            <div className="labor-card ytd-card">
+              <div className="labor-header">
+                <h3>Labor Cost YTD</h3>
+                <span className="icon">📈</span>
+              </div>
+              <div className="labor-value">${(metrics.laborCostYTD || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="labor-subtitle">Jan 1 - Today</div>
+            </div>
+
+            <div className="labor-card previous-card">
+              <div className="labor-header">
+                <h3>Previous Day</h3>
+                <span className="icon">🕘</span>
+              </div>
+              <div className="labor-value">${(metrics.laborCostPreviousDay || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">Yesterday total</div>
+            </div>
+          </div>
+        </GlassPanel>
+
         {/* Performance Summary */}
         <GlassPanel className="performance-summary">
           <h2>Performance Summary</h2>
