@@ -520,6 +520,8 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Izzy', pin: '69384', role: 'executive' },
         { name: 'John', pin: '78420', role: 'executive' },
         { name: 'Ryan', pin: '34090', role: 'executive' },
+        { name: 'Victor Roman', pin: '86214', role: 'executive' },
+        { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },
         { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
         { name: 'Sal', pin: '91356', role: 'manager' },
         { name: 'Jacob', pin: '53782', role: 'manager' },
@@ -534,7 +536,7 @@ export class DatabaseService implements IDatabaseService {
           DO UPDATE SET pin = $2, role = $3, is_active = true
         `, [exec.name, exec.pin, exec.role]);
       }
-      console.log('✓ Synced 12 users with PINs (8 executives + 4 managers)');
+      console.log('✓ Synced 14 users with PINs (10 executives + 4 managers)');
 
       // Seed production dock statuses if empty
       const prodDockCount = await client.query('SELECT COUNT(*) as count FROM production_dock_statuses');
@@ -3719,6 +3721,8 @@ export class DatabaseService implements IDatabaseService {
       { name: 'Izzy', pin: '69384', role: 'executive' },
       { name: 'John', pin: '78420', role: 'executive' },
       { name: 'Ryan', pin: '34090', role: 'executive' },
+      { name: 'Victor Roman', pin: '86214', role: 'executive' },
+      { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },
       { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
       { name: 'Sal', pin: '91356', role: 'manager' },
       { name: 'Jacob', pin: '53782', role: 'manager' },
@@ -3732,7 +3736,7 @@ export class DatabaseService implements IDatabaseService {
       `, [exec.name, exec.pin, exec.role]);
     }
     
-    console.log('✓ Force-seeded 12 users (8 executives + 4 managers)');
+    console.log('✓ Force-seeded 14 users (10 executives + 4 managers)');
     return await this.getExecutives();
   }
 

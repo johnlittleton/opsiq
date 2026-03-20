@@ -588,6 +588,8 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Izzy', pin: '69384', role: 'executive' },
         { name: 'John', pin: '78420', role: 'executive' },
         { name: 'Ryan', pin: '34090', role: 'executive' },
+        { name: 'Victor Roman', pin: '86214', role: 'executive' },
+        { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },
         { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
         { name: 'Sal', pin: '91356', role: 'manager' },
         { name: 'Jacob', pin: '53782', role: 'manager' },
@@ -606,7 +608,28 @@ export class DatabaseService implements IDatabaseService {
       });
 
       insertExecs();
-      console.log('✓ Initialized 12 users with PINs (8 executives + 4 managers)');
+      console.log('✓ Initialized 14 users with PINs (10 executives + 4 managers)');
+    }
+
+    // Ensure required executive users exist on existing desktop databases without re-seeding.
+    const now = getLocalISOString();
+    const ensureExecutives = [
+      { name: 'Victor Roman', pin: '86214', role: 'executive' },
+      { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' }
+    ];
+
+    const upsertExec = this.db.prepare(`
+      INSERT INTO executives (name, pin, role, isActive, createdAt, updatedAt)
+      VALUES (?, ?, ?, 1, ?, ?)
+      ON CONFLICT(name) DO UPDATE SET
+        pin = excluded.pin,
+        role = excluded.role,
+        isActive = 1,
+        updatedAt = excluded.updatedAt
+    `);
+
+    for (const exec of ensureExecutives) {
+      upsertExec.run(exec.name, exec.pin, exec.role, now, now);
     }
   }
 
@@ -3127,6 +3150,8 @@ export class DatabaseService implements IDatabaseService {
       { name: 'Izzy', pin: '69384', role: 'executive' },
       { name: 'John', pin: '78420', role: 'executive' },
       { name: 'Ryan', pin: '34090', role: 'executive' },
+      { name: 'Victor Roman', pin: '86214', role: 'executive' },
+      { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },
       { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
       { name: 'Sal', pin: '91356', role: 'manager' },
       { name: 'Jacob', pin: '53782', role: 'manager' },
@@ -3142,7 +3167,7 @@ export class DatabaseService implements IDatabaseService {
       insert.run(exec.name, exec.pin, exec.role, now, now);
     }
     
-    console.log('✓ Force-seeded 8 executives');
+    console.log('✓ Force-seeded 14 users (10 executives + 4 managers)');
     return this.getExecutives();
   }
 
