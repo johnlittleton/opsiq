@@ -248,6 +248,17 @@
   padding: 10px;
 }
 
+.warehouse-roster-card.clickable {
+  cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.warehouse-roster-card.clickable:hover {
+  border-color: rgba(52, 152, 219, 0.5);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+
 .warehouse-roster-header {
   margin-bottom: 8px;
   padding-bottom: 6px;
@@ -407,6 +418,34 @@
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 12px;
+}
+
+.session-inline-inputs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.session-inline-inputs label,
+.warehouse-inline-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.session-inline-inputs input,
+.warehouse-inline-label input {
+  width: 90px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--text);
 }
 
 .department-session-card__end-btn {

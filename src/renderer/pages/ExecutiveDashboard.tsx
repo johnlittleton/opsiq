@@ -232,7 +232,7 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
-  // Auto-update shift and silently refresh activeNow every minute
+  // Auto-update shift and refresh active labor metrics frequently for near real-time status.
   useEffect(() => {
     fetchCurrentShift();
     fetchDepartmentLaborLive();
@@ -258,7 +258,7 @@ const ExecutiveDashboard: React.FC = () => {
           setMetrics(prev => prev ? { ...prev, activeNow: data.activeNow } : prev);
         } catch {}
       })();
-    }, 60000);
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
