@@ -30,7 +30,7 @@
   color: var(--text-muted);
 }
 
-.header-actions {
+.analytics-header-actions {
   display: flex;
   align-items: flex-end;
   gap: 10px;
@@ -38,18 +38,18 @@
   justify-content: flex-end;
 }
 
-.date-selector {
+.analytics-date-selector {
   display: flex;
   gap: 10px;
 }
 
-.date-field {
+.analytics-date-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.date-field label {
+.analytics-date-field label {
   font-size: 10px;
   font-weight: 600;
   color: var(--text-muted);
@@ -57,7 +57,7 @@
   letter-spacing: 0.5px;
 }
 
-.date-field input {
+.analytics-date-field input {
   padding: 6px 8px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -66,7 +66,7 @@
   font-size: 12px;
 }
 
-.date-field input:focus {
+.analytics-date-field input:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.08);
   border-color: var(--primary);
@@ -94,7 +94,7 @@
 }
 
 /* Back Button - Teal */
-.back-btn {
+.analytics-back-btn {
   background: none !important;
   color: #16a085 !important;
   border: 3px solid #16a085 !important;
@@ -108,13 +108,13 @@
   height: fit-content;
 }
 
-.back-btn:hover {
+.analytics-back-btn:hover {
   background: #16a085 !important;
   color: #000 !important;
   transform: translateY(-1px) !important;
 }
 
-.back-btn:active {
+.analytics-back-btn:active {
   transform: translateY(0) !important;
 }
 
@@ -274,17 +274,17 @@
     gap: 12px;
   }
 
-  .header-actions {
+  .analytics-header-actions {
     width: 100%;
     justify-content: flex-start;
   }
 
-  .date-selector {
+  .analytics-date-selector {
     width: 100%;
     flex-wrap: wrap;
   }
 
-  .date-field {
+  .analytics-date-field {
     flex: 1;
     min-width: 140px;
   }
