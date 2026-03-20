@@ -319,6 +319,9 @@ const ExecutiveDashboard: React.FC = () => {
       ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
       : 0);
   const showShiftTrackerPanel = Boolean(currentShift || combinedActiveHeadcount > 0 || activeDepartmentSessions.length > 0);
+  const selectedRangeLaborTotal = Number(metrics.totalShiftLaborCost || 0);
+  const laborCostYTD = Number(metrics.laborCostYTD || 0);
+  const laborCostPreviousDay = Number(metrics.laborCostPreviousDay || 0);
 
   return (
     <div className="executive-dashboard" style={{ backgroundColor: '#1a1a2e', minHeight: '100vh' }}>
@@ -581,6 +584,57 @@ const ExecutiveDashboard: React.FC = () => {
             <div className="summary-item">
               <span className="label">Active Now</span>
               <span className="value highlight">{metrics.activeNow}</span>
+            </div>
+          </div>
+        </GlassPanel>
+
+        {/* Labor Cost Summary (restored bottom tiles) */}
+        <GlassPanel className="labor-summary">
+          <h2>Labor Cost Summary</h2>
+          <div className="labor-grid">
+            <div className="labor-card sr-card">
+              <div className="labor-header">
+                <h3>S&R Hourly</h3>
+                <span className="icon">🏭</span>
+              </div>
+              <div className="labor-value">${Number(metrics.shippingReceivingLaborCostPerHour || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="labor-subtitle">Current hourly cost</div>
+            </div>
+
+            <div className="labor-card prod-card">
+              <div className="labor-header">
+                <h3>Production Hourly</h3>
+                <span className="icon">⚙️</span>
+              </div>
+              <div className="labor-value">${Number(metrics.productionLaborCostPerHour || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="labor-subtitle">Current hourly cost</div>
+            </div>
+
+            <div className="labor-card total-card">
+              <div className="labor-header">
+                <h3>{viewMode === 'alltime' ? 'All-Time Labor Cost' : 'Selected Period'}</h3>
+                <span className="icon">💵</span>
+              </div>
+              <div className="labor-value">${selectedRangeLaborTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="labor-subtitle">{viewMode === 'alltime' ? 'Cumulative labor total' : `${dateRange.startDate} to ${dateRange.endDate}`}</div>
+            </div>
+
+            <div className="labor-card previous-card">
+              <div className="labor-header">
+                <h3>Previous Day</h3>
+                <span className="icon">📆</span>
+              </div>
+              <div className="labor-value">${laborCostPreviousDay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="labor-subtitle">Yesterday total labor</div>
+            </div>
+
+            <div className="labor-card ytd-card">
+              <div className="labor-header">
+                <h3>YTD Labor Cost</h3>
+                <span className="icon">📈</span>
+              </div>
+              <div className="labor-value">${laborCostYTD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="labor-subtitle">Jan 1 to today</div>
             </div>
           </div>
         </GlassPanel>

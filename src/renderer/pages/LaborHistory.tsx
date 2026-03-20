@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { GlassPanel } from '../components';
 import { TitleBar } from '../../components/layout/TitleBar';
+import { useAuth } from '../context/AuthContext';
 import './LaborHistory.css';
 
 const SR_HOURLY_WAGE = 27; // Warehouse
@@ -71,7 +71,7 @@ interface TrackerHistoryItem {
 }
 
 export default function LaborHistory() {
-  const navigate = useNavigate();
+  const { userRole } = useAuth();
   const [snapshots, setSnapshots] = useState<LaborSnapshot[]>([]);
   const [filteredSnapshots, setFilteredSnapshots] = useState<LaborSnapshot[]>([]);
   const [trackerHistory, setTrackerHistory] = useState<TrackerHistoryItem[]>([]);
@@ -303,6 +303,23 @@ export default function LaborHistory() {
   const trackerTotalCost = filteredTrackerHistory
     .reduce((sum, item) => sum + Number(item.totalLaborCost || 0), 0)
     .toFixed(2);
+
+  if (userRole !== 'executive') {
+    return (
+      <div className="labor-history">
+        <TitleBar showLegend={false} />
+        <div className="labor-history__container">
+          <div style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
+            ⛔ Access Denied
+            <br />
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>
+              Labor History is restricted to executive users.
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="labor-history">

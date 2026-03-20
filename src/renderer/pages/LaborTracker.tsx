@@ -216,6 +216,7 @@ export default function LaborTracker() {
   const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [endingShift, setEndingShift] = useState(false);
   const [department, setDepartment] = useState('production');
   const [departmentHeadcount, setDepartmentHeadcount] = useState('');
@@ -289,11 +290,24 @@ export default function LaborTracker() {
     (session) => session.department === 'warehouse' && session.status === 'active'
   );
 
+  const currentShiftStartTime = currentShift?.startTime ? new Date(currentShift.startTime).getTime() : null;
+  const isWithinCurrentShiftWindow = (startTime?: string | null) => {
+    if (!startTime || currentShiftStartTime === null) {
+      return false;
+    }
+
+    const sessionStart = new Date(startTime).getTime();
+    return Number.isFinite(sessionStart) && sessionStart >= currentShiftStartTime;
+  };
+
   const filteredDepartmentSessions = departmentSessions.filter(
     (session) => session.department === activeDepartment
   );
-  const activeDepartmentSessions = filteredDepartmentSessions.filter((session) => session.status === 'active');
-  const completedDepartmentSessions = filteredDepartmentSessions.filter((session) => session.status === 'completed');
+  const departmentSessionsForCards = currentShiftStartTime !== null
+    ? filteredDepartmentSessions.filter((session) => session.status === 'active' || isWithinCurrentShiftWindow(session.startTime))
+    : filteredDepartmentSessions.filter((session) => session.status === 'active');
+  const activeDepartmentSessions = departmentSessionsForCards.filter((session) => session.status === 'active');
+  const completedDepartmentSessions = departmentSessionsForCards.filter((session) => session.status === 'completed');
   const completedDepartmentHistory = [...departmentSessions]
     .filter((session) => session.status === 'completed')
     .sort((a, b) => {
@@ -314,27 +328,48 @@ export default function LaborTracker() {
   const canStartDepartmentShift =
     activeDepartment === 'production' ? !selectedProductionTeamIsActive : activeDepartmentSessions.length === 0;
 
+  const warehouseShiftsForCards = currentShiftStartTime !== null
+    ? warehouseEmployeeShifts.filter((shift) => shift.status === 'active' || isWithinCurrentShiftWindow(shift.startTime))
+    : warehouseEmployeeShifts.filter((shift) => shift.status === 'active');
+
   const getWarehouseShiftForEmployee = (employeeName: string) => {
-    return warehouseEmployeeShifts.find((shift) => shift.employeeName.toLowerCase() === employeeName.toLowerCase());
+    return warehouseShiftsForCards.find((shift) => shift.employeeName.toLowerCase() === employeeName.toLowerCase());
   };
 
-  const refreshLiveLaborData = async () => {
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setTimeout(() => {
+      setSuccessMessage((prev) => (prev === message ? null : prev));
+    }, 2500);
+  };
+
+  const refreshLiveLaborData = async (dateOverride?: string) => {
     await Promise.all([
       fetchSummary(),
       fetchCurrentShift(),
-      fetchDepartmentTrackerData(),
+      fetchDepartmentTrackerData(dateOverride),
     ]);
   };
 
   useEffect(() => {
-    refreshLiveLaborData();
+    refreshLiveLaborData(selectedDate);
     
-    // Poll for current shift every 30 seconds
+    // Poll for current shift every 30 seconds and auto-advance date at midnight
     const interval = setInterval(() => {
-      refreshLiveLaborData();
+      const today = getLocalDateString(new Date());
+      if (today !== selectedDate) {
+        setSelectedDate(today);
+      }
+      refreshLiveLaborData(today);
     }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    setDepartmentOvertimeDrafts({});
+    setDepartmentEndHeadcountDrafts({});
+    setWarehouseOvertimeDrafts({});
+  }, [selectedDate]);
 
   // Auto-fill recordedBy with authenticated executive's name
   useEffect(() => {
@@ -369,11 +404,12 @@ export default function LaborTracker() {
     }
   };
 
-  const fetchDepartmentTrackerData = async () => {
+  const fetchDepartmentTrackerData = async (dateOverride?: string) => {
     try {
+      const targetDate = dateOverride || selectedDate;
       const [sessionsRes, warehouseRes] = await Promise.all([
-        fetch(`${API_BASE}/api/labor/departments/sessions`),
-        fetch(`${API_BASE}/api/labor/warehouse/employees`),
+        fetch(`${API_BASE}/api/labor/departments/sessions?date=${targetDate}`),
+        fetch(`${API_BASE}/api/labor/warehouse/employees?date=${targetDate}`),
       ]);
 
       if (sessionsRes.ok) {
@@ -496,6 +532,7 @@ export default function LaborTracker() {
         return next;
       });
       await refreshLiveLaborData();
+      showSuccess(`${formatSessionLabel(session)} shift ended and logged.`);
     } catch (err: any) {
       setError(err.message);
     }
@@ -527,6 +564,7 @@ export default function LaborTracker() {
         return next;
       });
       await refreshLiveLaborData();
+      showSuccess(`OT saved for ${formatSessionLabel(session)}.`);
     } catch (err: any) {
       setError(err.message);
     }
@@ -659,6 +697,7 @@ export default function LaborTracker() {
         return next;
       });
       await refreshLiveLaborData();
+      showSuccess(`${shift.employeeName} shift ended and logged.`);
     } catch (err: any) {
       setError(err.message);
     }
@@ -690,6 +729,7 @@ export default function LaborTracker() {
         return next;
       });
       await refreshLiveLaborData();
+      showSuccess(`OT saved for ${shift.employeeName}.`);
     } catch (err: any) {
       setError(err.message);
     }
@@ -840,8 +880,15 @@ export default function LaborTracker() {
       
       <div className="labor-tracker__container">
         <div className="labor-tracker__header">
-          <h1>Labor Tracker</h1>
-          <p className="labor-tracker__subtitle">Manager Dashboard - Track Department Headcount & Labor Costs</p>
+          <div>
+            <h1>Labor Tracker</h1>
+            <p className="labor-tracker__subtitle">Manager Dashboard - Track Department Headcount & Labor Costs</p>
+          </div>
+          <div className="labor-tracker__header-buttons">
+            <button type="button" className="labor-tracker__history-btn" onClick={() => navigate('/labor-history')}>
+              Labor History
+            </button>
+          </div>
         </div>
 
         <div className="department-top-nav">
@@ -887,8 +934,15 @@ export default function LaborTracker() {
         </div>
       )}
 
+      {successMessage && (
+        <div className="labor-tracker__success">
+          {successMessage}
+        </div>
+      )}
+
       <div className="labor-tracker__content">
-        <GlassPanel className="labor-tracker__form-panel" style={{ marginBottom: '12px' }}>
+        <div style={{ marginBottom: '12px' }}>
+        <GlassPanel className="labor-tracker__form-panel">
           <div className="labor-tracker__form-header">
             <h2>{getDepartmentLabel(activeDepartment)} Shift Tracker (Dev)</h2>
           </div>
@@ -1343,6 +1397,7 @@ export default function LaborTracker() {
             </div>
           </div>}
         </GlassPanel>
+        </div>
       </div>
 
 
