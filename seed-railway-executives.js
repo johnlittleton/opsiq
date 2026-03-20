@@ -32,7 +32,9 @@ async function seedExecutives() {
       { name: 'Michelle', pin: '57263' },
       { name: 'Izzy', pin: '69384' },
       { name: 'John', pin: '78420' },
-      { name: 'Ryan', pin: '34090' }
+      { name: 'Ryan', pin: '34090' },
+      { name: 'Victor Roman', pin: '86214' },
+      { name: 'Erasmo Sanchez', pin: '97531' }
     ];
 
     console.log('📝 Inserting executives...');
