@@ -1553,13 +1553,13 @@ export class DatabaseService implements IDatabaseService {
         ? (departmentLive.totals.activeHeadcount || 0)
         : (currentWarehouseHeadcount + currentProductionHeadcount),
       currentWarehouseLaborCost: hasDepartmentTrackerData
-        ? (warehouseLive?.totalLaborCost || 0)
+        ? (warehouseLive?.runningLaborCost || 0)
         : Math.round(runningWarehouseCost * 100) / 100,
       currentProductionLaborCost: hasDepartmentTrackerData
-        ? (productionLive?.totalLaborCost || 0)
+        ? (productionLive?.runningLaborCost || 0)
         : Math.round(runningProductionCost * 100) / 100,
       runningLaborCost: hasDepartmentTrackerData
-        ? (departmentLive.totals.totalLaborCost || 0)
+        ? (departmentLive.totals.runningLaborCost || 0)
         : Math.round(runningCost * 100) / 100,
     };
   }

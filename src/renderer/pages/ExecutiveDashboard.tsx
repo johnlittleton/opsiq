@@ -304,7 +304,7 @@ const ExecutiveDashboard: React.FC = () => {
     );
   }
 
-  const combinedRunningLaborCost = departmentLaborSummary?.totals?.totalLaborCost ?? currentShift?.runningLaborCost ?? 0;
+  const combinedRunningLaborCost = departmentLaborSummary?.totals?.runningLaborCost ?? currentShift?.runningLaborCost ?? 0;
   const combinedActiveHeadcount = departmentLaborSummary?.totals?.activeHeadcount
     ?? (currentShift ? currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount : 0);
   const activeDepartmentSessions = departmentSessions.filter((session) => session.status === 'active');
@@ -314,11 +314,11 @@ const ExecutiveDashboard: React.FC = () => {
         .filter((value) => Number.isFinite(value))
         .sort((a, b) => a - b)[0]
     : null;
-  const derivedElapsedMinutes = currentShift?.elapsedMinutes
-    ?? (derivedTrackerStartTime
+  const derivedElapsedMinutes = (derivedTrackerStartTime
       ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
-      : 0);
-  const showShiftTrackerPanel = Boolean(currentShift || combinedActiveHeadcount > 0 || activeDepartmentSessions.length > 0);
+      : (currentShift?.elapsedMinutes ?? 0));
+  const showShiftTrackerPanel = combinedActiveHeadcount > 0 || activeDepartmentSessions.length > 0 || Boolean(currentShift?.status === 'active');
+  const trackerTitle = activeDepartmentSessions.length > 0 ? 'Department Tracker' : (currentShift?.shiftName || 'Department Tracker');
   const selectedRangeLaborTotal = Number(metrics.totalShiftLaborCost || 0);
   const laborCostYTD = Number(metrics.laborCostYTD || 0);
   const laborCostPreviousDay = Number(metrics.laborCostPreviousDay || 0);
@@ -512,7 +512,7 @@ const ExecutiveDashboard: React.FC = () => {
               <div className="shift-tracker-title">
                 <div className="shift-badge">
                   <div className="pulse-dot"></div>
-                  <span className="shift-name">{currentShift?.shiftName || 'Department Tracker'}</span>
+                  <span className="shift-name">{trackerTitle}</span>
                   <span className="shift-status">ACTIVE</span>
                 </div>
                 <span className="shift-start">
