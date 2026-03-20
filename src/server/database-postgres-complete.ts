@@ -2229,7 +2229,8 @@ export class DatabaseService implements IDatabaseService {
       }
 
       const hasAnySession = deptSessions.length > 0 || (department === 'warehouse' && warehouseEmployeeShifts.length > 0);
-      const status = activeSessions.length > 0 || (department === 'warehouse' && activeHeadcount > 0)
+      const hasActiveLabor = department === 'warehouse' ? activeHeadcount > 0 : activeSessions.length > 0;
+      const status = hasActiveLabor
         ? 'active'
         : hasAnySession
           ? 'ended'

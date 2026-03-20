@@ -308,6 +308,7 @@ const ExecutiveDashboard: React.FC = () => {
   const combinedActiveHeadcount = departmentLaborSummary?.totals?.activeHeadcount
     ?? (currentShift ? currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount : 0);
   const activeDepartmentSessions = departmentSessions.filter((session) => session.status === 'active');
+  const hasLiveDepartmentLabor = combinedActiveHeadcount > 0 || combinedRunningLaborCost > 0;
   const derivedTrackerStartTime = activeDepartmentSessions.length > 0
     ? activeDepartmentSessions
         .map((session) => new Date(session.startTime).getTime())
@@ -317,7 +318,7 @@ const ExecutiveDashboard: React.FC = () => {
   const derivedElapsedMinutes = (derivedTrackerStartTime
       ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
       : (currentShift?.elapsedMinutes ?? 0));
-  const showShiftTrackerPanel = combinedActiveHeadcount > 0 || activeDepartmentSessions.length > 0 || Boolean(currentShift?.status === 'active');
+  const showShiftTrackerPanel = hasLiveDepartmentLabor;
   const trackerTitle = activeDepartmentSessions.length > 0 ? 'Department Tracker' : (currentShift?.shiftName || 'Department Tracker');
   const selectedRangeLaborTotal = Number(metrics.totalShiftLaborCost || 0);
   const laborCostYTD = Number(metrics.laborCostYTD || 0);
