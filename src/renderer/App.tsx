@@ -54,20 +54,6 @@ const PUBLIC_ROUTES = [
   '/shipping'
 ];
 
-const MOBILE_ALLOWED_ROUTES = [
-  '/',
-  '/home',
-  '/dockboard',
-  '/scheduler',
-  '/production-scheduler',
-  '/production-dashboard',
-  '/dashboard',
-  '/executive',
-  '/executive-analytics',
-  '/production-costing',
-  '/shipping',
-];
-
 const AppRoutes: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, login } = useAuth();
@@ -83,10 +69,6 @@ const AppRoutes: React.FC = () => {
   // Show PIN entry only for protected routes when not authenticated
   if (!isAuthenticated && !isPublicRoute) {
     return <PinEntry onSuccess={handlePinSuccess} />;
-  }
-
-  if (isAuthenticated && isMobileRuntime && !MOBILE_ALLOWED_ROUTES.includes(location.pathname)) {
-    return <Navigate to="/home" replace />;
   }
 
   return (
