@@ -98,10 +98,10 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
   {
     name: 'VICTOR ROMAN',
     role: 'Office Staff (Coordinator)',
-    schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
+    schedule: { sun: 'OFF', mon: '7:00 AM - 3:30 PM', tue: '7:00 AM - 3:30 PM', wed: '7:00 AM - 3:30 PM', thu: '7:00 AM - 3:30 PM', fri: '7:00 AM - 3:30 PM', sat: 'OFF' },
   },
   {
-    name: 'JAPNET SINGH',
+    name: 'JAPNEET SINGH',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
@@ -111,12 +111,12 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
   {
-    name: 'LISETTE RASARIO',
+    name: 'LISSETTE ROSARIO',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
   {
-    name: 'RIZELYS "VAL\'RODRIGUEZ',
+    name: 'RIZELYS RODRIGUEZ',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
@@ -151,14 +151,14 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
     schedule: { sun: 'OFF', mon: '6:00 AM - 2:30 PM', tue: '6:00 AM - 2:30 PM', wed: '6:00 AM - 2:30 PM', thu: '6:00 AM - 2:30 PM', fri: '6:00 AM - 2:30 PM', sat: 'OFF' },
   },
   {
-    name: 'JOYCEANN ROSADO',
+    name: 'JOYCEANNE ROSADO',
     role: 'Office Staff',
-    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: 'OFF' },
+    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: '12:00 PM - 8:30 PM', wed: 'OFF', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
   },
   {
     name: 'DAHINNY BERNAL',
     role: 'Office Staff',
-    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: 'OFF' },
+    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: 'OFF', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
   },
   {
     name: 'JAN CARLOS MONTALVO',
@@ -178,7 +178,12 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
   {
     name: 'JENSEN AVILES',
     role: 'Office Staff',
-    schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '12:00 PM - 8:30 PM' },
+    schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
+  },
+  {
+    name: 'CLAUDIA HERMOSILLO',
+    role: 'Office Staff',
+    schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
   },
   {
     name: 'ESVIN GOMEZ',
@@ -917,10 +922,6 @@ export default function LaborTracker() {
                             <span className="label">Overtime</span>
                             <span className="value">{session.overtimeHours || 0} hrs</span>
                           </div>
-                          <div className="preview-item">
-                            <span className="label">Labor Cost</span>
-                            <span className="value">${Number(session.totalLaborCost || 0).toFixed(2)}</span>
-                          </div>
                         </div>
 
                         <div className="department-session-card__actions">
@@ -1059,10 +1060,6 @@ export default function LaborTracker() {
                           <div className="preview-item">
                             <span className="label">End</span>
                             <span className="value">{session.endHeadcount ?? session.startHeadcount}</span>
-                          </div>
-                          <div className="preview-item">
-                            <span className="label">Cost</span>
-                            <span className="value">${Number(session.totalLaborCost || 0).toFixed(2)}</span>
                           </div>
                         </div>
 
@@ -1285,7 +1282,7 @@ export default function LaborTracker() {
             </div>
           )}
 
-          <div className="department-session-section department-session-section--history" style={{ marginTop: '20px' }}>
+          {userRole === 'executive' && <div className="department-session-section department-session-section--history" style={{ marginTop: '20px' }}>
             <div className="department-session-section__header">
               <h3>Labor Tracker History ({selectedDate})</h3>
               <span>{completedDepartmentHistory.length + completedWarehouseHistory.length} records</span>
@@ -1344,7 +1341,7 @@ export default function LaborTracker() {
                 <div className="department-session-empty">No completed labor records yet for {selectedDate}.</div>
               )}
             </div>
-          </div>
+          </div>}
         </GlassPanel>
       </div>
 
