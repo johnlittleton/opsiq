@@ -1656,7 +1656,7 @@ export class DatabaseService implements IDatabaseService {
     const now = getLocalISOString();
     const date = now.split('T')[0];
     const department = this.normalizeDepartmentName(data.department);
-    const teamName = department === 'production' ? (data.teamName || null) : null;
+    const teamName = department === 'warehouse' ? null : (data.teamName?.trim() || null);
     const headcount = Math.max(0, Math.floor(data.headcount || 0));
 
     if (!data.startedBy) {
@@ -1680,12 +1680,8 @@ export class DatabaseService implements IDatabaseService {
       throw new Error(`Unsupported department: ${department}`);
     }
 
-    if (department === 'production' && !teamName) {
-      throw new Error('Production shifts require teamName (Group A/Group B)');
-    }
-
     let existing: any;
-    if (department === 'production') {
+    if (department !== 'warehouse' && teamName) {
       existing = this.db.prepare(`
         SELECT id FROM department_shift_sessions
         WHERE date = ? AND department = ? AND teamName = ? AND status = 'active'
