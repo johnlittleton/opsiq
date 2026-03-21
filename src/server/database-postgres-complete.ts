@@ -303,6 +303,19 @@ export class DatabaseService implements IDatabaseService {
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS pallet_tracker_events (
+          id SERIAL PRIMARY KEY,
+          order_type TEXT NOT NULL,
+          order_id TEXT NOT NULL,
+          line INTEGER,
+          pallet_tag TEXT NOT NULL,
+          direction TEXT NOT NULL,
+          scanned_by TEXT NOT NULL,
+          scanned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          scanner_source TEXT DEFAULT 'wireless',
+          notes TEXT
+        );
+
         CREATE TABLE IF NOT EXISTS production_dock_statuses (
           id SERIAL PRIMARY KEY,
           dock_number INTEGER NOT NULL UNIQUE,
@@ -407,6 +420,8 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_audit_time ON checkin_audit_log(changed_at);
         CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
         CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+        CREATE INDEX IF NOT EXISTS idx_pallet_tracker_order ON pallet_tracker_events(order_type, order_id, scanned_at);
+        CREATE INDEX IF NOT EXISTS idx_pallet_tracker_tag ON pallet_tracker_events(order_type, order_id, pallet_tag);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
@@ -3445,6 +3460,121 @@ export class DatabaseService implements IDatabaseService {
   async deleteWorkOrder(id: string): Promise<boolean> {
     const result = await this.pool.query('DELETE FROM work_orders WHERE id = $1', [id]);
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getPalletTrackerOrders(): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT id, line, date, product, customer, status
+      FROM work_orders
+      WHERE status IN ('Scheduled', 'Active')
+      ORDER BY date DESC, line ASC, slot ASC
+      LIMIT 200
+    `);
+    return this.toCamelCase(result.rows);
+  }
+
+  async recordPalletTrackerScan(payload: {
+    orderType: 'WO' | 'SO';
+    orderId: string;
+    line?: number | null;
+    palletTag: string;
+    direction: 'IN' | 'OUT';
+    scannedBy: string;
+    scannerSource?: string;
+    notes?: string;
+  }): Promise<any> {
+    const orderType = String(payload.orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
+    const orderId = String(payload.orderId || '').trim();
+    const palletTag = String(payload.palletTag || '').trim();
+    const direction = String(payload.direction || '').toUpperCase() === 'OUT' ? 'OUT' : 'IN';
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    const scannerSource = String(payload.scannerSource || 'wireless').trim() || 'wireless';
+
+    if (!orderId) {
+      throw new Error('Order number is required');
+    }
+
+    if (!palletTag) {
+      throw new Error('Pallet tag is required');
+    }
+
+    if (orderType === 'WO') {
+      const workOrder = await this.pool.query('SELECT id FROM work_orders WHERE id = $1 LIMIT 1', [orderId]);
+      if (!workOrder.rowCount) {
+        throw new Error('Work order not found');
+      }
+    }
+
+    const duplicate = await this.pool.query(
+      `SELECT id FROM pallet_tracker_events
+       WHERE order_type = $1 AND order_id = $2 AND pallet_tag = $3 AND direction = $4
+       LIMIT 1`,
+      [orderType, orderId, palletTag, direction]
+    );
+
+    if (duplicate.rowCount) {
+      throw new Error(`Duplicate ${direction} scan for pallet ${palletTag}`);
+    }
+
+    const result = await this.pool.query(
+      `INSERT INTO pallet_tracker_events (
+        order_type, order_id, line, pallet_tag, direction, scanned_by, scanner_source, notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *`,
+      [
+        orderType,
+        orderId,
+        payload.line ?? null,
+        palletTag,
+        direction,
+        scannedBy,
+        scannerSource,
+        payload.notes || null,
+      ]
+    );
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getPalletTrackerSummary(orderType: 'WO' | 'SO', orderId: string): Promise<any> {
+    const normalizedType = String(orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
+    const normalizedOrderId = String(orderId || '').trim();
+
+    if (!normalizedOrderId) {
+      throw new Error('Order number is required');
+    }
+
+    const counts = await this.pool.query(
+      `SELECT
+        COALESCE(SUM(CASE WHEN direction = 'IN' THEN 1 ELSE 0 END), 0) AS in_count,
+        COALESCE(SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END), 0) AS out_count,
+        MAX(scanned_at) AS last_scanned_at
+      FROM pallet_tracker_events
+      WHERE order_type = $1 AND order_id = $2`,
+      [normalizedType, normalizedOrderId]
+    );
+
+    const recentResult = await this.pool.query(
+      `SELECT *
+      FROM pallet_tracker_events
+      WHERE order_type = $1 AND order_id = $2
+      ORDER BY scanned_at DESC
+      LIMIT 50`,
+      [normalizedType, normalizedOrderId]
+    );
+
+    const inCount = Number(counts.rows[0]?.in_count || 0);
+    const outCount = Number(counts.rows[0]?.out_count || 0);
+
+    return {
+      orderType: normalizedType,
+      orderId: normalizedOrderId,
+      inCount,
+      outCount,
+      netWip: inCount - outCount,
+      lastScannedAt: counts.rows[0]?.last_scanned_at || null,
+      recent: this.toCamelCase(recentResult.rows),
+    };
   }
 
   // Production Downtime
