@@ -84,6 +84,12 @@ export const HomePage: React.FC = () => {
       description: 'View completed work orders',
       onClick: () => navigate('/work-order-history'),
     },
+    {
+      icon: '🏷️',
+      title: 'Pallet Tracker',
+      description: 'Scan build-in and finished-out pallets by order',
+      onClick: () => navigate('/pallet-tracker'),
+    },
   ];
 
   const managementCards = [

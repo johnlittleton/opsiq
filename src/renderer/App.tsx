@@ -27,6 +27,7 @@ import ProductionScheduler from './pages/ProductionScheduler';
 import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
+import PalletTracker from './pages/PalletTracker';
 
 type UpdaterStatus = {
   state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -96,6 +97,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/production-scheduler" element={<ProductionScheduler />} />
       <Route path="/production-dashboard" element={<ProductionDashboard />} />
       <Route path="/dashboard" element={<ProductionDashboard />} />
+      <Route path="/pallet-tracker" element={<PalletTracker />} />
       <Route path="/work-order-history" element={<WorkOrderHistory />} />
       <Route path="/downtime-history" element={<DowntimeHistory />} />
       <Route path="/settings" element={<Settings />} />
@@ -132,6 +134,7 @@ const MobileHamburgerMenu: React.FC = () => {
         { label: 'Dock Dashboard', path: '/dockboard' },
         { label: 'Appointment Scheduler', path: '/scheduler' },
         { label: 'Production Scheduler', path: '/production-scheduler' },
+        { label: 'Pallet Tracker', path: '/pallet-tracker' },
         { label: 'Production Dashboard', path: '/production-dashboard' },
         { label: 'Executive Dashboard', path: '/executive' },
         { label: 'Executive Analytics', path: '/executive-analytics' },
@@ -162,6 +165,7 @@ const MobileHamburgerMenu: React.FC = () => {
         { label: 'Labor Planner History', path: '/production-labor-planner-history' },
         { label: 'Labor Tracker', path: '/labor-tracker' },
         { label: 'Labor History', path: '/labor-history' },
+        { label: 'Pallet Tracker', path: '/pallet-tracker' },
         { label: 'WO History', path: '/work-order-history' },
         { label: 'Downtime History', path: '/downtime-history' }
       ];

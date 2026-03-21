@@ -873,6 +873,72 @@ app.delete('/api/production/work-orders/:id', async (req, res) => {
   }
 });
 
+app.get('/api/production/pallet-tracker/orders', async (_req, res) => {
+  try {
+    const orders = await db.getPalletTrackerOrders();
+    res.json(orders);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load pallet tracker orders' });
+  }
+});
+
+app.post('/api/production/pallet-tracker/scan', async (req, res) => {
+  try {
+    const payload = {
+      orderType: req.body.orderType,
+      orderId: req.body.orderId,
+      line: req.body.line,
+      palletTag: req.body.palletTag,
+      direction: req.body.direction,
+      scannedBy: req.body.scannedBy,
+      scannerSource: req.body.scannerSource,
+      notes: req.body.notes,
+    };
+
+    const event = await db.recordPalletTrackerScan(payload);
+    const summary = await db.getPalletTrackerSummary(payload.orderType, payload.orderId);
+
+    io.emit('pallet-tracker:scan', event);
+    io.emit('pallet-tracker:summary', {
+      orderType: summary.orderType,
+      orderId: summary.orderId,
+      inCount: summary.inCount,
+      outCount: summary.outCount,
+      netWip: summary.netWip,
+      lastScannedAt: summary.lastScannedAt,
+    });
+
+    res.status(201).json({ event, summary });
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to record pallet scan');
+    if (message.includes('Duplicate')) {
+      res.status(409).json({ error: message });
+      return;
+    }
+    if (message.includes('required') || message.includes('not found')) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
+app.get('/api/production/pallet-tracker/summary', async (req, res) => {
+  try {
+    const orderType = String(req.query.orderType || 'WO') as 'WO' | 'SO';
+    const orderId = String(req.query.orderId || '');
+    const summary = await db.getPalletTrackerSummary(orderType, orderId);
+    res.json(summary);
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to load pallet tracker summary');
+    if (message.includes('required')) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+});
+
 // Production Downtime
 app.post('/api/production/downtime', async (req, res) => {
   try {

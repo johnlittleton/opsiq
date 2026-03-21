@@ -943,6 +943,9 @@ export default function ProductionScheduler() {
               <button className="history-btn" onClick={() => navigate('/work-order-history')}>
                 📋 WO History
               </button>
+              <button className="history-btn" onClick={() => navigate('/pallet-tracker')}>
+                🏷️ Pallet Tracker
+              </button>
               <button className="downtime-history-btn" onClick={() => navigate('/downtime-history')}>
                 ⏱️ Downtime
               </button>
@@ -987,6 +990,9 @@ export default function ProductionScheduler() {
             </button>
             <button className="history-btn" onClick={() => navigate('/work-order-history')}>
               📋 WO History
+            </button>
+            <button className="history-btn" onClick={() => navigate('/pallet-tracker')}>
+              🏷️ Pallet Tracker
             </button>
           </div>
         </div>

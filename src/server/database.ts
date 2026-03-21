@@ -328,6 +328,19 @@ export class DatabaseService implements IDatabaseService {
         updatedAt TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS pallet_tracker_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        orderType TEXT NOT NULL,
+        orderId TEXT NOT NULL,
+        line INTEGER,
+        palletTag TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        scannedBy TEXT NOT NULL,
+        scannedAt TEXT NOT NULL,
+        scannerSource TEXT DEFAULT 'wireless',
+        notes TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS production_dock_statuses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dockNumber INTEGER NOT NULL UNIQUE,
@@ -411,6 +424,8 @@ export class DatabaseService implements IDatabaseService {
       CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
       CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
       CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+      CREATE INDEX IF NOT EXISTS idx_pallet_tracker_order ON pallet_tracker_events(orderType, orderId, scannedAt);
+      CREATE INDEX IF NOT EXISTS idx_pallet_tracker_tag ON pallet_tracker_events(orderType, orderId, palletTag);
       CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointmentDate);
       
       -- Partial unique index: only one active shift per date/shift_number
@@ -2904,6 +2919,117 @@ export class DatabaseService implements IDatabaseService {
   async deleteWorkOrder(id: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM work_orders WHERE id = ?').run(id);
     return result.changes > 0;
+  }
+
+  async getPalletTrackerOrders(): Promise<any[]> {
+    return this.db.prepare(`
+      SELECT id, line, date, product, customer, status
+      FROM work_orders
+      WHERE status IN ('Scheduled', 'Active')
+      ORDER BY date DESC, line ASC, slot ASC
+      LIMIT 200
+    `).all();
+  }
+
+  async recordPalletTrackerScan(payload: {
+    orderType: 'WO' | 'SO';
+    orderId: string;
+    line?: number | null;
+    palletTag: string;
+    direction: 'IN' | 'OUT';
+    scannedBy: string;
+    scannerSource?: string;
+    notes?: string;
+  }): Promise<any> {
+    const now = getLocalISOString();
+    const orderType = String(payload.orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
+    const orderId = String(payload.orderId || '').trim();
+    const palletTag = String(payload.palletTag || '').trim();
+    const direction = String(payload.direction || '').toUpperCase() === 'OUT' ? 'OUT' : 'IN';
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    const scannerSource = String(payload.scannerSource || 'wireless').trim() || 'wireless';
+
+    if (!orderId) {
+      throw new Error('Order number is required');
+    }
+
+    if (!palletTag) {
+      throw new Error('Pallet tag is required');
+    }
+
+    if (orderType === 'WO') {
+      const workOrder = this.db.prepare('SELECT id FROM work_orders WHERE id = ?').get(orderId);
+      if (!workOrder) {
+        throw new Error('Work order not found');
+      }
+    }
+
+    const duplicate = this.db.prepare(`
+      SELECT id FROM pallet_tracker_events
+      WHERE orderType = ? AND orderId = ? AND palletTag = ? AND direction = ?
+      LIMIT 1
+    `).get(orderType, orderId, palletTag, direction);
+
+    if (duplicate) {
+      throw new Error(`Duplicate ${direction} scan for pallet ${palletTag}`);
+    }
+
+    const result = this.db.prepare(`
+      INSERT INTO pallet_tracker_events (
+        orderType, orderId, line, palletTag, direction, scannedBy, scannedAt, scannerSource, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      orderType,
+      orderId,
+      payload.line ?? null,
+      palletTag,
+      direction,
+      scannedBy,
+      now,
+      scannerSource,
+      payload.notes || null
+    );
+
+    return this.db.prepare('SELECT * FROM pallet_tracker_events WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  async getPalletTrackerSummary(orderType: 'WO' | 'SO', orderId: string): Promise<any> {
+    const normalizedType = String(orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
+    const normalizedOrderId = String(orderId || '').trim();
+
+    if (!normalizedOrderId) {
+      throw new Error('Order number is required');
+    }
+
+    const counts = this.db.prepare(`
+      SELECT
+        SUM(CASE WHEN direction = 'IN' THEN 1 ELSE 0 END) AS inCount,
+        SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END) AS outCount,
+        MAX(scannedAt) AS lastScannedAt
+      FROM pallet_tracker_events
+      WHERE orderType = ? AND orderId = ?
+    `).get(normalizedType, normalizedOrderId) as any;
+
+    const recent = this.db.prepare(`
+      SELECT *
+      FROM pallet_tracker_events
+      WHERE orderType = ? AND orderId = ?
+      ORDER BY scannedAt DESC
+      LIMIT 50
+    `).all(normalizedType, normalizedOrderId);
+
+    const inCount = Number(counts?.inCount || 0);
+    const outCount = Number(counts?.outCount || 0);
+
+    return {
+      orderType: normalizedType,
+      orderId: normalizedOrderId,
+      inCount,
+      outCount,
+      netWip: inCount - outCount,
+      lastScannedAt: counts?.lastScannedAt || null,
+      recent,
+    };
   }
 
   // Production Downtime
