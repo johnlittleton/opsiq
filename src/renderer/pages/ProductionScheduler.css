@@ -308,7 +308,7 @@
 /* Table Styles */
 .wo-table {
   width: 100%;
-  min-width: 1720px;
+  min-width: 0;
   table-layout: fixed;
   border-collapse: collapse;
   background: #232837;
