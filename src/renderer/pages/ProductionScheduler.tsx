@@ -61,6 +61,9 @@ interface CurrentShift {
 export default function ProductionScheduler() {
   const navigate = useNavigate();
   const { executiveName, sessionToken } = useAuth();
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
