@@ -1,6 +1,6 @@
 {
   "name": "opsiq",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "description": "OpsIQ - Production-ready dock and production management system",
   "main": "dist/electron/main.js",
   "scripts": {
