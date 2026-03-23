@@ -2990,13 +2990,50 @@ export class DatabaseService implements IDatabaseService {
     return this.db.prepare('SELECT * FROM pallet_tracker_events WHERE id = ?').get(result.lastInsertRowid);
   }
 
-  async getPalletTrackerSummary(orderType: 'WO' | 'SO', orderId: string): Promise<any> {
+  async getPalletTrackerSummary(
+    orderType: 'WO' | 'SO',
+    orderId: string,
+    options?: {
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<any> {
     const normalizedType = String(orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
     const normalizedOrderId = String(orderId || '').trim();
+    const normalizedSearch = String(options?.search || '').trim();
+    const normalizedStartDate = String(options?.startDate || '').trim();
+    const normalizedEndDate = String(options?.endDate || '').trim();
+    const limit = Math.min(Math.max(Number(options?.limit || 25), 1), 100);
+    const offset = Math.max(Number(options?.offset || 0), 0);
 
     if (!normalizedOrderId) {
       throw new Error('Order number is required');
     }
+
+    const whereClauses = ['orderType = ?', 'orderId = ?'];
+    const params: any[] = [normalizedType, normalizedOrderId];
+
+    if (normalizedSearch) {
+      whereClauses.push('(palletTag LIKE ? OR scannedBy LIKE ?)');
+      params.push(`%${normalizedSearch}%`, `%${normalizedSearch}%`);
+    }
+
+    if (normalizedStartDate) {
+      whereClauses.push('scannedAt >= ?');
+      params.push(`${normalizedStartDate}T00:00:00`);
+    }
+
+    if (normalizedEndDate) {
+      const nextDay = new Date(`${normalizedEndDate}T00:00:00`);
+      nextDay.setDate(nextDay.getDate() + 1);
+      whereClauses.push('scannedAt < ?');
+      params.push(getLocalISOString(nextDay).slice(0, 19));
+    }
+
+    const whereSql = whereClauses.join(' AND ');
 
     const counts = this.db.prepare(`
       SELECT
@@ -3004,19 +3041,26 @@ export class DatabaseService implements IDatabaseService {
         SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END) AS outCount,
         MAX(scannedAt) AS lastScannedAt
       FROM pallet_tracker_events
-      WHERE orderType = ? AND orderId = ?
-    `).get(normalizedType, normalizedOrderId) as any;
+      WHERE ${whereSql}
+    `).get(...params) as any;
+
+    const totalResult = this.db.prepare(`
+      SELECT COUNT(*) AS totalCount
+      FROM pallet_tracker_events
+      WHERE ${whereSql}
+    `).get(...params) as any;
 
     const recent = this.db.prepare(`
       SELECT *
       FROM pallet_tracker_events
-      WHERE orderType = ? AND orderId = ?
+      WHERE ${whereSql}
       ORDER BY scannedAt DESC
-      LIMIT 50
-    `).all(normalizedType, normalizedOrderId);
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset);
 
     const inCount = Number(counts?.inCount || 0);
     const outCount = Number(counts?.outCount || 0);
+    const totalCount = Number(totalResult?.totalCount || 0);
 
     return {
       orderType: normalizedType,
@@ -3025,6 +3069,14 @@ export class DatabaseService implements IDatabaseService {
       outCount,
       netWip: inCount - outCount,
       lastScannedAt: counts?.lastScannedAt || null,
+      recentCount: totalCount,
+      recentPage: Math.floor(offset / limit) + 1,
+      recentPageSize: limit,
+      appliedFilters: {
+        search: normalizedSearch,
+        startDate: normalizedStartDate || null,
+        endDate: normalizedEndDate || null,
+      },
       recent,
     };
   }

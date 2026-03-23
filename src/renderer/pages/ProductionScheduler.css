@@ -267,6 +267,11 @@
   margin-bottom: 20px;
 }
 
+.wo-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
 .section-title {
   font-size: 1.1rem;
   margin: 0 0 10px 0;
@@ -303,6 +308,7 @@
 /* Table Styles */
 .wo-table {
   width: 100%;
+  min-width: 1720px;
   border-collapse: collapse;
   background: #232837;
   border-radius: 8px;
@@ -326,6 +332,7 @@
 .wo-table td {
   padding: 6px 10px;
   border-bottom: 1px solid #2a3142;
+  vertical-align: middle;
 }
 
 .wo-row {
@@ -365,7 +372,18 @@
   cursor: pointer;
   font-size: 0.75rem;
   font-weight: 600;
-  margin-right: 4px;
+}
+
+.wo-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.actions-column {
+  min-width: 132px;
+  white-space: nowrap;
 }
 
 .btn-small.start-btn {
