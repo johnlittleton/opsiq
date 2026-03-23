@@ -471,10 +471,12 @@
 
 /* Notes Cell */
 .notes-cell {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 220px;
+  max-width: 360px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
   color: #d0d5db;
   font-size: 0.8rem;
   font-style: italic;
@@ -486,10 +488,12 @@
 
 /* Lots Cell */
 .lots-cell {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 180px;
+  max-width: 300px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.25;
   color: #d0d5db;
   font-size: 0.8rem;
 }
