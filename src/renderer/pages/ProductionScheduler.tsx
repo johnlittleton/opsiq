@@ -1010,6 +1010,7 @@ export default function ProductionScheduler() {
             {activeWorkOrders.length === 0 ? (
               <div className="no-orders">No active work orders</div>
             ) : (
+              <div className="wo-table-wrap">
               <table className="wo-table">
                 <thead>
                   <tr>
@@ -1031,7 +1032,7 @@ export default function ProductionScheduler() {
                     <th>ETA (Cases)</th>
                     <th>ETA (Bags)</th>
                     <th>Notes</th>
-                    <th>Actions</th>
+                    <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1076,14 +1077,17 @@ export default function ProductionScheduler() {
                       <td>{getEtaCases(wo)}</td>
                       <td>{getEtaBags(wo)}</td>
                       <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <button className="btn-small go-btn" onClick={() => updateCompletedCases(wo.id, casesInputs[wo.id] ?? 0)}>Go</button>
-                        <button className="btn-small done-btn" onClick={() => completeWorkOrder(wo.id)}>Done</button>
+                      <td className="actions-column" onClick={(e) => e.stopPropagation()}>
+                        <div className="wo-action-buttons">
+                          <button className="btn-small go-btn" onClick={() => updateCompletedCases(wo.id, casesInputs[wo.id] ?? 0)}>Go</button>
+                          <button className="btn-small done-btn" onClick={() => completeWorkOrder(wo.id)}>Done</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
@@ -1093,6 +1097,7 @@ export default function ProductionScheduler() {
             {scheduledWorkOrders.length === 0 ? (
               <div className="no-orders">No scheduled work orders</div>
             ) : (
+              <div className="wo-table-wrap">
               <table className="wo-table">
                 <thead>
                   <tr>
@@ -1109,7 +1114,7 @@ export default function ProductionScheduler() {
                     <th>Lots</th>
                     <th>Target</th>
                     <th>Notes</th>
-                    <th>Actions</th>
+                    <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1134,13 +1139,16 @@ export default function ProductionScheduler() {
                       </td>
                       <td>{wo.targetCases || 0}</td>
                       <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <button className="btn-small start-btn" onClick={() => startWorkOrder(wo.id)}>Start</button>
+                      <td className="actions-column" onClick={(e) => e.stopPropagation()}>
+                        <div className="wo-action-buttons">
+                          <button className="btn-small start-btn" onClick={() => startWorkOrder(wo.id)}>Start</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
@@ -1150,6 +1158,7 @@ export default function ProductionScheduler() {
             {completedWorkOrders.length === 0 ? (
               <div className="no-orders">No completed work orders</div>
             ) : (
+              <div className="wo-table-wrap">
               <table className="wo-table">
                 <thead>
                   <tr>
@@ -1178,6 +1187,7 @@ export default function ProductionScheduler() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>

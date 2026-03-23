@@ -896,7 +896,10 @@ app.post('/api/production/pallet-tracker/scan', async (req, res) => {
     };
 
     const event = await db.recordPalletTrackerScan(payload);
-    const summary = await db.getPalletTrackerSummary(payload.orderType, payload.orderId);
+    const summary = await db.getPalletTrackerSummary(payload.orderType, payload.orderId, {
+      limit: 25,
+      offset: 0,
+    });
 
     io.emit('pallet-tracker:scan', event);
     io.emit('pallet-tracker:summary', {
@@ -927,7 +930,19 @@ app.get('/api/production/pallet-tracker/summary', async (req, res) => {
   try {
     const orderType = String(req.query.orderType || 'WO') as 'WO' | 'SO';
     const orderId = String(req.query.orderId || '');
-    const summary = await db.getPalletTrackerSummary(orderType, orderId);
+    const search = String(req.query.search || '');
+    const startDate = String(req.query.startDate || '');
+    const endDate = String(req.query.endDate || '');
+    const limit = Number(req.query.limit || 25);
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const offset = (page - 1) * Math.min(Math.max(limit, 1), 100);
+    const summary = await db.getPalletTrackerSummary(orderType, orderId, {
+      search,
+      startDate,
+      endDate,
+      limit,
+      offset,
+    });
     res.json(summary);
   } catch (error: any) {
     const message = String(error?.message || 'Failed to load pallet tracker summary');
