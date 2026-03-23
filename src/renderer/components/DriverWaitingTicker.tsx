@@ -49,7 +49,7 @@ export default function DriverWaitingTicker({ lineFilter, inline = false }: Driv
         const outboundWaiting = checkins.filter((checkin: any) => 
           checkin.inboundOutbound === 'Outbound' && 
           !checkin.closedAt &&
-          ['Waiting', 'Parked', 'Open'].includes(checkin.status)
+          ['Checked In', 'Waiting', 'Parked', 'Open'].includes(checkin.status)
         );
         
         const waitingDrivers = outboundWaiting

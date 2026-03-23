@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
+import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { useAuth } from '../context/AuthContext';
 import './ProductionScheduler.css';
 import DowntimeTracker from '../components/DowntimeTracker';
@@ -120,8 +121,11 @@ export default function ProductionScheduler() {
 
   useEffect(() => {
     fetchWorkOrders();
-    // Fetch every 2 seconds to keep timers updated
-    const interval = setInterval(fetchWorkOrders, 2000);
+    // Keep scheduler fresh without hammering API and renderer.
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchWorkOrders();
+    }, 5000);
     return () => clearInterval(interval);
   }, [selectedDate]);
 
@@ -130,6 +134,7 @@ export default function ProductionScheduler() {
     fetchPlannerShiftWindow();
 
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       fetchCurrentShift();
       fetchPlannerShiftWindow();
     }, 60000);
@@ -147,9 +152,15 @@ export default function ProductionScheduler() {
   // Force re-render every second for live timer display
   const [, setTick] = useState(0);
   useEffect(() => {
+    const hasActiveTimers = workOrders.some(
+      (wo) => wo.status === 'Active' && !!wo.startTimestamp && !wo.isPaused
+    );
+
+    if (!hasActiveTimers) return;
+
     const timer = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [workOrders]);
 
   const fetchWorkOrders = async () => {
     try {
@@ -707,9 +718,18 @@ export default function ProductionScheduler() {
   };
 
   // Group work orders by status
-  const activeWorkOrders = workOrders.filter(wo => wo.status === 'Active');
-  const scheduledWorkOrders = workOrders.filter(wo => wo.status === 'Scheduled');
-  const completedWorkOrders = workOrders.filter(wo => wo.status === 'Completed');
+  const activeWorkOrders = useMemo(
+    () => workOrders.filter(wo => wo.status === 'Active'),
+    [workOrders]
+  );
+  const scheduledWorkOrders = useMemo(
+    () => workOrders.filter(wo => wo.status === 'Scheduled'),
+    [workOrders]
+  );
+  const completedWorkOrders = useMemo(
+    () => workOrders.filter(wo => wo.status === 'Completed'),
+    [workOrders]
+  );
 
   const getLineName = (lineId: number) => LINES.find(l => l.id === lineId)?.name || `Line ${lineId}`;
 
@@ -971,6 +991,7 @@ export default function ProductionScheduler() {
 
   return (
     <div className="production-scheduler">
+      <DriverWaitingTicker />
       <MessageBanner 
         isOpen={messengerOpen}
         onToggle={() => setMessengerOpen(!messengerOpen)}

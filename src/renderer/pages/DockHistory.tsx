@@ -300,6 +300,7 @@ const DockHistory: React.FC = () => {
                   className="form-select"
                 >
                   <option value="">All Statuses</option>
+                  <option value="Checked In">Checked In</option>
                   <option value="Open">Open</option>
                   <option value="Offload">Offload</option>
                   <option value="Loading">Loading</option>
@@ -375,7 +376,7 @@ const DockHistory: React.FC = () => {
                       </td>
                       <td>
                       {event.oldStatus ? (
-                        <span className={`door-status ${event.oldStatus ? `status-${event.oldStatus}` : ''}`}>
+                        <span className={`door-status ${event.oldStatus ? `status-${event.oldStatus.replace(/\s+/g, '-')}` : ''}`}>
                           {event.oldStatus}
                         </span>
                       ) : (
@@ -383,7 +384,7 @@ const DockHistory: React.FC = () => {
                       )}
                     </td>
                     <td>
-                      <span className={`door-status status-${event.newStatus}`}>
+                      <span className={`door-status status-${event.newStatus.replace(/\s+/g, '-')}`}>
                         {event.newStatus}
                       </span>
                     </td>

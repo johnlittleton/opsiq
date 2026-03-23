@@ -274,6 +274,7 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
     Open: 0,
     Offload: 0,
     Loading: 0,
+    'Checked In': 0,
     Blocked: 0,
     Waiting: 0,
     Parked: 0,

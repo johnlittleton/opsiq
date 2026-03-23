@@ -664,7 +664,7 @@ export class DatabaseService implements IDatabaseService {
 
       // Handle parked/offline trucks without door assignment
       if (data.doorId === null) {
-        const shouldSetLoadStartTime = data.status === 'Loading' || data.status === 'Offload';
+        const shouldSetLoadStartTime = data.status === 'Checked In' || data.status === 'Loading' || data.status === 'Offload';
 
         let checkinResult;
         if (shouldSetLoadStartTime) {
@@ -714,7 +714,7 @@ export class DatabaseService implements IDatabaseService {
       }
 
       // Determine if we should set loadStartTime
-      const shouldSetLoadStartTime = data.status === 'Loading' || data.status === 'Offload';
+      const shouldSetLoadStartTime = data.status === 'Checked In' || data.status === 'Loading' || data.status === 'Offload';
 
       let checkinResult;
       if (shouldSetLoadStartTime) {
@@ -814,7 +814,7 @@ export class DatabaseService implements IDatabaseService {
         `, [data.newStatus, now, now, door.currentCheckinId]);
         
         // Mark load start time if status is Loading or Offload
-        if (data.newStatus === 'Loading' || data.newStatus === 'Offload') {
+        if (data.newStatus === 'Checked In' || data.newStatus === 'Loading' || data.newStatus === 'Offload') {
           const checkinResult = await client.query('SELECT * FROM dock_checkins WHERE id = $1', [door.currentCheckinId]);
           const checkin = this.toCamelCase(checkinResult.rows[0]);
           
@@ -889,50 +889,41 @@ export class DatabaseService implements IDatabaseService {
           expectedPallets: checkin.pallets
         });
         
-        // Calculate total time if loadStartTime exists
-        if (checkin.loadStartTime) {
-          const loadEndTime = now;
-          const startMs = new Date(checkin.loadStartTime).getTime();
-          const endMs = new Date(loadEndTime).getTime();
-          const totalMinutes = Math.round((endMs - startMs) / 60000);
+        const effectiveLoadStartTime = checkin.loadStartTime || checkin.statusStartTime || checkin.createdAt || now;
+        const loadEndTime = now;
+        const startMs = new Date(effectiveLoadStartTime).getTime();
+        const endMs = new Date(loadEndTime).getTime();
+        const totalMinutes = Math.max(0, Math.round((endMs - startMs) / 60000));
           
-          console.log('🔍 Calculated performance:', {
-            startTime: checkin.loadStartTime,
-            endTime: loadEndTime,
-            startMs,
-            endMs,
-            diffMs: endMs - startMs,
-            totalMinutes,
-            actualPallets: effectiveActualPallets,
-            checkinId: savedCheckinId,
-            forkliftDriver: checkin.forkliftDriver
-          });
-          
-          await client.query(`
-            UPDATE dock_checkins
-            SET closed_at = $1, updated_at = $2, actual_pallets = $3, load_end_time = $4, total_minutes = $5
-            WHERE id = $6
-          `, [now, now, effectiveActualPallets, loadEndTime, totalMinutes, savedCheckinId]);
-          
-          // Verify the update
-          const verifyResult = await client.query('SELECT id, total_minutes, actual_pallets, load_end_time, closed_at, forklift_driver FROM dock_checkins WHERE id = $1', [savedCheckinId]);
-          console.log('✅ Verified data after update:', verifyResult.rows[0]);
-          
-          console.log('✅ Checkin closed successfully:', {
-            id: savedCheckinId,
-            closedAt: now,
-            forkliftDriver: checkin.forkliftDriver,
-            totalMinutes,
-            actualPallets: data.actualPallets || checkin.pallets
-          });
-        } else {
-          console.log('⚠️ No loadStartTime found - performance tracking skipped');
-          await client.query(`
-            UPDATE dock_checkins
-            SET closed_at = $1, updated_at = $2, actual_pallets = $3
-            WHERE id = $4
-          `, [now, now, effectiveActualPallets, savedCheckinId]);
-        }
+        console.log('🔍 Calculated performance:', {
+          startTime: effectiveLoadStartTime,
+          endTime: loadEndTime,
+          startMs,
+          endMs,
+          diffMs: endMs - startMs,
+          totalMinutes,
+          actualPallets: effectiveActualPallets,
+          checkinId: savedCheckinId,
+          forkliftDriver: checkin.forkliftDriver
+        });
+
+        await client.query(`
+          UPDATE dock_checkins
+          SET closed_at = $1, updated_at = $2, actual_pallets = $3, load_start_time = COALESCE(load_start_time, $4), load_end_time = $5, total_minutes = $6
+          WHERE id = $7
+        `, [now, now, effectiveActualPallets, effectiveLoadStartTime, loadEndTime, totalMinutes, savedCheckinId]);
+
+        // Verify the update
+        const verifyResult = await client.query('SELECT id, load_start_time, total_minutes, actual_pallets, load_end_time, closed_at, forklift_driver FROM dock_checkins WHERE id = $1', [savedCheckinId]);
+        console.log('✅ Verified data after update:', verifyResult.rows[0]);
+
+        console.log('✅ Checkin closed successfully:', {
+          id: savedCheckinId,
+          closedAt: now,
+          forkliftDriver: checkin.forkliftDriver,
+          totalMinutes,
+          actualPallets: data.actualPallets || checkin.pallets
+        });
       }
 
       // Log event BEFORE clearing the door (while we still have checkin_id)

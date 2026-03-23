@@ -211,10 +211,12 @@ export default function ProductionDashboard() {
         const hasAlerts = checkins.some((checkin: any) => {
           const isOutbound = checkin.inboundOutbound === 'Outbound';
           const isOpen = !checkin.closedAt;
-          const isWaiting = ['Waiting', 'Parked', 'Open'].includes(checkin.status);
-          const hasMatch = activeWorkOrders.some((wo: any) => wo.id === checkin.pickupNumber);
-          
-          return isOutbound && isOpen && isWaiting && hasMatch;
+          const isWaiting = ['Checked In', 'Waiting', 'Parked', 'Open'].includes(checkin.status);
+          const matchingWO = activeWorkOrders.find((wo: any) => wo.id === checkin.pickupNumber);
+          if (!matchingWO) return false;
+          // In single-line mode, only alert for the specific line being viewed
+          if (specificLine && matchingWO.line !== specificLine) return false;
+          return isOutbound && isOpen && isWaiting;
         });
         
         setHasDriverAlerts(hasAlerts);
@@ -376,7 +378,7 @@ export default function ProductionDashboard() {
     return checkins.some((checkin: any) => 
       checkin.inboundOutbound === 'Outbound' &&
       !checkin.closedAt &&
-      ['Waiting', 'Parked', 'Open'].includes(checkin.status) &&
+      ['Checked In', 'Waiting', 'Parked', 'Open'].includes(checkin.status) &&
       checkin.pickupNumber === activeWO.id
     );
   };
@@ -480,7 +482,7 @@ export default function ProductionDashboard() {
           const progress = wo && plannedCases > 0
             ? Math.round(((wo.completedCases || 0) / plannedCases) * 100)
             : 0;
-          const hasAlert = !specificLine && hasDriverAlertForLine(line.id);
+          const hasAlert = hasDriverAlertForLine(line.id);
 
           return (
             <div key={line.id} className={`line-card ${status} ${hasAlert ? 'driver-alert' : ''}`}>
