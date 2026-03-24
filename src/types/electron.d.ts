@@ -1,5 +1,6 @@
 export interface IElectronAPI {
   getAppVersion: () => Promise<string>;
+  checkForUpdates?: () => Promise<{ success: boolean; reason?: string }>;
   getSettings: () => Promise<any>;
   saveSettings: (settings: any) => Promise<void>;
   getDisplays: () => Promise<any[]>;
