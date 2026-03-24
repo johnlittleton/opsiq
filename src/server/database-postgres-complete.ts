@@ -512,6 +512,30 @@ export class DatabaseService implements IDatabaseService {
         ALTER TABLE messages ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES chat_sessions(id);
       `);
 
+      // Migration: Backfill historical dock timing fields so Dock History has start/end for closed records.
+      await client.query(`
+        UPDATE dock_checkins
+        SET
+          load_start_time = COALESCE(load_start_time, status_start_time, created_at),
+          load_end_time = COALESCE(load_end_time, closed_at, updated_at),
+          total_minutes = COALESCE(
+            total_minutes,
+            GREATEST(
+              0,
+              ROUND(
+                EXTRACT(
+                  EPOCH FROM (
+                    COALESCE(load_end_time, closed_at, updated_at) -
+                    COALESCE(load_start_time, status_start_time, created_at)
+                  )
+                ) / 60.0
+              )::INTEGER
+            )
+          )
+        WHERE closed_at IS NOT NULL
+          AND (load_start_time IS NULL OR load_end_time IS NULL OR total_minutes IS NULL);
+      `);
+
       // Seed dock doors if empty
       const doorCount = await client.query('SELECT COUNT(*) as count FROM dock_doors');
       if (doorCount.rows[0].count === '0') {
@@ -986,8 +1010,8 @@ export class DatabaseService implements IDatabaseService {
         c.inbound_outbound,
         c.forklift_driver,
         c.checker,
-        c.load_start_time,
-        c.load_end_time
+        COALESCE(c.load_start_time, c.status_start_time, c.created_at, e.event_time) AS load_start_time,
+        COALESCE(c.load_end_time, c.closed_at, e.event_time) AS load_end_time
       FROM dock_events e
       LEFT JOIN dock_checkins c ON e.checkin_id = c.id
       WHERE 1=1

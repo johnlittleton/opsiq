@@ -497,6 +497,26 @@ export class DatabaseService implements IDatabaseService {
         console.log('Adding role column to executives...');
         this.db.exec("ALTER TABLE executives ADD COLUMN role TEXT NOT NULL DEFAULT 'manager'");
       }
+
+      // Migration: Backfill historical dock timing fields so Dock History has start/end for closed records.
+      this.db.exec(`
+        UPDATE dock_checkins
+        SET
+          loadStartTime = COALESCE(loadStartTime, statusStartTime, createdAt),
+          loadEndTime = COALESCE(loadEndTime, closedAt, updatedAt),
+          totalMinutes = COALESCE(
+            totalMinutes,
+            MAX(
+              0,
+              CAST(
+                (julianday(COALESCE(loadEndTime, closedAt, updatedAt)) - julianday(COALESCE(loadStartTime, statusStartTime, createdAt))) * 1440
+                AS INTEGER
+              )
+            )
+          )
+        WHERE closedAt IS NOT NULL
+          AND (loadStartTime IS NULL OR loadEndTime IS NULL OR totalMinutes IS NULL);
+      `);
       
       // Migration: Remove NOT NULL constraint from doorId to support parked trucks
       const doorIdColumn = columns.find(c => c.name === 'doorId');
@@ -1017,8 +1037,8 @@ export class DatabaseService implements IDatabaseService {
         c.actualPallets,
         c.forkliftDriver,
         c.checker,
-        c.loadStartTime,
-        c.loadEndTime
+        COALESCE(c.loadStartTime, c.statusStartTime, c.createdAt, e.eventTime) as loadStartTime,
+        COALESCE(c.loadEndTime, c.closedAt, e.eventTime) as loadEndTime
       FROM dock_events e
       LEFT JOIN dock_checkins c ON e.checkinId = c.id
       WHERE 1=1
