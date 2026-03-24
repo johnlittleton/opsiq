@@ -2394,9 +2394,10 @@ export class DatabaseService implements IDatabaseService {
     const totalPalletsLoaded = outbound.reduce((sum: number, c: any) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
     const totalPalletsOffloaded = inbound.reduce((sum: number, c: any) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
-    // Avg load/offload time only from records that have totalMinutes recorded
-    const outboundTimed = outbound.filter((c: any) => c.totalMinutes != null && c.totalMinutes > 0);
-    const inboundTimed = inbound.filter((c: any) => c.totalMinutes != null && c.totalMinutes > 0);
+    // Ignore unrealistic legacy/outlier durations in dashboard averages.
+    const isValidDockDuration = (minutes: any) => Number.isFinite(minutes) && minutes > 0 && minutes <= 240;
+    const outboundTimed = outbound.filter((c: any) => isValidDockDuration(c.totalMinutes));
+    const inboundTimed = inbound.filter((c: any) => isValidDockDuration(c.totalMinutes));
     const avgLoadTime = outboundTimed.length > 0
       ? outboundTimed.reduce((sum: number, c: any) => sum + c.totalMinutes, 0) / outboundTimed.length
       : 0;
@@ -2445,7 +2446,7 @@ export class DatabaseService implements IDatabaseService {
       }
       operatorStats[normalizedName].loads++;
       operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      if (c.totalMinutes != null && c.totalMinutes > 0) {
+      if (isValidDockDuration(c.totalMinutes)) {
         operatorStats[normalizedName].totalMinutes += c.totalMinutes;
         operatorStats[normalizedName].timedLoads++;
       }
@@ -2472,7 +2473,9 @@ export class DatabaseService implements IDatabaseService {
     );
     const activeNow = parseInt(activeResult.rows[0].count);
 
-    const totalDockHours = completedCheckins.reduce((sum: number, c: any) => sum + c.totalMinutes, 0) / 60;
+    const totalDockHours = completedCheckins
+      .filter((c: any) => isValidDockDuration(c.totalMinutes))
+      .reduce((sum: number, c: any) => sum + c.totalMinutes, 0) / 60;
 
     // Get latest labor snapshot
     const latestLabor = await this.getLatestLaborSnapshot();

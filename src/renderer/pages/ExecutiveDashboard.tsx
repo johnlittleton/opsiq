@@ -309,6 +309,8 @@ const ExecutiveDashboard: React.FC = () => {
   const combinedRunningLaborCost = departmentLaborSummary?.totals?.runningLaborCost ?? currentShift?.runningLaborCost ?? 0;
   const combinedActiveHeadcount = departmentLaborSummary?.totals?.activeHeadcount
     ?? (currentShift ? currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount : 0);
+  const combinedHourlyLaborCost = departmentLaborSummary?.totals?.currentHourlyLaborCost
+    ?? 0;
   const activeDepartmentSessions = departmentSessions.filter((session) => session.status === 'active');
   const hasLiveDepartmentLabor = combinedActiveHeadcount > 0 || combinedRunningLaborCost > 0;
   // Use the authoritative shift_sessions start time when available; it is always scoped to today
@@ -321,9 +323,17 @@ const ExecutiveDashboard: React.FC = () => {
           .filter((value) => Number.isFinite(value))
           .sort((a, b) => a - b)[0]
       : null;
-  const derivedElapsedMinutes = (derivedTrackerStartTime
-      ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
-      : (currentShift?.elapsedMinutes ?? 0));
+  // Prefer server-computed labor burn-rate math because it is resilient to timezone
+  // parsing issues in raw timestamp strings.
+  const elapsedFromLaborSummary = combinedHourlyLaborCost > 0
+    ? Math.max(0, Math.floor((combinedRunningLaborCost / combinedHourlyLaborCost) * 60))
+    : null;
+  const elapsedFromTimestamps = derivedTrackerStartTime
+    ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
+    : null;
+  const derivedElapsedMinutes = elapsedFromLaborSummary
+    ?? elapsedFromTimestamps
+    ?? (currentShift?.elapsedMinutes ?? 0);
   const showShiftTrackerPanel = hasLiveDepartmentLabor;
   const trackerTitle = activeDepartmentSessions.length > 0 ? 'Department Tracker' : (currentShift?.shiftName || 'Department Tracker');
   const selectedRangeLaborTotal = Number(metrics.totalShiftLaborCost || 0);

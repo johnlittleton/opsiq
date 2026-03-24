@@ -2314,9 +2314,10 @@ export class DatabaseService implements IDatabaseService {
     const totalPalletsLoaded = outbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
     const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
-    // Avg load/offload time only from records that have totalMinutes recorded
-    const outboundTimed = outbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
-    const inboundTimed = inbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
+    // Ignore unrealistic legacy/outlier durations in dashboard averages.
+    const isValidDockDuration = (minutes: any) => Number.isFinite(minutes) && minutes > 0 && minutes <= 240;
+    const outboundTimed = outbound.filter(c => isValidDockDuration(c.totalMinutes));
+    const inboundTimed = inbound.filter(c => isValidDockDuration(c.totalMinutes));
     const avgLoadTime = outboundTimed.length > 0
       ? outboundTimed.reduce((sum, c) => sum + c.totalMinutes, 0) / outboundTimed.length
       : 0;
@@ -2372,7 +2373,7 @@ export class DatabaseService implements IDatabaseService {
       }
       operatorStats[normalizedName].loads++;
       operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      if (c.totalMinutes != null && c.totalMinutes > 0) {
+      if (isValidDockDuration(c.totalMinutes)) {
         operatorStats[normalizedName].totalMinutes += c.totalMinutes;
         operatorStats[normalizedName].timedLoads++;
       }
@@ -2452,7 +2453,9 @@ export class DatabaseService implements IDatabaseService {
       'SELECT COUNT(*) as count FROM dock_checkins WHERE closedAt IS NULL'
     ).get() as any;
 
-    const totalDockHours = completedCheckins.reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
+    const totalDockHours = completedCheckins
+      .filter(c => isValidDockDuration(c.totalMinutes))
+      .reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
 
     // Get latest labor snapshot
     const latestLabor = this.db.prepare(

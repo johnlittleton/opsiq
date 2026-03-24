@@ -193,7 +193,7 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
     schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '12:00 PM - 8:30 PM' },
   },
   {
-    name: 'NOEL PREZ',
+    name: 'NOEL PEREZ',
     role: 'Warehouse',
     schedule: { sun: 'OFF', mon: 'OFF', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: '7:30 AM - 4:00 PM' },
   },

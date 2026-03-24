@@ -1143,21 +1143,21 @@ export default function ProductionScheduler() {
                     <th>SO#</th>
                     <th>Line</th>
                     <th>Product</th>
-                    <th>Bag</th>
+                    <th className="col-bag">Bag</th>
                     <th>Customer</th>
-                    <th>Lead</th>
-                    <th>Country</th>
+                    <th className="col-lead">Lead</th>
+                    <th className="col-country">Country</th>
                     <th>Priority</th>
-                    <th>Planned Bags/Min</th>
+                    <th className="col-planned-bags">Planned Bags/Min</th>
                     <th>Planned Cases/Min</th>
                     <th>Labor</th>
-                    <th>Lots</th>
+                    <th className="col-lots">Lots</th>
                     <th>Target</th>
                     <th>Completed</th>
                     <th>Elapsed</th>
                     <th>ETA (Cases)</th>
-                    <th>ETA (Bags)</th>
-                    <th>Notes</th>
+                    <th className="col-eta-bags">ETA (Bags)</th>
+                    <th className="col-notes">Notes</th>
                     <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
@@ -1167,19 +1167,19 @@ export default function ProductionScheduler() {
                       <td><strong>#{wo.id}</strong></td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
-                      <td>{wo.bagSize || 'N/A'}</td>
+                      <td className="col-bag">{wo.bagSize || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
-                      <td>{wo.lead || 'N/A'}</td>
-                      <td>{wo.countryOfOrigin || 'N/A'}</td>
+                      <td className="col-lead">{wo.lead || 'N/A'}</td>
+                      <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td>
                         <span className={`priority-badge-sm priority-${(wo.priority || 'Normal').toLowerCase()}`}>
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{formatRate(getPlannedBagsPerMinute(wo))}</td>
+                      <td className="col-planned-bags">{formatRate(getPlannedBagsPerMinute(wo))}</td>
                       <td>{formatRate(getPlannedCasesPerMinute(wo))}</td>
                       <td>{wo.labor || '-'}</td>
-                      <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
+                      <td className="lots-cell col-lots" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
                       </td>
                       <td>{wo.targetCases || 0}</td>
@@ -1201,8 +1201,8 @@ export default function ProductionScheduler() {
                       </td>
                       <td className="elapsed-cell">{calculateElapsedTime(wo)}</td>
                       <td>{getEtaCases(wo)}</td>
-                      <td>{getEtaBags(wo)}</td>
-                      <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="col-eta-bags">{getEtaBags(wo)}</td>
+                      <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
                       <td className="actions-column" onClick={(e) => e.stopPropagation()}>
                         <div className="wo-action-buttons">
                           <button className="btn-small go-btn" onClick={() => updateCompletedCases(wo.id, casesInputs[wo.id] ?? 0)}>Go</button>
@@ -1230,16 +1230,16 @@ export default function ProductionScheduler() {
                     <th>SO#</th>
                     <th>Line</th>
                     <th>Product</th>
-                    <th>Bag</th>
+                    <th className="col-bag">Bag</th>
                     <th>Customer</th>
-                    <th>Lead</th>
-                    <th>Country</th>
+                    <th className="col-lead">Lead</th>
+                    <th className="col-country">Country</th>
                     <th>Priority</th>
                     <th>Run Rate</th>
                     <th>Labor</th>
-                    <th>Lots</th>
+                    <th className="col-lots">Lots</th>
                     <th>Target</th>
-                    <th>Notes</th>
+                    <th className="col-notes">Notes</th>
                     <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
@@ -1249,10 +1249,10 @@ export default function ProductionScheduler() {
                       <td><strong>#{wo.id}</strong></td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
-                      <td>{wo.bagSize || 'N/A'}</td>
+                      <td className="col-bag">{wo.bagSize || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
-                      <td>{wo.lead || 'N/A'}</td>
-                      <td>{wo.countryOfOrigin || 'N/A'}</td>
+                      <td className="col-lead">{wo.lead || 'N/A'}</td>
+                      <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td>
                         <span className={`priority-badge-sm priority-${(wo.priority || 'Normal').toLowerCase()}`}>
                           {wo.priority || 'Normal'}
@@ -1260,11 +1260,11 @@ export default function ProductionScheduler() {
                       </td>
                       <td>{getRunRateLabel(wo)}</td>
                       <td>{wo.labor || '-'}</td>
-                      <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
+                      <td className="lots-cell col-lots" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
                       </td>
                       <td>{wo.targetCases || 0}</td>
-                      <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
                       <td className="actions-column" onClick={(e) => e.stopPropagation()}>
                         <div className="wo-action-buttons">
                           <button className="btn-small start-btn" onClick={() => startWorkOrder(wo.id)}>Start</button>
@@ -1292,10 +1292,10 @@ export default function ProductionScheduler() {
                     <th>Line</th>
                     <th>Product</th>
                     <th>Customer</th>
-                    <th>Lead</th>
-                    <th>Country</th>
+                    <th className="col-lead">Lead</th>
+                    <th className="col-country">Country</th>
                     <th>Completed</th>
-                    <th>Notes</th>
+                    <th className="col-notes">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1305,10 +1305,10 @@ export default function ProductionScheduler() {
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
-                      <td>{wo.lead || 'N/A'}</td>
-                      <td>{wo.countryOfOrigin || 'N/A'}</td>
+                      <td className="col-lead">{wo.lead || 'N/A'}</td>
+                      <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td><span className="completed-badge-sm">✓ {wo.completedCases || 0} cases</span></td>
-                      <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
