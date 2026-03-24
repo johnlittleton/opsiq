@@ -1854,6 +1854,17 @@ export class DatabaseService implements IDatabaseService {
 
   getDepartmentShiftSessions(date?: string): any[] {
     const targetDate = date || getLocalISOString().split('T')[0];
+    // Auto-close stale active sessions (>24 h) that were never properly ended.
+    this.db.prepare(`
+      UPDATE department_shift_sessions
+      SET status = 'completed', endTime = datetime('now'), endedBy = 'System (auto-closed stale)'
+      WHERE status = 'active' AND startTime < datetime('now', '-24 hours')
+    `).run();
+    this.db.prepare(`
+      UPDATE warehouse_employee_shifts
+      SET status = 'completed', endTime = datetime('now'), endedBy = 'System (auto-closed stale)'
+      WHERE status = 'active' AND startTime < datetime('now', '-24 hours')
+    `).run();
     return this.db.prepare(`
       SELECT * FROM department_shift_sessions
       WHERE date = ?

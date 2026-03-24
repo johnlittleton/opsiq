@@ -311,12 +311,16 @@ const ExecutiveDashboard: React.FC = () => {
     ?? (currentShift ? currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount : 0);
   const activeDepartmentSessions = departmentSessions.filter((session) => session.status === 'active');
   const hasLiveDepartmentLabor = combinedActiveHeadcount > 0 || combinedRunningLaborCost > 0;
-  const derivedTrackerStartTime = activeDepartmentSessions.length > 0
-    ? activeDepartmentSessions
-        .map((session) => new Date(session.startTime).getTime())
-        .filter((value) => Number.isFinite(value))
-        .sort((a, b) => a - b)[0]
-    : null;
+  // Use the authoritative shift_sessions start time when available; it is always scoped to today
+  // and can never be a stale multi-day-old department session.
+  const derivedTrackerStartTime = currentShift?.startTime
+    ? new Date(currentShift.startTime).getTime()
+    : activeDepartmentSessions.length > 0
+      ? activeDepartmentSessions
+          .map((session) => new Date(session.startTime).getTime())
+          .filter((value) => Number.isFinite(value))
+          .sort((a, b) => a - b)[0]
+      : null;
   const derivedElapsedMinutes = (derivedTrackerStartTime
       ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
       : (currentShift?.elapsedMinutes ?? 0));

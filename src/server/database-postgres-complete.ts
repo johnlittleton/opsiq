@@ -2059,6 +2059,19 @@ export class DatabaseService implements IDatabaseService {
 
   async getDepartmentShiftSessions(date?: string): Promise<any[]> {
     const targetDate = date || getLocalISOString().split('T')[0];
+    // Auto-close any department sessions or employee shifts that have been "active" for more
+    // than 24 hours — these are stale records that were never properly ended and would otherwise
+    // produce wildly inflated elapsed-time readings on the executive dashboard.
+    await this.pool.query(`
+      UPDATE department_shift_sessions
+      SET status = 'completed', end_time = NOW(), ended_by = 'System (auto-closed stale)'
+      WHERE status = 'active' AND start_time < NOW() - INTERVAL '24 hours'
+    `);
+    await this.pool.query(`
+      UPDATE warehouse_employee_shifts
+      SET status = 'completed', end_time = NOW(), ended_by = 'System (auto-closed stale)'
+      WHERE status = 'active' AND start_time < NOW() - INTERVAL '24 hours'
+    `);
     const result = await this.pool.query(`
       SELECT * FROM department_shift_sessions
       WHERE date = $1
