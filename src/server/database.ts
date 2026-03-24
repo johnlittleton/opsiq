@@ -3683,6 +3683,71 @@ export class DatabaseService implements IDatabaseService {
   }
 
   close() {
+      getStorageBilling(): any {
+        const rows = (this.db.prepare(`
+          WITH monthly_movements AS (
+            SELECT
+              strftime('%Y-%m', closedAt) AS month,
+              SUM(CASE WHEN inboundOutbound = 'Inbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) AS palletsIn,
+              SUM(CASE WHEN inboundOutbound = 'Outbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) AS palletsOut
+            FROM dock_checkins
+            WHERE closedAt IS NOT NULL
+              AND closedAt >= '2025-11-01'
+              AND COALESCE(actualPallets, pallets, 0) BETWEEN 1 AND 200
+            GROUP BY strftime('%Y-%m', closedAt)
+          ),
+          running_balance AS (
+            SELECT
+              month,
+              palletsIn,
+              palletsOut,
+              SUM(palletsIn - palletsOut) OVER (ORDER BY month) AS balance
+            FROM monthly_movements
+          )
+          SELECT
+            month,
+            CAST(palletsIn AS INTEGER) AS palletsIn,
+            CAST(palletsOut AS INTEGER) AS palletsOut,
+            MAX(CAST(balance AS INTEGER), 0) AS balance,
+            MAX(CAST(balance AS INTEGER), 0) * 40 AS monthlyCharge
+          FROM running_balance
+          ORDER BY month
+        `).all() as any[]).map((r: any) => {
+          const [year, mon] = (r.month || '').split('-');
+          const labels: Record<string, string> = {
+            '01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+            '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec',
+          };
+          return {
+            month: r.month,
+            monthLabel: `${labels[mon] || mon} ${year}`,
+            palletsIn: r.palletsIn || 0,
+            palletsOut: r.palletsOut || 0,
+            balance: r.balance || 0,
+            monthlyCharge: r.monthlyCharge || 0,
+          };
+        });
+
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const currentBalance = rows.length > 0 ? rows[rows.length - 1].balance : 0;
+        const completedRows = rows.filter((r: any) => r.month < currentMonth);
+        const totalBilledComplete = completedRows.reduce((sum: number, r: any) => sum + r.monthlyCharge, 0);
+        const totalBilledAll = rows.reduce((sum: number, r: any) => sum + r.monthlyCharge, 0);
+        const totalPalletsIn = rows.reduce((sum: number, r: any) => sum + r.palletsIn, 0);
+        const totalPalletsOut = rows.reduce((sum: number, r: any) => sum + r.palletsOut, 0);
+
+        return {
+          months: rows,
+          currentBalance,
+          currentMonthCharge: currentBalance * 40,
+          totalBilledComplete,
+          totalBilledAll,
+          totalPalletsIn,
+          totalPalletsOut,
+        };
+      }
+
+      close() {
     this.db.close();
   }
 }

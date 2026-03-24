@@ -4312,6 +4312,72 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async close() {
+      async getStorageBilling(): Promise<any> {
+        const client = await this.pool.connect();
+        try {
+          const result = await client.query(`
+            WITH monthly_movements AS (
+              SELECT
+                DATE_TRUNC('month', closed_at) AS month,
+                SUM(CASE WHEN inbound_outbound = 'Inbound' THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) AS pallets_in,
+                SUM(CASE WHEN inbound_outbound = 'Outbound' THEN COALESCE(actual_pallets, pallets, 0) ELSE 0 END) AS pallets_out
+              FROM dock_checkins
+              WHERE closed_at IS NOT NULL
+                AND closed_at >= '2025-11-01'
+                AND COALESCE(actual_pallets, pallets, 0) BETWEEN 1 AND 200
+              GROUP BY DATE_TRUNC('month', closed_at)
+            ),
+            running_balance AS (
+              SELECT
+                month,
+                pallets_in,
+                pallets_out,
+                SUM(pallets_in - pallets_out) OVER (ORDER BY month) AS balance
+              FROM monthly_movements
+            )
+            SELECT
+              TO_CHAR(month, 'YYYY-MM') AS month,
+              TO_CHAR(month, 'Mon YYYY') AS month_label,
+              pallets_in::INTEGER,
+              pallets_out::INTEGER,
+              GREATEST(balance::INTEGER, 0) AS balance,
+              GREATEST(balance::INTEGER, 0) * 40 AS monthly_charge
+            FROM running_balance
+            ORDER BY month
+          `);
+
+          const rows = result.rows.map((r: any) => ({
+            month: r.month,
+            monthLabel: r.month_label,
+            palletsIn: parseInt(r.pallets_in) || 0,
+            palletsOut: parseInt(r.pallets_out) || 0,
+            balance: parseInt(r.balance) || 0,
+            monthlyCharge: parseInt(r.monthly_charge) || 0,
+          }));
+
+          const currentMonth = new Date().toISOString().slice(0, 7);
+          const currentBalance = rows.length > 0 ? rows[rows.length - 1].balance : 0;
+          const completedRows = rows.filter((r: any) => r.month < currentMonth);
+          const totalBilledComplete = completedRows.reduce((sum: number, r: any) => sum + r.monthlyCharge, 0);
+          const totalBilledAll = rows.reduce((sum: number, r: any) => sum + r.monthlyCharge, 0);
+          const totalPalletsIn = rows.reduce((sum: number, r: any) => sum + r.palletsIn, 0);
+          const totalPalletsOut = rows.reduce((sum: number, r: any) => sum + r.palletsOut, 0);
+
+          return {
+            months: rows,
+            currentBalance,
+            currentMonthCharge: currentBalance * 40,
+            totalBilledComplete,
+            totalBilledAll,
+            totalPalletsIn,
+            totalPalletsOut,
+          };
+        } finally {
+          client.release();
+        }
+      }
+
+      async close() {
     await this.pool.end();
   }
 }

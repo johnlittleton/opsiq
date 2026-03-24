@@ -96,6 +96,13 @@ export const HomePage: React.FC = () => {
       title: 'Labor Tracker',
       description: 'Track department headcount and labor costs',
       onClick: () => navigate('/labor-tracker'),
+        {
+          icon: '🏗️',
+          title: 'Storage Billing',
+          description: 'Monthly pallet storage charges and history',
+          onClick: () => navigate('/storage-billing'),
+        },
+      ];
     },
   ];
 

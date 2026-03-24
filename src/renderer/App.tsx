@@ -28,6 +28,7 @@ import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
+import StorageBilling from './pages/StorageBilling';
 
 type UpdaterStatus = {
   state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -88,6 +89,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/work-order-history" element={<WorkOrderHistory />} />
       <Route path="/downtime-history" element={<DowntimeHistory />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/storage-billing" element={<StorageBilling />} />
     </Routes>
   );
 };
