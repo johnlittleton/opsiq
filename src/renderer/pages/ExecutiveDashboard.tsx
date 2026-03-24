@@ -389,6 +389,7 @@ const ExecutiveDashboard: React.FC = () => {
             >🌐 All Time</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
+            <button className="storage-btn" onClick={() => navigate('/storage-billing')}>📦 Storage Billing</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
           </div>
         </div>
