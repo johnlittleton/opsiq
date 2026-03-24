@@ -233,6 +233,8 @@ export default function LaborTracker() {
   const [departmentOvertimeDrafts, setDepartmentOvertimeDrafts] = useState<Record<number, string>>({});
   const [departmentEndHeadcountDrafts, setDepartmentEndHeadcountDrafts] = useState<Record<number, string>>({});
   const [warehouseOvertimeDrafts, setWarehouseOvertimeDrafts] = useState<Record<number, string>>({});
+  const [warehouseShiftActionState, setWarehouseShiftActionState] = useState<Record<number, 'ending' | 'saving-ot'>>({});
+  const [warehouseStartingEmployees, setWarehouseStartingEmployees] = useState<Record<string, boolean>>({});
 
   const activeDepartment = department as DepartmentKey;
   const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()] as 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
@@ -689,9 +691,16 @@ export default function LaborTracker() {
 
   const handleStartWarehouseEmployeeFromRoster = async (employeeName: string) => {
     setError(null);
+    const employeeKey = employeeName.trim().toLowerCase();
+    setWarehouseStartingEmployees((prev) => ({ ...prev, [employeeKey]: true }));
 
     const hasDepartmentSession = await ensureWarehouseDepartmentSession();
     if (!hasDepartmentSession) {
+      setWarehouseStartingEmployees((prev) => {
+        const next = { ...prev };
+        delete next[employeeKey];
+        return next;
+      });
       return;
     }
 
@@ -712,11 +721,18 @@ export default function LaborTracker() {
       await refreshLiveLaborData();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setWarehouseStartingEmployees((prev) => {
+        const next = { ...prev };
+        delete next[employeeKey];
+        return next;
+      });
     }
   };
 
   const handleEndWarehouseEmployee = async (shift: WarehouseEmployeeShift, overtimeHoursOverride?: number) => {
     setError(null);
+    setWarehouseShiftActionState((prev) => ({ ...prev, [shift.id]: 'ending' }));
     const overtimeHours = Math.max(
       0,
       Number.isFinite(overtimeHoursOverride as number)
@@ -747,11 +763,18 @@ export default function LaborTracker() {
       showSuccess(`${shift.employeeName} shift ended and logged.`);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setWarehouseShiftActionState((prev) => {
+        const next = { ...prev };
+        delete next[shift.id];
+        return next;
+      });
     }
   };
 
   const handleUpdateWarehouseEmployeeOt = async (shift: WarehouseEmployeeShift, overtimeHoursOverride?: number) => {
     setError(null);
+    setWarehouseShiftActionState((prev) => ({ ...prev, [shift.id]: 'saving-ot' }));
     const overtimeHours = Math.max(
       0,
       Number.isFinite(overtimeHoursOverride as number)
@@ -779,6 +802,12 @@ export default function LaborTracker() {
       showSuccess(`OT saved for ${shift.employeeName}.`);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setWarehouseShiftActionState((prev) => {
+        const next = { ...prev };
+        delete next[shift.id];
+        return next;
+      });
     }
   };
 
@@ -1170,6 +1199,10 @@ export default function LaborTracker() {
                   const latestCompletedShift = getWarehouseLatestCompletedShiftForEmployee(person.name);
                   const todaySchedule = person.schedule[dayKey] || 'OFF';
                   const isOff = todaySchedule.toUpperCase() === 'OFF';
+                  const employeeKey = person.name.trim().toLowerCase();
+                  const isStartingShift = Boolean(warehouseStartingEmployees[employeeKey]);
+                  const activeShiftAction = activePersonShift ? warehouseShiftActionState[activePersonShift.id] : undefined;
+                  const completedShiftAction = latestCompletedShift ? warehouseShiftActionState[latestCompletedShift.id] : undefined;
                   const canStartFromCard = !activePersonShift && !isOff;
                   const scheduledDays = (Object.entries(person.schedule) as Array<[
                     'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat',
@@ -1207,12 +1240,13 @@ export default function LaborTracker() {
                           <button
                             type="button"
                             className="department-action-btn dept-warehouse"
+                            disabled={isStartingShift}
                             onClick={(event) => {
                               event.stopPropagation();
                               void handleStartWarehouseEmployeeFromRoster(person.name);
                             }}
                           >
-                            Start Shift
+                            {isStartingShift ? 'Starting...' : 'Start Shift'}
                           </button>
                         )}
                         {activePersonShift && (
@@ -1234,27 +1268,54 @@ export default function LaborTracker() {
                             <button
                               type="button"
                               className="labor-tracker__history-btn"
+                              disabled={activeShiftAction === 'saving-ot' || activeShiftAction === 'ending'}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 void handleUpdateWarehouseEmployeeOt(activePersonShift);
                               }}
                             >
-                              Save OT
+                              {activeShiftAction === 'saving-ot' ? 'Saving OT...' : 'Save OT'}
                             </button>
                             <button
                               type="button"
                               className="labor-tracker__history-btn"
+                              disabled={activeShiftAction === 'saving-ot' || activeShiftAction === 'ending'}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 void handleEndWarehouseEmployee(activePersonShift);
                               }}
                             >
-                              End Shift
+                              {activeShiftAction === 'ending' ? 'Ending...' : 'End Shift'}
                             </button>
                           </>
                         )}
                         {!activePersonShift && latestCompletedShift && (
                           <>
+                            <label className="warehouse-inline-label" onClick={(event) => event.stopPropagation()}>
+                              OT
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.25"
+                                value={getWarehouseOvertimeDraft(latestCompletedShift)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const value = e.target.value;
+                                  setWarehouseOvertimeDrafts((prev) => ({ ...prev, [latestCompletedShift.id]: value }));
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="labor-tracker__history-btn"
+                              disabled={completedShiftAction === 'saving-ot'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleUpdateWarehouseEmployeeOt(latestCompletedShift);
+                              }}
+                            >
+                              {completedShiftAction === 'saving-ot' ? 'Saving OT...' : 'Save OT'}
+                            </button>
                             <span className="warehouse-off-label">Last OT: {latestCompletedShift.overtimeHours || 0} hrs</span>
                           </>
                         )}
