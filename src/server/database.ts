@@ -2002,6 +2002,21 @@ export class DatabaseService implements IDatabaseService {
     const departments = ['production', 'warehouse', 'qc', 'maintenance', 'food-safety', 'housekeeping'];
     const now = new Date();
 
+    const activeShift = this.db.prepare(`
+      SELECT startTime
+      FROM shift_sessions
+      WHERE date = ? AND status = 'active'
+      ORDER BY startTime DESC
+      LIMIT 1
+    `).get(targetDate) as { startTime?: string } | undefined;
+    const activeShiftStartMs = activeShift?.startTime ? new Date(activeShift.startTime).getTime() : null;
+    const isWithinActiveShiftWindow = (startTime?: string | null) => {
+      if (activeShiftStartMs === null) return true;
+      if (!startTime) return false;
+      const ms = new Date(startTime).getTime();
+      return Number.isFinite(ms) && ms >= activeShiftStartMs;
+    };
+
     const departmentSessions = this.db.prepare(`
       SELECT * FROM department_shift_sessions
       WHERE date = ?
@@ -2014,7 +2029,7 @@ export class DatabaseService implements IDatabaseService {
 
     const departmentSummaries = departments.map((department) => {
       const deptSessions = departmentSessions.filter((s) => s.department === department);
-      const activeSessions = deptSessions.filter((s) => s.status === 'active');
+      const activeSessions = deptSessions.filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
       const completedSessions = deptSessions.filter((s) => s.status === 'completed');
 
       let runningCost = 0;
@@ -2023,7 +2038,7 @@ export class DatabaseService implements IDatabaseService {
       let currentHourlyLaborCost = 0;
 
       if (department === 'warehouse') {
-        const activeEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'active');
+        const activeEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
         const completedEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'completed');
 
         activeHeadcount = activeEmployees.length;

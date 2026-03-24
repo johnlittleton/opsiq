@@ -190,7 +190,8 @@ const ExecutiveDashboard: React.FC = () => {
 
   const fetchDepartmentLaborLive = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/labor/departments/live`);
+      const todayLocal = getLocalDateString(new Date());
+      const response = await fetch(`${API_BASE}/api/labor/departments/live?date=${todayLocal}`);
       if (!response.ok) {
         setDepartmentLaborWarning('Combined labor tracker feed is not available on the current server deployment.');
         return;
@@ -213,7 +214,8 @@ const ExecutiveDashboard: React.FC = () => {
 
   const fetchDepartmentSessions = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/labor/departments/sessions`);
+      const todayLocal = getLocalDateString(new Date());
+      const response = await fetch(`${API_BASE}/api/labor/departments/sessions?date=${todayLocal}`);
       if (!response.ok) {
         return;
       }

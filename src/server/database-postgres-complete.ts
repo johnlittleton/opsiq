@@ -2214,6 +2214,23 @@ export class DatabaseService implements IDatabaseService {
     const departments = ['production', 'warehouse', 'qc', 'maintenance', 'food-safety', 'housekeeping'];
     const now = new Date();
 
+    const activeShiftResult = await this.pool.query(`
+      SELECT start_time
+      FROM shift_sessions
+      WHERE date = $1 AND status = 'active'
+      ORDER BY start_time DESC
+      LIMIT 1
+    `, [targetDate]);
+    const activeShiftStartMs = activeShiftResult.rows.length > 0
+      ? new Date(activeShiftResult.rows[0].start_time).getTime()
+      : null;
+    const isWithinActiveShiftWindow = (startTime?: string | Date | null) => {
+      if (activeShiftStartMs === null) return true;
+      if (!startTime) return false;
+      const ms = new Date(startTime).getTime();
+      return Number.isFinite(ms) && ms >= activeShiftStartMs;
+    };
+
     const sessionsResult = await this.pool.query(`
       SELECT * FROM department_shift_sessions
       WHERE date = $1
@@ -2228,7 +2245,7 @@ export class DatabaseService implements IDatabaseService {
 
     const departmentSummaries = departments.map((department) => {
       const deptSessions = departmentSessions.filter((s: any) => s.department === department);
-      const activeSessions = deptSessions.filter((s: any) => s.status === 'active');
+      const activeSessions = deptSessions.filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
       const completedSessions = deptSessions.filter((s: any) => s.status === 'completed');
 
       let runningCost = 0;
@@ -2237,7 +2254,7 @@ export class DatabaseService implements IDatabaseService {
       let currentHourlyLaborCost = 0;
 
       if (department === 'warehouse') {
-        const activeEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'active');
+        const activeEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
         const completedEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'completed');
 
         activeHeadcount = activeEmployees.length;
