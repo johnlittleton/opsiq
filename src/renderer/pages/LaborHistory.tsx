@@ -304,7 +304,7 @@ export default function LaborHistory() {
     .reduce((sum, item) => sum + Number(item.totalLaborCost || 0), 0)
     .toFixed(2);
 
-  if (userRole !== 'executive') {
+  if (userRole !== 'executive' && userRole !== 'manager') {
     return (
       <div className="labor-history">
         <TitleBar showLegend={false} />
@@ -313,7 +313,7 @@ export default function LaborHistory() {
             ⛔ Access Denied
             <br />
             <span style={{ fontSize: '16px', color: '#94a3b8' }}>
-              Labor History is restricted to executive users.
+              Labor History is restricted to authorized users.
             </span>
           </div>
         </div>

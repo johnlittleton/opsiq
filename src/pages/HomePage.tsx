@@ -5,7 +5,7 @@ import './HomePage.css';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { executiveName, logout } = useAuth();
+  const { executiveName, userRole, logout } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
   
@@ -85,12 +85,12 @@ export const HomePage: React.FC = () => {
   ];
 
   const managementCards = [
-    {
+    ...(userRole === 'executive' ? [{
       icon: '📊',
       title: 'Executive Dashboard',
       description: 'Site performance metrics and top operators',
       onClick: () => navigate('/executive'),
-    },
+    }] : []),
     {
       icon: '💼',
       title: 'Labor Tracker',

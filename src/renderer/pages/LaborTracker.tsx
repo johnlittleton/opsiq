@@ -940,15 +940,15 @@ export default function LaborTracker() {
 
   const preview = calculatePreview();
 
-  // Check if user is executive
-  if (userRole !== 'executive') {
+  // Check if user is executive or manager
+  if (userRole !== 'executive' && userRole !== 'manager') {
     return (
       <div className="labor-tracker">
         <TitleBar showLegend={false} />
         <div className="labor-tracker__container">
           <div style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
             ⛔ Access Denied<br/>
-            <span style={{ fontSize: '16px', color: '#94a3b8' }}>Labor Tracker is restricted to executive users.</span>
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>Labor Tracker is restricted to authorized users.</span>
           </div>
         </div>
       </div>
