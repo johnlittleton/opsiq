@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
+import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { useAuth } from '../context/AuthContext';
 import './ProductionScheduler.css';
 import DowntimeTracker from '../components/DowntimeTracker';
@@ -52,6 +53,12 @@ interface WorkOrder {
   planned_run_rate?: number;
 }
 
+interface CurrentShift {
+  shiftNumber: number;
+  shiftName: string;
+  startTime: string;
+}
+
 export default function ProductionScheduler() {
   const navigate = useNavigate();
   const { executiveName, sessionToken } = useAuth();
@@ -78,6 +85,10 @@ export default function ProductionScheduler() {
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedCalendarWO, setSelectedCalendarWO] = useState<WorkOrder | null>(null);
+  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
+  const [plannedShiftEndTime, setPlannedShiftEndTime] = useState<string | null>(null);
+  const [showShiftReminder, setShowShiftReminder] = useState(false);
+  const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
 
   const selectedDateStr = getLocalDateString(selectedDate);
   const getPlannedRunRate = (wo: WorkOrder): number | null => {
@@ -110,8 +121,24 @@ export default function ProductionScheduler() {
 
   useEffect(() => {
     fetchWorkOrders();
-    // Fetch every 2 seconds to keep timers updated
-    const interval = setInterval(fetchWorkOrders, 2000);
+    // Keep scheduler fresh without hammering API and renderer.
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchWorkOrders();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    fetchCurrentShift();
+    fetchPlannerShiftWindow();
+
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchCurrentShift();
+      fetchPlannerShiftWindow();
+    }, 60000);
+
     return () => clearInterval(interval);
   }, [selectedDate]);
 
@@ -125,9 +152,15 @@ export default function ProductionScheduler() {
   // Force re-render every second for live timer display
   const [, setTick] = useState(0);
   useEffect(() => {
+    const hasActiveTimers = workOrders.some(
+      (wo) => wo.status === 'Active' && !!wo.startTimestamp && !wo.isPaused
+    );
+
+    if (!hasActiveTimers) return;
+
     const timer = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [workOrders]);
 
   const fetchWorkOrders = async () => {
     try {
@@ -180,6 +213,83 @@ export default function ProductionScheduler() {
       }
     } catch (error) {
       console.error('Failed to fetch month work orders:', error);
+    }
+  };
+
+  const fetchCurrentShift = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
+      if (!response.ok) {
+        setCurrentShift(null);
+        return;
+      }
+      const data = await response.json();
+      setCurrentShift(data);
+    } catch (error) {
+      console.error('Failed to fetch current shift:', error);
+      setCurrentShift(null);
+    }
+  };
+
+  const fetchPlannerShiftWindow = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/production-labor-planner?startDate=${selectedDateStr}&endDate=${selectedDateStr}`);
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const endTime = data?.summary?.shiftEndTime || data?.plannerConfig?.shiftEndTime || null;
+      setPlannedShiftEndTime(endTime);
+    } catch (error) {
+      console.error('Failed to fetch labor planner shift window:', error);
+    }
+  };
+
+  const parseShiftTime = (baseDate: Date, timeLabel: string): Date | null => {
+    const match = String(timeLabel || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (!match) return null;
+
+    const hours12 = parseInt(match[1], 10);
+    const minutes = parseInt(match[2], 10);
+    const meridiem = match[3].toUpperCase();
+    let hours24 = hours12 % 12;
+    if (meridiem === 'PM') hours24 += 12;
+
+    const target = new Date(baseDate);
+    target.setHours(hours24, minutes, 0, 0);
+    return target;
+  };
+
+  const getShiftMinutesRemaining = (): number | null => {
+    if (!currentShift || !plannedShiftEndTime) return null;
+
+    const start = new Date(currentShift.startTime);
+    const plannedEnd = parseShiftTime(start, plannedShiftEndTime);
+    if (!plannedEnd) return null;
+
+    if (plannedEnd.getTime() < start.getTime()) {
+      plannedEnd.setDate(plannedEnd.getDate() + 1);
+    }
+
+    return Math.floor((plannedEnd.getTime() - Date.now()) / 60000);
+  };
+
+  const minutesRemaining = getShiftMinutesRemaining();
+  const shiftKey = currentShift ? `${currentShift.shiftNumber}-${currentShift.startTime}` : null;
+
+  useEffect(() => {
+    if (messengerOpen) return;
+    if (!shiftKey || minutesRemaining === null) return;
+
+    const withinReminderWindow = minutesRemaining >= 0 && minutesRemaining <= 10;
+    if (withinReminderWindow && remindedShiftKey !== shiftKey) {
+      setShowShiftReminder(true);
+    }
+  }, [minutesRemaining, shiftKey, remindedShiftKey, messengerOpen]);
+
+  const dismissShiftReminder = () => {
+    setShowShiftReminder(false);
+    if (shiftKey) {
+      setRemindedShiftKey(shiftKey);
     }
   };
 
@@ -608,9 +718,18 @@ export default function ProductionScheduler() {
   };
 
   // Group work orders by status
-  const activeWorkOrders = workOrders.filter(wo => wo.status === 'Active');
-  const scheduledWorkOrders = workOrders.filter(wo => wo.status === 'Scheduled');
-  const completedWorkOrders = workOrders.filter(wo => wo.status === 'Completed');
+  const activeWorkOrders = useMemo(
+    () => workOrders.filter(wo => wo.status === 'Active'),
+    [workOrders]
+  );
+  const scheduledWorkOrders = useMemo(
+    () => workOrders.filter(wo => wo.status === 'Scheduled'),
+    [workOrders]
+  );
+  const completedWorkOrders = useMemo(
+    () => workOrders.filter(wo => wo.status === 'Completed'),
+    [workOrders]
+  );
 
   const getLineName = (lineId: number) => LINES.find(l => l.id === lineId)?.name || `Line ${lineId}`;
 
@@ -872,35 +991,32 @@ export default function ProductionScheduler() {
 
   return (
     <div className="production-scheduler">
+      <DriverWaitingTicker />
       <MessageBanner 
         isOpen={messengerOpen}
         onToggle={() => setMessengerOpen(!messengerOpen)}
         onUnreadCountChange={setUnreadCount}
       />
       <div className="header-bar">
-        {!isMobileRuntime && (
-          <button className="back-btn" onClick={() => navigate('/')}>
-            ← Home
-          </button>
-        )}
+        <button className="back-btn" onClick={() => navigate('/')}>
+          ← Home
+        </button>
         <h1>Production Scheduler</h1>
         <div className="header-controls">
-          {!isMobileRuntime && (
-            <div className="view-toggle-group">
-              <button 
-                className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
-                onClick={() => setViewMode('list')}
-              >
-                📋 List
-              </button>
-              <button 
-                className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
-                onClick={() => setViewMode('calendar')}
-              >
-                📅 Calendar
-              </button>
-            </div>
-          )}
+          <div className="view-toggle-group">
+            <button 
+              className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              📋 List
+            </button>
+            <button 
+              className={`view-toggle-btn ${viewMode === 'calendar' ? 'active' : ''}`}
+              onClick={() => setViewMode('calendar')}
+            >
+              📅 Calendar
+            </button>
+          </div>
           <input
             type="date"
             value={selectedDateStr}
@@ -956,6 +1072,16 @@ export default function ProductionScheduler() {
           </button>
         </div>
       </div>
+
+      {showShiftReminder && (
+        <div className="shift-reminder-toast" role="status" aria-live="polite">
+          <div className="shift-reminder-title">Shift Reminder</div>
+          <div className="shift-reminder-text">
+            Reminder: planned shift time is approaching.
+          </div>
+          <button className="shift-reminder-dismiss" onClick={dismissShiftReminder}>Dismiss</button>
+        </div>
+      )}
 
       {isMobileRuntime && (
         <div className="mobile-scheduler-tools">
@@ -1017,21 +1143,21 @@ export default function ProductionScheduler() {
                     <th>SO#</th>
                     <th>Line</th>
                     <th>Product</th>
-                    <th>Bag</th>
+                    <th className="col-bag">Bag</th>
                     <th>Customer</th>
-                    <th>Lead</th>
-                    <th>Country</th>
+                    <th className="col-lead">Lead</th>
+                    <th className="col-country">Country</th>
                     <th>Priority</th>
-                    <th>Planned Bags/Min</th>
+                    <th className="col-planned-bags">Planned Bags/Min</th>
                     <th>Planned Cases/Min</th>
                     <th>Labor</th>
-                    <th>Lots</th>
+                    <th className="col-lots">Lots</th>
                     <th>Target</th>
                     <th>Completed</th>
                     <th>Elapsed</th>
                     <th>ETA (Cases)</th>
-                    <th>ETA (Bags)</th>
-                    <th>Notes</th>
+                    <th className="col-eta-bags">ETA (Bags)</th>
+                    <th className="col-notes">Notes</th>
                     <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
@@ -1041,19 +1167,19 @@ export default function ProductionScheduler() {
                       <td><strong>#{wo.id}</strong></td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
-                      <td>{wo.bagSize || 'N/A'}</td>
+                      <td className="col-bag">{wo.bagSize || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
-                      <td>{wo.lead || 'N/A'}</td>
-                      <td>{wo.countryOfOrigin || 'N/A'}</td>
+                      <td className="col-lead">{wo.lead || 'N/A'}</td>
+                      <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td>
                         <span className={`priority-badge-sm priority-${(wo.priority || 'Normal').toLowerCase()}`}>
                           {wo.priority || 'Normal'}
                         </span>
                       </td>
-                      <td>{formatRate(getPlannedBagsPerMinute(wo))}</td>
+                      <td className="col-planned-bags">{formatRate(getPlannedBagsPerMinute(wo))}</td>
                       <td>{formatRate(getPlannedCasesPerMinute(wo))}</td>
                       <td>{wo.labor || '-'}</td>
-                      <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
+                      <td className="lots-cell col-lots" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
                       </td>
                       <td>{wo.targetCases || 0}</td>
@@ -1075,8 +1201,8 @@ export default function ProductionScheduler() {
                       </td>
                       <td className="elapsed-cell">{calculateElapsedTime(wo)}</td>
                       <td>{getEtaCases(wo)}</td>
-                      <td>{getEtaBags(wo)}</td>
-                      <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="col-eta-bags">{getEtaBags(wo)}</td>
+                      <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
                       <td className="actions-column" onClick={(e) => e.stopPropagation()}>
                         <div className="wo-action-buttons">
                           <button className="btn-small go-btn" onClick={() => updateCompletedCases(wo.id, casesInputs[wo.id] ?? 0)}>Go</button>
@@ -1104,16 +1230,16 @@ export default function ProductionScheduler() {
                     <th>SO#</th>
                     <th>Line</th>
                     <th>Product</th>
-                    <th>Bag</th>
+                    <th className="col-bag">Bag</th>
                     <th>Customer</th>
-                    <th>Lead</th>
-                    <th>Country</th>
+                    <th className="col-lead">Lead</th>
+                    <th className="col-country">Country</th>
                     <th>Priority</th>
                     <th>Run Rate</th>
                     <th>Labor</th>
-                    <th>Lots</th>
+                    <th className="col-lots">Lots</th>
                     <th>Target</th>
-                    <th>Notes</th>
+                    <th className="col-notes">Notes</th>
                     <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
@@ -1123,10 +1249,10 @@ export default function ProductionScheduler() {
                       <td><strong>#{wo.id}</strong></td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
-                      <td>{wo.bagSize || 'N/A'}</td>
+                      <td className="col-bag">{wo.bagSize || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
-                      <td>{wo.lead || 'N/A'}</td>
-                      <td>{wo.countryOfOrigin || 'N/A'}</td>
+                      <td className="col-lead">{wo.lead || 'N/A'}</td>
+                      <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td>
                         <span className={`priority-badge-sm priority-${(wo.priority || 'Normal').toLowerCase()}`}>
                           {wo.priority || 'Normal'}
@@ -1134,11 +1260,11 @@ export default function ProductionScheduler() {
                       </td>
                       <td>{getRunRateLabel(wo)}</td>
                       <td>{wo.labor || '-'}</td>
-                      <td className="lots-cell" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
+                      <td className="lots-cell col-lots" title={`Lot1: ${wo.lot1 || '-'}, Lot2: ${wo.lot2 || '-'}, Lot3: ${wo.lot3 || '-'}, Lot4: ${wo.lot4 || '-'}`}>
                         {[wo.lot1, wo.lot2, wo.lot3, wo.lot4].filter(Boolean).join(', ') || '-'}
                       </td>
                       <td>{wo.targetCases || 0}</td>
-                      <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
                       <td className="actions-column" onClick={(e) => e.stopPropagation()}>
                         <div className="wo-action-buttons">
                           <button className="btn-small start-btn" onClick={() => startWorkOrder(wo.id)}>Start</button>
@@ -1166,10 +1292,10 @@ export default function ProductionScheduler() {
                     <th>Line</th>
                     <th>Product</th>
                     <th>Customer</th>
-                    <th>Lead</th>
-                    <th>Country</th>
+                    <th className="col-lead">Lead</th>
+                    <th className="col-country">Country</th>
                     <th>Completed</th>
-                    <th>Notes</th>
+                    <th className="col-notes">Notes</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1179,10 +1305,10 @@ export default function ProductionScheduler() {
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
-                      <td>{wo.lead || 'N/A'}</td>
-                      <td>{wo.countryOfOrigin || 'N/A'}</td>
+                      <td className="col-lead">{wo.lead || 'N/A'}</td>
+                      <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td><span className="completed-badge-sm">✓ {wo.completedCases || 0} cases</span></td>
-                      <td className="notes-cell" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

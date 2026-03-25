@@ -79,6 +79,8 @@ interface DepartmentOption {
   colorClass: string;
 }
 
+const TEAM_OPTIONS = ['Group A', 'Group B'] as const;
+
 interface WarehouseSchedulePerson {
   name: string;
   role: string;
@@ -98,10 +100,10 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
   {
     name: 'VICTOR ROMAN',
     role: 'Office Staff (Coordinator)',
-    schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
+    schedule: { sun: 'OFF', mon: '7:00 AM - 3:30 PM', tue: '7:00 AM - 3:30 PM', wed: '7:00 AM - 3:30 PM', thu: '7:00 AM - 3:30 PM', fri: '7:00 AM - 3:30 PM', sat: 'OFF' },
   },
   {
-    name: 'JAPNET SINGH',
+    name: 'JAPNEET SINGH',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
@@ -111,12 +113,12 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
   {
-    name: 'LISETTE RASARIO',
+    name: 'LISSETTE ROSARIO',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
   {
-    name: 'RIZELYS "VAL\'RODRIGUEZ',
+    name: 'RIZELYS RODRIGUEZ',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: '7:30 AM - 4:00 PM', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: 'OFF' },
   },
@@ -151,14 +153,14 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
     schedule: { sun: 'OFF', mon: '6:00 AM - 2:30 PM', tue: '6:00 AM - 2:30 PM', wed: '6:00 AM - 2:30 PM', thu: '6:00 AM - 2:30 PM', fri: '6:00 AM - 2:30 PM', sat: 'OFF' },
   },
   {
-    name: 'JOYCEANN ROSADO',
+    name: 'JOYCEANNE ROSADO',
     role: 'Office Staff',
-    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: 'OFF' },
+    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: '12:00 PM - 8:30 PM', wed: 'OFF', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
   },
   {
     name: 'DAHINNY BERNAL',
     role: 'Office Staff',
-    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: 'OFF' },
+    schedule: { sun: 'OFF', mon: '12:00 PM - 8:30 PM', tue: 'OFF', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
   },
   {
     name: 'JAN CARLOS MONTALVO',
@@ -178,12 +180,22 @@ const WAREHOUSE_SCHEDULE: WarehouseSchedulePerson[] = [
   {
     name: 'JENSEN AVILES',
     role: 'Office Staff',
-    schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '12:00 PM - 8:30 PM' },
+    schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
+  },
+  {
+    name: 'CLAUDIA HERMOSILLO',
+    role: 'Office Staff',
+    schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '7:30 AM - 12:00 PM' },
   },
   {
     name: 'ESVIN GOMEZ',
     role: 'Office Staff',
     schedule: { sun: 'OFF', mon: 'OFF', tue: '12:00 PM - 8:30 PM', wed: '12:00 PM - 8:30 PM', thu: '12:00 PM - 8:30 PM', fri: '12:00 PM - 8:30 PM', sat: '12:00 PM - 8:30 PM' },
+  },
+  {
+    name: 'NOEL PEREZ',
+    role: 'Warehouse',
+    schedule: { sun: 'OFF', mon: 'OFF', tue: '7:30 AM - 4:00 PM', wed: '7:30 AM - 4:00 PM', thu: '7:30 AM - 4:00 PM', fri: '7:30 AM - 4:00 PM', sat: '7:30 AM - 4:00 PM' },
   },
 ];
 
@@ -211,6 +223,7 @@ export default function LaborTracker() {
   const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [endingShift, setEndingShift] = useState(false);
   const [department, setDepartment] = useState('production');
   const [departmentHeadcount, setDepartmentHeadcount] = useState('');
@@ -221,6 +234,12 @@ export default function LaborTracker() {
   const [departmentSessions, setDepartmentSessions] = useState<DepartmentShiftSession[]>([]);
   const [warehouseEmployeeShifts, setWarehouseEmployeeShifts] = useState<WarehouseEmployeeShift[]>([]);
   const [departmentLoading, setDepartmentLoading] = useState(false);
+  const [departmentStartHeadcountDrafts, setDepartmentStartHeadcountDrafts] = useState<Record<string, string>>({});
+  const [departmentOvertimeDrafts, setDepartmentOvertimeDrafts] = useState<Record<number, string>>({});
+  const [departmentEndHeadcountDrafts, setDepartmentEndHeadcountDrafts] = useState<Record<number, string>>({});
+  const [warehouseOvertimeDrafts, setWarehouseOvertimeDrafts] = useState<Record<number, string>>({});
+  const [warehouseShiftActionState, setWarehouseShiftActionState] = useState<Record<number, 'ending' | 'saving-ot'>>({});
+  const [warehouseStartingEmployees, setWarehouseStartingEmployees] = useState<Record<string, boolean>>({});
 
   const activeDepartment = department as DepartmentKey;
   const dayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date().getDay()] as 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat';
@@ -281,38 +300,82 @@ export default function LaborTracker() {
     (session) => session.department === 'warehouse' && session.status === 'active'
   );
 
-  const filteredDepartmentSessions = departmentSessions.filter(
-    (session) => session.department === activeDepartment
-  );
-  const activeDepartmentSessions = filteredDepartmentSessions.filter((session) => session.status === 'active');
-  const completedDepartmentSessions = filteredDepartmentSessions.filter((session) => session.status === 'completed');
-  const selectedProductionTeamIsActive =
-    activeDepartment === 'production' &&
-    activeDepartmentSessions.some((session) => (session.teamName || '') === productionTeam);
-  const canStartDepartmentShift =
-    activeDepartment === 'production' ? !selectedProductionTeamIsActive : activeDepartmentSessions.length === 0;
+  const currentShiftStartTime = currentShift?.startTime ? new Date(currentShift.startTime).getTime() : null;
+  const isWithinCurrentShiftWindow = (startTime?: string | null) => {
+    if (!startTime || currentShiftStartTime === null) {
+      return false;
+    }
 
-  const getWarehouseShiftForEmployee = (employeeName: string) => {
-    return warehouseEmployeeShifts.find((shift) => shift.employeeName.toLowerCase() === employeeName.toLowerCase());
+    const sessionStart = new Date(startTime).getTime();
+    return Number.isFinite(sessionStart) && sessionStart >= currentShiftStartTime;
   };
 
-  const refreshLiveLaborData = async () => {
+  const filteredDepartmentSessions = departmentSessions.filter((session) => session.department === activeDepartment);
+  const departmentSessionsForCards = currentShiftStartTime !== null
+    ? filteredDepartmentSessions.filter((session) => session.status === 'active' || isWithinCurrentShiftWindow(session.startTime))
+    : filteredDepartmentSessions.filter((session) => session.status === 'active');
+  const activeDepartmentSessions = departmentSessionsForCards.filter((session) => session.status === 'active');
+  const getDepartmentActiveSessionByTeam = (teamName: string) => {
+    return activeDepartmentSessions.find((session) => (session.teamName || 'Group A') === teamName);
+  };
+  const getDepartmentTeamStartHeadcountDraft = (teamName: string) => {
+    const key = `${activeDepartment}-${teamName}`;
+    return departmentStartHeadcountDrafts[key] ?? '';
+  };
+
+  const getWarehouseActiveShiftForEmployee = (employeeName: string) => {
+    return warehouseEmployeeShifts.find(
+      (shift) => shift.employeeName.toLowerCase() === employeeName.toLowerCase() && shift.status === 'active'
+    );
+  };
+
+  const getWarehouseLatestCompletedShiftForEmployee = (employeeName: string) => {
+    const completedShifts = warehouseEmployeeShifts
+      .filter((shift) => shift.employeeName.toLowerCase() === employeeName.toLowerCase() && shift.status === 'completed')
+      .sort((a, b) => {
+        const aTime = new Date(a.endTime || a.startTime).getTime();
+        const bTime = new Date(b.endTime || b.startTime).getTime();
+        return bTime - aTime;
+      });
+
+    return completedShifts[0] || null;
+  };
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setTimeout(() => {
+      setSuccessMessage((prev) => (prev === message ? null : prev));
+    }, 2500);
+  };
+
+  const refreshLiveLaborData = async (dateOverride?: string) => {
     await Promise.all([
       fetchSummary(),
       fetchCurrentShift(),
-      fetchDepartmentTrackerData(),
+      fetchDepartmentTrackerData(dateOverride),
     ]);
   };
 
   useEffect(() => {
-    refreshLiveLaborData();
+    refreshLiveLaborData(selectedDate);
     
-    // Poll for current shift every 30 seconds
+    // Poll for current shift every 30 seconds and auto-advance date at midnight
     const interval = setInterval(() => {
-      refreshLiveLaborData();
+      const today = getLocalDateString(new Date());
+      if (today !== selectedDate) {
+        setSelectedDate(today);
+      }
+      refreshLiveLaborData(today);
     }, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    setDepartmentStartHeadcountDrafts({});
+    setDepartmentOvertimeDrafts({});
+    setDepartmentEndHeadcountDrafts({});
+    setWarehouseOvertimeDrafts({});
+  }, [selectedDate]);
 
   // Auto-fill recordedBy with authenticated executive's name
   useEffect(() => {
@@ -347,11 +410,12 @@ export default function LaborTracker() {
     }
   };
 
-  const fetchDepartmentTrackerData = async () => {
+  const fetchDepartmentTrackerData = async (dateOverride?: string) => {
     try {
+      const targetDate = dateOverride || selectedDate;
       const [sessionsRes, warehouseRes] = await Promise.all([
-        fetch(`${API_BASE}/api/labor/departments/sessions`),
-        fetch(`${API_BASE}/api/labor/warehouse/employees`),
+        fetch(`${API_BASE}/api/labor/departments/sessions?date=${targetDate}`),
+        fetch(`${API_BASE}/api/labor/warehouse/employees?date=${targetDate}`),
       ]);
 
       if (sessionsRes.ok) {
@@ -418,18 +482,88 @@ export default function LaborTracker() {
     }
   };
 
-  const handleEndDepartmentShift = async (session: DepartmentShiftSession) => {
-    const endHeadcountInput = window.prompt(
-      `End ${session.department}${session.teamName ? ` (${session.teamName})` : ''} shift.\nEnter ending headcount:`,
-      String(session.startHeadcount)
+  const handleStartDepartmentTeamShift = async (teamName: string) => {
+    setError(null);
+
+    const key = `${activeDepartment}-${teamName}`;
+    const headcount = parseInt(departmentStartHeadcountDrafts[key] || '0', 10) || 0;
+
+    if (headcount <= 0) {
+      setError(`${teamName} headcount must be greater than 0`);
+      return;
+    }
+
+    if (!recordedBy) {
+      setError('Recorded By is required');
+      return;
+    }
+
+    setDepartmentLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/labor/departments/${department}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startedBy: recordedBy,
+          headcount,
+          teamName,
+          notes: departmentNotes || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await getApiErrorMessage(response, 'Failed to start department shift'));
+      }
+
+      setDepartmentStartHeadcountDrafts((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setDepartmentNotes('');
+      await refreshLiveLaborData();
+      showSuccess(`${getDepartmentLabel(activeDepartment)} ${teamName} shift started.`);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setDepartmentLoading(false);
+    }
+  };
+
+  const getDepartmentOvertimeDraft = (session: DepartmentShiftSession) => {
+    const rawValue = departmentOvertimeDrafts[session.id];
+    return rawValue === undefined ? String(session.overtimeHours || 0) : rawValue;
+  };
+
+  const getDepartmentEndHeadcountDraft = (session: DepartmentShiftSession) => {
+    const fallbackHeadcount = session.endHeadcount ?? session.startHeadcount ?? 0;
+    const rawValue = departmentEndHeadcountDrafts[session.id];
+    return rawValue === undefined ? String(fallbackHeadcount) : rawValue;
+  };
+
+  const getWarehouseOvertimeDraft = (shift: WarehouseEmployeeShift) => {
+    const rawValue = warehouseOvertimeDrafts[shift.id];
+    return rawValue === undefined ? String(shift.overtimeHours || 0) : rawValue;
+  };
+
+  const handleEndDepartmentShift = async (
+    session: DepartmentShiftSession,
+    endHeadcountOverride?: number,
+    overtimeHoursOverride?: number
+  ) => {
+    const endHeadcount = Math.max(
+      0,
+      Number.isFinite(endHeadcountOverride as number)
+        ? Number(endHeadcountOverride)
+        : Number(getDepartmentEndHeadcountDraft(session)) || 0
     );
-
-    if (endHeadcountInput === null) return;
-    const endHeadcount = Math.max(0, parseInt(endHeadcountInput) || 0);
-
-    const overtimeInput = window.prompt('Enter overtime hours (optional):', '0');
-    if (overtimeInput === null) return;
-    const overtimeHours = Math.max(0, parseFloat(overtimeInput) || 0);
+    const overtimeHours = Math.max(
+      0,
+      Number.isFinite(overtimeHoursOverride as number)
+        ? Number(overtimeHoursOverride)
+        : Number(getDepartmentOvertimeDraft(session)) || 0
+    );
+    setError(null);
 
     try {
       const response = await fetch(`${API_BASE}/api/labor/departments/${session.department}/${session.id}/end`, {
@@ -446,16 +580,26 @@ export default function LaborTracker() {
         throw new Error(await getApiErrorMessage(response, 'Failed to end department shift'));
       }
 
+      setDepartmentEndHeadcountDrafts((prev) => {
+        const next = { ...prev };
+        delete next[session.id];
+        return next;
+      });
       await refreshLiveLaborData();
+      showSuccess(`${formatSessionLabel(session)} shift ended and logged.`);
     } catch (err: any) {
       setError(err.message);
     }
   };
 
-  const handleUpdateDepartmentOt = async (session: DepartmentShiftSession) => {
-    const overtimeInput = window.prompt('Update overtime hours:', String(session.overtimeHours || 0));
-    if (overtimeInput === null) return;
-    const overtimeHours = Math.max(0, parseFloat(overtimeInput) || 0);
+  const handleUpdateDepartmentOt = async (session: DepartmentShiftSession, overtimeHoursOverride?: number) => {
+    const overtimeHours = Math.max(
+      0,
+      Number.isFinite(overtimeHoursOverride as number)
+        ? Number(overtimeHoursOverride)
+        : Number(getDepartmentOvertimeDraft(session)) || 0
+    );
+    setError(null);
 
     try {
       const response = await fetch(`${API_BASE}/api/labor/departments/${session.department}/${session.id}/overtime`, {
@@ -468,7 +612,13 @@ export default function LaborTracker() {
         throw new Error(await getApiErrorMessage(response, 'Failed to update overtime'));
       }
 
+      setDepartmentOvertimeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[session.id];
+        return next;
+      });
       await refreshLiveLaborData();
+      showSuccess(`OT saved for ${formatSessionLabel(session)}.`);
     } catch (err: any) {
       setError(err.message);
     }
@@ -479,37 +629,18 @@ export default function LaborTracker() {
       return true;
     }
 
-    if (!recordedBy) {
-      setError('Recorded By is required');
-      return false;
-    }
-
     const suggestedHeadcount = WAREHOUSE_SCHEDULE.filter((person) => {
       const shift = person.schedule[dayKey] || 'OFF';
       return shift.toUpperCase() !== 'OFF';
     }).length;
-
-    const startHeadcountInput = window.prompt(
-      'Start Warehouse department shift first. Enter starting headcount:',
-      String(suggestedHeadcount || 1)
-    );
-
-    if (startHeadcountInput === null) {
-      return false;
-    }
-
-    const headcount = Math.max(0, parseInt(startHeadcountInput, 10) || 0);
-    if (headcount <= 0) {
-      setError('Warehouse department headcount must be greater than 0');
-      return false;
-    }
+    const headcount = Math.max(1, suggestedHeadcount || 1);
 
     try {
       const response = await fetch(`${API_BASE}/api/labor/departments/warehouse/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          startedBy: recordedBy,
+          startedBy: recordedBy || 'Manager',
           headcount,
         }),
       });
@@ -565,9 +696,16 @@ export default function LaborTracker() {
 
   const handleStartWarehouseEmployeeFromRoster = async (employeeName: string) => {
     setError(null);
+    const employeeKey = employeeName.trim().toLowerCase();
+    setWarehouseStartingEmployees((prev) => ({ ...prev, [employeeKey]: true }));
 
     const hasDepartmentSession = await ensureWarehouseDepartmentSession();
     if (!hasDepartmentSession) {
+      setWarehouseStartingEmployees((prev) => {
+        const next = { ...prev };
+        delete next[employeeKey];
+        return next;
+      });
       return;
     }
 
@@ -588,15 +726,24 @@ export default function LaborTracker() {
       await refreshLiveLaborData();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setWarehouseStartingEmployees((prev) => {
+        const next = { ...prev };
+        delete next[employeeKey];
+        return next;
+      });
     }
   };
 
-  const handleEndWarehouseEmployee = async (shift: WarehouseEmployeeShift) => {
+  const handleEndWarehouseEmployee = async (shift: WarehouseEmployeeShift, overtimeHoursOverride?: number) => {
     setError(null);
-
-    const overtimeInput = window.prompt(`End ${shift.employeeName} shift. Enter overtime hours:`, String(shift.overtimeHours || 0));
-    if (overtimeInput === null) return;
-    const overtimeHours = Math.max(0, parseFloat(overtimeInput) || 0);
+    setWarehouseShiftActionState((prev) => ({ ...prev, [shift.id]: 'ending' }));
+    const overtimeHours = Math.max(
+      0,
+      Number.isFinite(overtimeHoursOverride as number)
+        ? Number(overtimeHoursOverride)
+        : Number(getWarehouseOvertimeDraft(shift)) || 0
+    );
 
     try {
       const response = await fetch(`${API_BASE}/api/labor/warehouse/employees/${shift.id}/end`, {
@@ -612,18 +759,33 @@ export default function LaborTracker() {
         throw new Error(await getApiErrorMessage(response, 'Failed to end warehouse employee shift'));
       }
 
+      setWarehouseOvertimeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[shift.id];
+        return next;
+      });
       await refreshLiveLaborData();
+      showSuccess(`${shift.employeeName} shift ended and logged.`);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setWarehouseShiftActionState((prev) => {
+        const next = { ...prev };
+        delete next[shift.id];
+        return next;
+      });
     }
   };
 
-  const handleUpdateWarehouseEmployeeOt = async (shift: WarehouseEmployeeShift) => {
+  const handleUpdateWarehouseEmployeeOt = async (shift: WarehouseEmployeeShift, overtimeHoursOverride?: number) => {
     setError(null);
-
-    const overtimeInput = window.prompt(`Update ${shift.employeeName} overtime hours:`, String(shift.overtimeHours || 0));
-    if (overtimeInput === null) return;
-    const overtimeHours = Math.max(0, parseFloat(overtimeInput) || 0);
+    setWarehouseShiftActionState((prev) => ({ ...prev, [shift.id]: 'saving-ot' }));
+    const overtimeHours = Math.max(
+      0,
+      Number.isFinite(overtimeHoursOverride as number)
+        ? Number(overtimeHoursOverride)
+        : Number(getWarehouseOvertimeDraft(shift)) || 0
+    );
 
     try {
       const response = await fetch(`${API_BASE}/api/labor/warehouse/employees/${shift.id}/overtime`, {
@@ -636,9 +798,21 @@ export default function LaborTracker() {
         throw new Error(await getApiErrorMessage(response, 'Failed to update warehouse overtime'));
       }
 
+      setWarehouseOvertimeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[shift.id];
+        return next;
+      });
       await refreshLiveLaborData();
+      showSuccess(`OT saved for ${shift.employeeName}.`);
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setWarehouseShiftActionState((prev) => {
+        const next = { ...prev };
+        delete next[shift.id];
+        return next;
+      });
     }
   };
 
@@ -766,15 +940,15 @@ export default function LaborTracker() {
 
   const preview = calculatePreview();
 
-  // Check if user is executive
-  if (userRole !== 'executive') {
+  // Check if user is executive or manager
+  if (userRole !== 'executive' && userRole !== 'manager') {
     return (
       <div className="labor-tracker">
         <TitleBar showLegend={false} />
         <div className="labor-tracker__container">
           <div style={{ color: 'white', fontSize: '24px', textAlign: 'center', marginTop: '100px' }}>
             ⛔ Access Denied<br/>
-            <span style={{ fontSize: '16px', color: '#94a3b8' }}>Labor Tracker is restricted to executive users.</span>
+            <span style={{ fontSize: '16px', color: '#94a3b8' }}>Labor Tracker is restricted to authorized users.</span>
           </div>
         </div>
       </div>
@@ -787,8 +961,15 @@ export default function LaborTracker() {
       
       <div className="labor-tracker__container">
         <div className="labor-tracker__header">
-          <h1>Labor Tracker</h1>
-          <p className="labor-tracker__subtitle">Manager Dashboard - Track Department Headcount & Labor Costs</p>
+          <div>
+            <h1>Labor Tracker</h1>
+            <p className="labor-tracker__subtitle">Manager Dashboard - Track Department Headcount and OT</p>
+          </div>
+          <div className="labor-tracker__header-buttons">
+            <button type="button" className="labor-tracker__history-btn" onClick={() => navigate('/labor-history')}>
+              Labor History
+            </button>
+          </div>
         </div>
 
         <div className="department-top-nav">
@@ -834,8 +1015,15 @@ export default function LaborTracker() {
         </div>
       )}
 
+      {successMessage && (
+        <div className="labor-tracker__success">
+          {successMessage}
+        </div>
+      )}
+
       <div className="labor-tracker__content">
-        <GlassPanel className="labor-tracker__form-panel" style={{ marginBottom: '12px' }}>
+        <div style={{ marginBottom: '12px' }}>
+        <GlassPanel className="labor-tracker__form-panel">
           <div className="labor-tracker__form-header">
             <h2>{getDepartmentLabel(activeDepartment)} Shift Tracker (Dev)</h2>
           </div>
@@ -844,153 +1032,123 @@ export default function LaborTracker() {
             <>
               <div className="department-session-section">
                 <div className="department-session-section__header">
-                  <h3>Active {getDepartmentLabel(activeDepartment)} Shifts</h3>
+                  <h3>{getDepartmentLabel(activeDepartment)} Team Cards</h3>
                   <span>{activeDepartmentSessions.length} active</span>
                 </div>
 
-                {activeDepartmentSessions.length > 0 ? (
-                  <div className="department-session-list">
-                    {activeDepartmentSessions.map((session) => (
-                      <div key={session.id} className="department-session-card active">
+                <div className="department-team-grid">
+                  {TEAM_OPTIONS.map((teamName) => {
+                    const teamSession = getDepartmentActiveSessionByTeam(teamName);
+                    const draftKey = `${activeDepartment}-${teamName}`;
+
+                    return (
+                      <div key={teamName} className={`department-session-card ${teamSession ? 'active' : 'completed'}`}>
                         <div className="department-session-card__header">
                           <div>
-                            <div className="department-session-card__title">{formatSessionLabel(session)}</div>
-                            <div className="department-session-card__time">Started {formatSessionTime(session.startTime)}</div>
+                            <div className="department-session-card__title">{getDepartmentLabel(activeDepartment)} {teamName}</div>
+                            <div className="department-session-card__time">
+                              {teamSession ? `Started ${formatSessionTime(teamSession.startTime)}` : 'Ready to start'}
+                            </div>
                           </div>
-                          <span className="department-session-card__status active">Active</span>
+                          <span className={`department-session-card__status ${teamSession ? 'active' : 'completed'}`}>
+                            {teamSession ? 'Active' : 'Not Started'}
+                          </span>
                         </div>
 
                         <div className="department-session-card__stats">
                           <div className="preview-item">
                             <span className="label">Headcount</span>
-                            <span className="value">{session.startHeadcount}</span>
+                            <span className="value">{teamSession ? teamSession.startHeadcount : '-'}</span>
                           </div>
                           <div className="preview-item">
-                            <span className="label">Overtime</span>
-                            <span className="value">{session.overtimeHours || 0} hrs</span>
-                          </div>
-                          <div className="preview-item">
-                            <span className="label">Labor Cost</span>
-                            <span className="value">${Number(session.totalLaborCost || 0).toFixed(2)}</span>
+                            <span className="label">OT</span>
+                            <span className="value">{teamSession ? (teamSession.overtimeHours || 0) : 0} hrs</span>
                           </div>
                         </div>
 
                         <div className="department-session-card__actions">
-                          <button
-                            type="button"
-                            className="labor-tracker__history-btn"
-                            onClick={() => handleUpdateDepartmentOt(session)}
-                          >
-                            Edit OT
-                          </button>
-                          <button
-                            type="button"
-                            className="end-shift-btn department-session-card__end-btn"
-                            onClick={() => handleEndDepartmentShift(session)}
-                          >
-                            End Shift
-                          </button>
+                          {teamSession ? (
+                            <>
+                              <div className="session-inline-inputs">
+                                <label>
+                                  End Headcount
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={getDepartmentEndHeadcountDraft(teamSession)}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setDepartmentEndHeadcountDrafts((prev) => ({ ...prev, [teamSession.id]: value }));
+                                    }}
+                                  />
+                                </label>
+                                <label>
+                                  OT Hours
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.25"
+                                    value={getDepartmentOvertimeDraft(teamSession)}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setDepartmentOvertimeDrafts((prev) => ({ ...prev, [teamSession.id]: value }));
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <button
+                                type="button"
+                                className="labor-tracker__history-btn"
+                                onClick={() => {
+                                  void handleUpdateDepartmentOt(teamSession);
+                                }}
+                              >
+                                Save OT
+                              </button>
+                              <button
+                                type="button"
+                                className="end-shift-btn department-session-card__end-btn"
+                                onClick={() => {
+                                  void handleEndDepartmentShift(teamSession);
+                                }}
+                              >
+                                End Shift
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <div className="session-inline-inputs">
+                                <label>
+                                  Start Headcount
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={getDepartmentTeamStartHeadcountDraft(teamName)}
+                                    onChange={(e) => {
+                                      const value = e.target.value;
+                                      setDepartmentStartHeadcountDrafts((prev) => ({ ...prev, [draftKey]: value }));
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                              <button
+                                type="button"
+                                className="department-action-btn"
+                                disabled={departmentLoading}
+                                onClick={() => {
+                                  void handleStartDepartmentTeamShift(teamName);
+                                }}
+                              >
+                                {departmentLoading ? 'Starting...' : `Start ${teamName} Shift`}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="department-session-empty">No active {getDepartmentLabel(activeDepartment).toLowerCase()} shift right now.</div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
-
-              <form onSubmit={handleStartDepartmentShift} className="labor-tracker__form">
-                <div className="labor-tracker__form-row">
-                  {activeDepartment === 'production' && (
-                    <div className="labor-tracker__form-group">
-                      <label>Production Team *</label>
-                      <select value={productionTeam} onChange={(e) => setProductionTeam(e.target.value)}>
-                        <option value="Group A">Group A (6:30 AM)</option>
-                        <option value="Group B">Group B (6:55 AM)</option>
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="labor-tracker__form-group">
-                    <label>{getDepartmentLabel(activeDepartment)} Start Headcount *</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={departmentHeadcount}
-                      onChange={(e) => setDepartmentHeadcount(e.target.value)}
-                      placeholder="Enter headcount"
-                    />
-                  </div>
-                </div>
-
-                <div className="labor-tracker__form-group">
-                  <label>Notes</label>
-                  <input
-                    type="text"
-                    value={departmentNotes}
-                    onChange={(e) => setDepartmentNotes(e.target.value)}
-                    placeholder="Optional note"
-                  />
-                </div>
-
-                {!canStartDepartmentShift && activeDepartment === 'production' && (
-                  <div className="department-session-empty">
-                    {productionTeam} already has an active shift. End it before starting another {productionTeam} session.
-                  </div>
-                )}
-
-                {!canStartDepartmentShift && activeDepartment !== 'production' && (
-                  <div className="department-session-empty">
-                    End the active {getDepartmentLabel(activeDepartment).toLowerCase()} shift before starting a new one.
-                  </div>
-                )}
-
-                <button type="submit" className="labor-tracker__submit" disabled={departmentLoading || !canStartDepartmentShift}>
-                  {departmentLoading
-                    ? 'Starting...'
-                    : `▶ Start ${getDepartmentLabel(activeDepartment)}${activeDepartment === 'production' ? ` ${productionTeam}` : ''} Shift`}
-                </button>
-              </form>
-
-              {completedDepartmentSessions.length > 0 && (
-                <div className="department-session-section department-session-section--history">
-                  <div className="department-session-section__header">
-                    <h3>Completed {getDepartmentLabel(activeDepartment)} Shifts</h3>
-                    <span>{completedDepartmentSessions.length} completed</span>
-                  </div>
-
-                  <div className="department-session-list">
-                    {completedDepartmentSessions.slice(0, 6).map((session) => (
-                      <div key={session.id} className="department-session-card completed">
-                        <div className="department-session-card__header">
-                          <div>
-                            <div className="department-session-card__title">{formatSessionLabel(session)}</div>
-                            <div className="department-session-card__time">
-                              {formatSessionTime(session.startTime)} to {formatSessionTime(session.endTime)}
-                            </div>
-                          </div>
-                          <span className="department-session-card__status completed">Completed</span>
-                        </div>
-
-                        <div className="department-session-card__stats">
-                          <div className="preview-item">
-                            <span className="label">Start</span>
-                            <span className="value">{session.startHeadcount}</span>
-                          </div>
-                          <div className="preview-item">
-                            <span className="label">End</span>
-                            <span className="value">{session.endHeadcount ?? session.startHeadcount}</span>
-                          </div>
-                          <div className="preview-item">
-                            <span className="label">Cost</span>
-                            <span className="value">${Number(session.totalLaborCost || 0).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -1042,9 +1200,15 @@ export default function LaborTracker() {
 
               <div className="warehouse-roster-grid">
                 {WAREHOUSE_SCHEDULE.map((person) => {
-                  const personShift = getWarehouseShiftForEmployee(person.name);
+                  const activePersonShift = getWarehouseActiveShiftForEmployee(person.name);
+                  const latestCompletedShift = getWarehouseLatestCompletedShiftForEmployee(person.name);
                   const todaySchedule = person.schedule[dayKey] || 'OFF';
                   const isOff = todaySchedule.toUpperCase() === 'OFF';
+                  const employeeKey = person.name.trim().toLowerCase();
+                  const isStartingShift = Boolean(warehouseStartingEmployees[employeeKey]);
+                  const activeShiftAction = activePersonShift ? warehouseShiftActionState[activePersonShift.id] : undefined;
+                  const completedShiftAction = latestCompletedShift ? warehouseShiftActionState[latestCompletedShift.id] : undefined;
+                  const canStartFromCard = !activePersonShift && !isOff;
                   const scheduledDays = (Object.entries(person.schedule) as Array<[
                     'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat',
                     string,
@@ -1053,7 +1217,11 @@ export default function LaborTracker() {
                     .map(([day]) => dayLabels[day]);
 
                   return (
-                    <div key={person.name} className="warehouse-roster-card">
+                    <div
+                      key={person.name}
+                      className={`warehouse-roster-card ${canStartFromCard ? 'clickable' : ''}`}
+                      onClick={canStartFromCard ? () => handleStartWarehouseEmployeeFromRoster(person.name) : undefined}
+                    >
                       <div className="warehouse-roster-header">
                         <div className="warehouse-roster-name">{person.name}</div>
                         <div className="warehouse-roster-role">{person.role}</div>
@@ -1069,36 +1237,92 @@ export default function LaborTracker() {
                       </div>
                       <div className="preview-item">
                         <span className="label">Status:</span>
-                        <span className="value">{personShift?.status || (isOff ? 'off' : 'not-started')}</span>
+                        <span className="value">{activePersonShift ? 'active' : (latestCompletedShift ? 'completed' : (isOff ? 'off' : 'not-started'))}</span>
                       </div>
 
                       <div className="warehouse-roster-actions">
-                        {!personShift && !isOff && (
+                        {!activePersonShift && !isOff && (
                           <button
                             type="button"
                             className="department-action-btn dept-warehouse"
-                            onClick={() => handleStartWarehouseEmployeeFromRoster(person.name)}
+                            disabled={isStartingShift}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleStartWarehouseEmployeeFromRoster(person.name);
+                            }}
                           >
-                            Start Shift
+                            {isStartingShift ? 'Starting...' : 'Start Shift'}
                           </button>
                         )}
-                        {personShift?.status === 'active' && (
-                          <button
-                            type="button"
-                            className="labor-tracker__history-btn"
-                            onClick={() => handleEndWarehouseEmployee(personShift)}
-                          >
-                            End Shift
-                          </button>
+                        {activePersonShift && (
+                          <>
+                            <label className="warehouse-inline-label" onClick={(event) => event.stopPropagation()}>
+                              OT
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.25"
+                                value={getWarehouseOvertimeDraft(activePersonShift)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const value = e.target.value;
+                                  setWarehouseOvertimeDrafts((prev) => ({ ...prev, [activePersonShift.id]: value }));
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="labor-tracker__history-btn"
+                              disabled={activeShiftAction === 'saving-ot' || activeShiftAction === 'ending'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleUpdateWarehouseEmployeeOt(activePersonShift);
+                              }}
+                            >
+                              {activeShiftAction === 'saving-ot' ? 'Saving OT...' : 'Save OT'}
+                            </button>
+                            <button
+                              type="button"
+                              className="labor-tracker__history-btn"
+                              disabled={activeShiftAction === 'saving-ot' || activeShiftAction === 'ending'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleEndWarehouseEmployee(activePersonShift);
+                              }}
+                            >
+                              {activeShiftAction === 'ending' ? 'Ending...' : 'End Shift'}
+                            </button>
+                          </>
                         )}
-                        {personShift?.status === 'completed' && (
-                          <button
-                            type="button"
-                            className="labor-tracker__history-btn"
-                            onClick={() => handleUpdateWarehouseEmployeeOt(personShift)}
-                          >
-                            Edit OT
-                          </button>
+                        {!activePersonShift && latestCompletedShift && (
+                          <>
+                            <label className="warehouse-inline-label" onClick={(event) => event.stopPropagation()}>
+                              OT
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.25"
+                                value={getWarehouseOvertimeDraft(latestCompletedShift)}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  const value = e.target.value;
+                                  setWarehouseOvertimeDrafts((prev) => ({ ...prev, [latestCompletedShift.id]: value }));
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              className="labor-tracker__history-btn"
+                              disabled={completedShiftAction === 'saving-ot'}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void handleUpdateWarehouseEmployeeOt(latestCompletedShift);
+                              }}
+                            >
+                              {completedShiftAction === 'saving-ot' ? 'Saving OT...' : 'Save OT'}
+                            </button>
+                            <span className="warehouse-off-label">Last OT: {latestCompletedShift.overtimeHours || 0} hrs</span>
+                          </>
                         )}
                         {isOff && <span className="warehouse-off-label">Off Today</span>}
                       </div>
@@ -1132,7 +1356,9 @@ export default function LaborTracker() {
               </form>
             </div>
           )}
+
         </GlassPanel>
+        </div>
       </div>
 
 

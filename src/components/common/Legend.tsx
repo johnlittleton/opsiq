@@ -4,6 +4,7 @@ import './Legend.css';
 export const Legend: React.FC = () => {
   const items = [
     { key: 'open', label: 'Open' },
+    { key: 'checked-in', label: 'Checked In' },
     { key: 'loading', label: 'Loading' },
     { key: 'offload', label: 'Offloading' },
     { key: 'waiting', label: 'Waiting' },

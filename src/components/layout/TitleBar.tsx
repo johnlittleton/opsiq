@@ -12,18 +12,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children
   const navigate = useNavigate();
   const [showViewMenu, setShowViewMenu] = useState(false);
 
-  const isNativeIOS =
-    typeof window !== 'undefined' &&
-    (
-      window.location.protocol === 'capacitor:' ||
-      (window as any).Capacitor?.isNativePlatform?.() === true ||
-      (window as any).Capacitor?.getPlatform?.() === 'ios'
-    );
-
-  if (isNativeIOS) {
-    return null;
-  }
-
   const handleMinimize = () => {
     if (window.electron) {
       window.electron.minimize();

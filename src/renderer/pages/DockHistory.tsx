@@ -16,6 +16,7 @@ const DockHistory: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [actualPalletsInput, setActualPalletsInput] = useState('');
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
@@ -58,6 +59,7 @@ const DockHistory: React.FC = () => {
     const actualPallets = !isNaN(parsed) && parsed >= 0 ? parsed : checkin.pallets;
 
     setCheckingOut(true);
+    setCheckoutError(null);
     setShowCheckoutModal(false);
     
     try {
@@ -70,7 +72,8 @@ const DockHistory: React.FC = () => {
       navigate('/dockboard');
     } catch (err: any) {
       console.error('Checkout failed:', err);
-      navigate('/active-drivers');
+      setCheckoutError(err?.message || 'Checkout failed. Please try again.');
+      setShowCheckoutModal(true);
     } finally {
       setCheckingOut(false);
     }
@@ -150,6 +153,19 @@ const DockHistory: React.FC = () => {
             border: '1px solid rgba(255,255,255,0.1)'
           }}>
             <h2 style={{ color: 'white', marginBottom: '16px', fontSize: '24px' }}>Check Out Driver</h2>
+            {checkoutError && (
+              <div style={{
+                marginBottom: '16px',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                color: '#fecaca',
+                fontSize: '14px'
+              }}>
+                {checkoutError}
+              </div>
+            )}
             <div style={{ color: '#94a3b8', marginBottom: '24px', lineHeight: '1.6' }}>
               <p><strong>Driver:</strong> {checkin.driverName}</p>
               <p><strong>Company:</strong> {checkin.company}</p>
@@ -284,6 +300,7 @@ const DockHistory: React.FC = () => {
                   className="form-select"
                 >
                   <option value="">All Statuses</option>
+                  <option value="Checked In">Checked In</option>
                   <option value="Open">Open</option>
                   <option value="Offload">Offload</option>
                   <option value="Loading">Loading</option>
@@ -359,7 +376,7 @@ const DockHistory: React.FC = () => {
                       </td>
                       <td>
                       {event.oldStatus ? (
-                        <span className={`door-status ${event.oldStatus ? `status-${event.oldStatus}` : ''}`}>
+                        <span className={`door-status ${event.oldStatus ? `status-${event.oldStatus.replace(/\s+/g, '-')}` : ''}`}>
                           {event.oldStatus}
                         </span>
                       ) : (
@@ -367,7 +384,7 @@ const DockHistory: React.FC = () => {
                       )}
                     </td>
                     <td>
-                      <span className={`door-status status-${event.newStatus}`}>
+                      <span className={`door-status status-${event.newStatus.replace(/\s+/g, '-')}`}>
                         {event.newStatus}
                       </span>
                     </td>

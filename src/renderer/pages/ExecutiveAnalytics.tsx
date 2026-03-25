@@ -182,9 +182,9 @@ const ExecutiveAnalytics: React.FC = () => {
             <p className="subtitle">Data Visualization & Trends • {executiveName}</p>
           </div>
           
-          <div className="analytics-header-actions">
-            <div className="analytics-date-selector">
-              <div className="analytics-date-field">
+          <div className="header-actions">
+            <div className="date-selector">
+              <div className="date-field">
                 <label>Start Date</label>
                 <input
                   type="date"
@@ -192,7 +192,7 @@ const ExecutiveAnalytics: React.FC = () => {
                   onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
                 />
               </div>
-              <div className="analytics-date-field">
+              <div className="date-field">
                 <label>End Date</label>
                 <input
                   type="date"
@@ -209,7 +209,7 @@ const ExecutiveAnalytics: React.FC = () => {
               }
             }}>🖨️ Print</button>
             <button className="today-btn" onClick={setToday}>📅 Today</button>
-            <button className="analytics-back-btn" onClick={() => navigate('/executive')}>← Back</button>
+            <button className="back-btn" onClick={() => navigate('/executive')}>← Back</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
           </div>
         </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DockTile, DockStatus } from '../components/docks/DockTile';
 import { TitleBar } from '../components/layout/TitleBar';
-import { Legend } from '../components/common/Legend';
 import { EditCheckinModal } from '../components/docks/EditCheckinModal';
 import { MessageBanner } from '../renderer/components/MessageBanner';
 import { ChatTicker } from '../renderer/components/ChatTicker';
@@ -20,15 +19,6 @@ export const DockBoardPage: React.FC = () => {
   const [parkedTrucks, setParkedTrucks] = useState<DockCheckin[]>([]);
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [mobileLegendOpen, setMobileLegendOpen] = useState(true);
-  const isMobileRuntime =
-    typeof window !== 'undefined' &&
-    (
-      window.location.protocol === 'capacitor:' ||
-      (window as any).Capacitor?.isNativePlatform?.() === true ||
-      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
-      window.matchMedia('(max-width: 900px)').matches
-    );
   
   // Initialize data sync on mount
   useEffect(() => {
@@ -69,7 +59,9 @@ export const DockBoardPage: React.FC = () => {
       'Waiting': 'waiting',
       'Loading': 'loading',
       'Offload': 'offload',
+      'Checked In': 'checked-in',
       'Parked': 'parked',
+      'Dropped': 'dropped',
       'Blocked': 'offline'
     };
     return statusMap[status] || 'open';
@@ -136,42 +128,6 @@ export const DockBoardPage: React.FC = () => {
     }
   };
 
-  const gridContent = (
-    <>
-      {allDoors.map((door) => (
-        <DockTile
-          key={door.doorNumber}
-          doorNumber={door.doorNumber}
-          status={door.status}
-          timer={door.timer}
-          pulsing={door.pulsing}
-          checkin={door.checkin}
-          onClick={() => handleDoorClick(door.doorNumber)}
-          onEdit={door.checkin ? () => handleEditCheckin(door.checkin) : undefined}
-        />
-      ))}
-      {parkedTrucks.length > 0 && (
-        <div 
-          className="dock-board-page__parked-truck pulsing"
-          data-status="parked"
-        >
-          <div className="dock-board-page__parked-label">PARKED</div>
-          <div className="dock-board-page__parked-list">
-            {parkedTrucks.map((truck) => (
-              <div 
-                key={truck.id}
-                className="dock-board-page__parked-item"
-                onClick={() => setEditingCheckin(truck)}
-              >
-                #{truck.pickupNumber}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
-  );
-
   return (
     <div className="dock-board-page">
       <MessageBanner 
@@ -179,65 +135,53 @@ export const DockBoardPage: React.FC = () => {
         onToggle={() => setMessengerOpen(!messengerOpen)}
         onUnreadCountChange={setUnreadCount}
       />
-      {!isMobileRuntime && (
-        <TitleBar showLegend={true}>
-          <button 
-            className="message-chat-btn" 
-            onClick={() => setMessengerOpen(!messengerOpen)}
-          >
-            CHAT
-            {unreadCount > 0 && (
-              <span className="message-badge">{unreadCount}</span>
-            )}
-          </button>
-        </TitleBar>
-      )}
-
-      {isMobileRuntime && !messengerOpen && (
-        <button
-          className="dock-board-mobile-chat-btn"
-          onPointerDown={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            setMessengerOpen(true);
-          }}
-          onClick={() => setMessengerOpen(true)}
+      <TitleBar showLegend={true}>
+        <button 
+          className="message-chat-btn" 
+          onClick={() => setMessengerOpen(!messengerOpen)}
         >
           CHAT
           {unreadCount > 0 && (
             <span className="message-badge">{unreadCount}</span>
           )}
         </button>
-      )}
-
-      {!isMobileRuntime && (
-        <button
-          className="dock-board-mobile-legend-btn"
-          onClick={() => setMobileLegendOpen((open) => !open)}
-        >
-          Legend
-        </button>
-      )}
-
-      <aside className={`dock-board-mobile-legend ${(mobileLegendOpen || isMobileRuntime) ? 'open' : ''}`}>
-        <Legend />
-      </aside>
-
-      {mobileLegendOpen && !isMobileRuntime && (
-        <button
-          className="dock-board-mobile-legend-backdrop"
-          onClick={() => setMobileLegendOpen(false)}
-          aria-label="Close legend"
-        />
-      )}
+      </TitleBar>
       
-      {isMobileRuntime ? (
-        <div className="dock-board-page__mobile-grid">{gridContent}</div>
-      ) : (
-        <div className="dock-board-page__content">
-          <div className="dock-board-page__grid">{gridContent}</div>
+      <div className="dock-board-page__content">
+        <div className="dock-board-page__grid">
+          {allDoors.map((door) => (
+            <DockTile
+              key={door.doorNumber}
+              doorNumber={door.doorNumber}
+              status={door.status}
+              timer={door.timer}
+              pulsing={door.pulsing}
+              checkin={door.checkin}
+              onClick={() => handleDoorClick(door.doorNumber)}
+              onEdit={door.checkin ? () => handleEditCheckin(door.checkin) : undefined}
+            />
+          ))}
+          {parkedTrucks.length > 0 && (
+            <div 
+              className="dock-board-page__parked-truck pulsing"
+              data-status="parked"
+            >
+              <div className="dock-board-page__parked-label">PARKED</div>
+              <div className="dock-board-page__parked-list">
+                {parkedTrucks.map((truck) => (
+                  <div 
+                    key={truck.id}
+                    className="dock-board-page__parked-item"
+                    onClick={() => setEditingCheckin(truck)}
+                  >
+                    #{truck.pickupNumber}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {editingCheckin && (
         <EditCheckinModal

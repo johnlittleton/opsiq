@@ -3,7 +3,7 @@
   color: #f3f6fa;
   min-height: 100vh;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -42,14 +42,10 @@
 
 .header-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.scheduler-nav-buttons {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  justify-content: flex-end;
 }
 
 .header-controls input[type="date"] {
@@ -61,52 +57,6 @@
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
-}
-
-.mobile-scheduler-tools {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .header-controls,
-  .back-btn,
-  .view-toggle-group,
-  .scheduler-nav-buttons {
-    display: none !important;
-  }
-
-  .header-bar {
-    padding-left: calc(env(safe-area-inset-left) + 64px);
-    justify-content: flex-start;
-  }
-
-  .mobile-scheduler-tools {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px 10px;
-    border-bottom: 1px solid #2a3142;
-    background: #232837;
-  }
-
-  .mobile-tool-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .mobile-tool-row input[type="date"] {
-    flex: 1;
-    min-width: 160px;
-    padding: 8px 10px;
-    border-radius: 12px;
-    border: 3px solid #7ffb7f;
-    background: #181c24;
-    color: #f3f6fa;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-  }
 }
 
 /* Message/Chat Button - Yellow like image */
@@ -227,6 +177,49 @@
   transform: translateY(-1px) !important;
 }
 
+.shift-reminder-toast {
+  position: fixed;
+  top: 92px;
+  left: 16px;
+  width: min(360px, calc(100vw - 32px));
+  background: linear-gradient(135deg, rgba(24, 28, 36, 0.97), rgba(35, 40, 55, 0.97));
+  border: 2px solid rgba(245, 158, 11, 0.85);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 24px rgba(245, 158, 11, 0.3);
+  padding: 12px 14px;
+  z-index: 9800;
+}
+
+.shift-reminder-title {
+  color: #f59e0b;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.shift-reminder-text {
+  color: #f3f6fa;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.shift-reminder-dismiss {
+  margin-top: 10px;
+  background: none;
+  color: #f59e0b;
+  border: 2px solid #f59e0b;
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.shift-reminder-dismiss:hover {
+  background: #f59e0b;
+  color: #000;
+}
+
 /* Downtime Button */
 .downtime-history-btn {
   background: none !important;
@@ -276,7 +269,7 @@
 
 .wo-table-wrap {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .section-title {
@@ -315,7 +308,8 @@
 /* Table Styles */
 .wo-table {
   width: 100%;
-  min-width: 1720px;
+  min-width: 0;
+  table-layout: fixed;
   border-collapse: collapse;
   background: #232837;
   border-radius: 8px;
@@ -328,18 +322,27 @@
 }
 
 .wo-table th {
-  padding: 8px 10px;
+  padding: 6px 6px;
   text-align: left;
   font-weight: 600;
   color: #7ffb7f;
   border-bottom: 2px solid #2a3142;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
+  line-height: 1.15;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .wo-table td {
-  padding: 6px 10px;
+  padding: 5px 6px;
   border-bottom: 1px solid #2a3142;
   vertical-align: middle;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .wo-row {
@@ -373,11 +376,11 @@
 
 /* Compact Buttons */
 .btn-small {
-  padding: 4px 8px;
+  padding: 3px 6px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 600;
 }
 
@@ -385,12 +388,13 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .actions-column {
-  min-width: 132px;
-  white-space: nowrap;
+  min-width: 0;
+  width: 112px;
+  white-space: normal;
 }
 
 .btn-small.start-btn {
@@ -431,7 +435,7 @@
 
 /* Compact Input */
 .cases-input-compact {
-  width: 60px;
+  width: 52px;
   padding: 4px 6px;
   background: #1e2432;
   border: 1px solid #444;
@@ -477,11 +481,15 @@
 }
 
 /* Notes Cell */
-.notes-cell {
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.wo-table td.notes-cell {
+  width: 120px;
+  min-width: 80px;
+  max-width: 140px;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.25;
   color: #d0d5db;
   font-size: 0.8rem;
   font-style: italic;
@@ -492,17 +500,65 @@
 }
 
 /* Lots Cell */
-.lots-cell {
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.wo-table td.lots-cell {
+  width: 110px;
+  min-width: 72px;
+  max-width: 130px;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.25;
   color: #d0d5db;
   font-size: 0.8rem;
 }
 
 .lots-cell:hover {
   cursor: help;
+}
+
+/* Keep table fully visible without horizontal scroll by collapsing lower-priority columns. */
+@media (max-width: 1600px) {
+  .wo-table .col-country,
+  .wo-table .col-planned-bags,
+  .wo-table .col-eta-bags {
+    display: none;
+  }
+}
+
+@media (max-width: 1366px) {
+  .wo-table .col-bag,
+  .wo-table .col-lead,
+  .wo-table .col-lots {
+    display: none;
+  }
+
+  .wo-table th,
+  .wo-table td {
+    font-size: 0.7rem;
+    padding: 4px 5px;
+  }
+
+  .actions-column {
+    width: 90px;
+  }
+
+  .cases-input-compact {
+    width: 44px;
+    font-size: 0.75rem;
+    padding: 3px 4px;
+  }
+
+  .btn-small {
+    font-size: 0.62rem;
+    padding: 2px 5px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .wo-table .col-notes {
+    display: none;
+  }
 }
 
 /* Timer Header Section */

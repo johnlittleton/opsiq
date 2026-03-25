@@ -170,6 +170,12 @@
   border: 1px solid #ff9800;
 }
 
+.status-Checked-In {
+  background: rgba(229, 248, 255, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
 /* Card styling */
 .card {
   background: #232837;

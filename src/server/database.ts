@@ -497,6 +497,26 @@ export class DatabaseService implements IDatabaseService {
         console.log('Adding role column to executives...');
         this.db.exec("ALTER TABLE executives ADD COLUMN role TEXT NOT NULL DEFAULT 'manager'");
       }
+
+      // Migration: Backfill historical dock timing fields so Dock History has start/end for closed records.
+      this.db.exec(`
+        UPDATE dock_checkins
+        SET
+          loadStartTime = COALESCE(loadStartTime, statusStartTime, createdAt),
+          loadEndTime = COALESCE(loadEndTime, closedAt, updatedAt),
+          totalMinutes = COALESCE(
+            totalMinutes,
+            MAX(
+              0,
+              CAST(
+                (julianday(COALESCE(loadEndTime, closedAt, updatedAt)) - julianday(COALESCE(loadStartTime, statusStartTime, createdAt))) * 1440
+                AS INTEGER
+              )
+            )
+          )
+        WHERE closedAt IS NOT NULL
+          AND (loadStartTime IS NULL OR loadEndTime IS NULL OR totalMinutes IS NULL);
+      `);
       
       // Migration: Remove NOT NULL constraint from doorId to support parked trucks
       const doorIdColumn = columns.find(c => c.name === 'doorId');
@@ -599,12 +619,12 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Tyler', pin: '28591', role: 'executive' },
         { name: 'Phil Jr', pin: '36847', role: 'executive' },
         { name: 'Julia', pin: '45129', role: 'executive' },
-        { name: 'Michelle', pin: '57263', role: 'executive' },
+        { name: 'Michelle', pin: '57263', role: 'manager' },
         { name: 'Izzy', pin: '69384', role: 'executive' },
         { name: 'John', pin: '78420', role: 'executive' },
-        { name: 'Ryan', pin: '34090', role: 'executive' },
-        { name: 'Victor Roman', pin: '86214', role: 'executive' },
-        { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },
+        { name: 'Ryan', pin: '34090', role: 'manager' },
+        { name: 'Victor Roman', pin: '86214', role: 'manager' },
+        { name: 'Erasmo Sanchez', pin: '97531', role: 'manager' },
         { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
         { name: 'Sal', pin: '91356', role: 'manager' },
         { name: 'Jacob', pin: '53782', role: 'manager' },
@@ -629,8 +649,8 @@ export class DatabaseService implements IDatabaseService {
     // Ensure required executive users exist on existing desktop databases without re-seeding.
     const now = getLocalISOString();
     const ensureExecutives = [
-      { name: 'Victor Roman', pin: '86214', role: 'executive' },
-      { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' }
+      { name: 'Victor Roman', pin: '86214', role: 'manager' },
+      { name: 'Erasmo Sanchez', pin: '97531', role: 'manager' }
     ];
 
     const upsertExec = this.db.prepare(`
@@ -695,7 +715,7 @@ export class DatabaseService implements IDatabaseService {
 
     // Handle parked/offline trucks without door assignment
     if (data.doorId === null) {
-      const shouldSetLoadStartTime = data.status === 'Loading' || data.status === 'Offload';
+      const shouldSetLoadStartTime = data.status === 'Checked In' || data.status === 'Loading' || data.status === 'Offload';
       
       let checkinId: number;
       if (shouldSetLoadStartTime) {
@@ -771,7 +791,7 @@ export class DatabaseService implements IDatabaseService {
 
     const transaction = this.db.transaction(() => {
       // Determine if we should set loadStartTime based on initial status
-      const shouldSetLoadStartTime = data.status === 'Loading' || data.status === 'Offload';
+      const shouldSetLoadStartTime = data.status === 'Checked In' || data.status === 'Loading' || data.status === 'Offload';
       
       // Insert checkin with loadStartTime if status is Loading/Offload
       if (shouldSetLoadStartTime) {
@@ -889,7 +909,7 @@ export class DatabaseService implements IDatabaseService {
         `).run(data.newStatus, now, now, door.currentCheckinId);
         
         // Mark load start time if status is Loading or Offload
-        if (data.newStatus === 'Loading' || data.newStatus === 'Offload') {
+        if (data.newStatus === 'Checked In' || data.newStatus === 'Loading' || data.newStatus === 'Offload') {
           const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
           if (!checkin.loadStartTime) {
             console.log('✅ Setting loadStartTime for checkin', door.currentCheckinId, 'at', now);
@@ -949,45 +969,34 @@ export class DatabaseService implements IDatabaseService {
           expectedPallets: checkin.pallets
         });
         
-        // Calculate total time if loadStartTime exists
-        let totalMinutes = null;
-        if (checkin.loadStartTime) {
-          const loadEndTime = now;
-          const startMs = new Date(checkin.loadStartTime).getTime();
-          const endMs = new Date(loadEndTime).getTime();
-          totalMinutes = Math.round((endMs - startMs) / 60000); // Convert to minutes
+        const effectiveLoadStartTime = checkin.loadStartTime || checkin.statusStartTime || checkin.createdAt || now;
+        const loadEndTime = now;
+        const startMs = new Date(effectiveLoadStartTime).getTime();
+        const endMs = new Date(loadEndTime).getTime();
+        const totalMinutes = Math.max(0, Math.round((endMs - startMs) / 60000));
           
-          console.log('🔍 Calculated performance:', {
-            startTime: checkin.loadStartTime,
-            endTime: loadEndTime,
-            startMs,
-            endMs,
-            diffMs: endMs - startMs,
-            totalMinutes,
-            actualPallets: effectiveActualPallets,
-            checkinId: door.currentCheckinId
-          });
-          
-          const updateResult = this.db.prepare(`
-            UPDATE dock_checkins
-            SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadEndTime = ?, totalMinutes = ?
-            WHERE id = ?
-          `).run(now, now, effectiveActualPallets, loadEndTime, totalMinutes, door.currentCheckinId);
-          
-          console.log('✅ UPDATE result:', updateResult);
-          
-          // Verify the update
-          const verify = this.db.prepare('SELECT totalMinutes, actualPallets, loadEndTime FROM dock_checkins WHERE id = ?').get(door.currentCheckinId);
-          console.log('✅ Verified data after update:', verify);
-        } else {
-          console.log('⚠️ No loadStartTime found - performance tracking skipped');
-          // No load start time, just close it
-          this.db.prepare(`
-            UPDATE dock_checkins
-            SET closedAt = ?, updatedAt = ?, actualPallets = ?
-            WHERE id = ?
-          `).run(now, now, effectiveActualPallets, door.currentCheckinId);
-        }
+        console.log('🔍 Calculated performance:', {
+          startTime: effectiveLoadStartTime,
+          endTime: loadEndTime,
+          startMs,
+          endMs,
+          diffMs: endMs - startMs,
+          totalMinutes,
+          actualPallets: effectiveActualPallets,
+          checkinId: door.currentCheckinId
+        });
+
+        const updateResult = this.db.prepare(`
+          UPDATE dock_checkins
+          SET closedAt = ?, updatedAt = ?, actualPallets = ?, loadStartTime = COALESCE(loadStartTime, ?), loadEndTime = ?, totalMinutes = ?
+          WHERE id = ?
+        `).run(now, now, effectiveActualPallets, effectiveLoadStartTime, loadEndTime, totalMinutes, door.currentCheckinId);
+
+        console.log('✅ UPDATE result:', updateResult);
+
+        // Verify the update
+        const verify = this.db.prepare('SELECT loadStartTime, totalMinutes, actualPallets, loadEndTime FROM dock_checkins WHERE id = ?').get(door.currentCheckinId);
+        console.log('✅ Verified data after update:', verify);
       }
 
       // Update door to Open
@@ -1028,8 +1037,8 @@ export class DatabaseService implements IDatabaseService {
         c.actualPallets,
         c.forkliftDriver,
         c.checker,
-        c.loadStartTime,
-        c.loadEndTime
+        COALESCE(c.loadStartTime, c.statusStartTime, c.createdAt, e.eventTime) as loadStartTime,
+        COALESCE(c.loadEndTime, c.closedAt, e.eventTime) as loadEndTime
       FROM dock_events e
       LEFT JOIN dock_checkins c ON e.checkinId = c.id
       WHERE 1=1
@@ -1591,13 +1600,13 @@ export class DatabaseService implements IDatabaseService {
         ? (departmentLive.totals.activeHeadcount || 0)
         : (currentWarehouseHeadcount + currentProductionHeadcount),
       currentWarehouseLaborCost: hasDepartmentTrackerData
-        ? (warehouseLive?.totalLaborCost || 0)
+        ? (warehouseLive?.runningLaborCost || 0)
         : Math.round(runningWarehouseCost * 100) / 100,
       currentProductionLaborCost: hasDepartmentTrackerData
-        ? (productionLive?.totalLaborCost || 0)
+        ? (productionLive?.runningLaborCost || 0)
         : Math.round(runningProductionCost * 100) / 100,
       runningLaborCost: hasDepartmentTrackerData
-        ? (departmentLive.totals.totalLaborCost || 0)
+        ? (departmentLive.totals.runningLaborCost || 0)
         : Math.round(runningCost * 100) / 100,
     };
   }
@@ -1694,7 +1703,7 @@ export class DatabaseService implements IDatabaseService {
     const now = getLocalISOString();
     const date = now.split('T')[0];
     const department = this.normalizeDepartmentName(data.department);
-    const teamName = department === 'production' ? (data.teamName || null) : null;
+    const teamName = department === 'warehouse' ? null : (data.teamName?.trim() || null);
     const headcount = Math.max(0, Math.floor(data.headcount || 0));
 
     if (!data.startedBy) {
@@ -1718,12 +1727,8 @@ export class DatabaseService implements IDatabaseService {
       throw new Error(`Unsupported department: ${department}`);
     }
 
-    if (department === 'production' && !teamName) {
-      throw new Error('Production shifts require teamName (Group A/Group B)');
-    }
-
     let existing: any;
-    if (department === 'production') {
+    if (department !== 'warehouse' && teamName) {
       existing = this.db.prepare(`
         SELECT id FROM department_shift_sessions
         WHERE date = ? AND department = ? AND teamName = ? AND status = 'active'
@@ -1849,6 +1854,17 @@ export class DatabaseService implements IDatabaseService {
 
   getDepartmentShiftSessions(date?: string): any[] {
     const targetDate = date || getLocalISOString().split('T')[0];
+    // Auto-close stale active sessions (>24 h) that were never properly ended.
+    this.db.prepare(`
+      UPDATE department_shift_sessions
+      SET status = 'completed', endTime = datetime('now'), endedBy = 'System (auto-closed stale)'
+      WHERE status = 'active' AND startTime < datetime('now', '-24 hours')
+    `).run();
+    this.db.prepare(`
+      UPDATE warehouse_employee_shifts
+      SET status = 'completed', endTime = datetime('now'), endedBy = 'System (auto-closed stale)'
+      WHERE status = 'active' AND startTime < datetime('now', '-24 hours')
+    `).run();
     return this.db.prepare(`
       SELECT * FROM department_shift_sessions
       WHERE date = ?
@@ -1997,6 +2013,21 @@ export class DatabaseService implements IDatabaseService {
     const departments = ['production', 'warehouse', 'qc', 'maintenance', 'food-safety', 'housekeeping'];
     const now = new Date();
 
+    const activeShift = this.db.prepare(`
+      SELECT startTime
+      FROM shift_sessions
+      WHERE date = ? AND status = 'active'
+      ORDER BY startTime DESC
+      LIMIT 1
+    `).get(targetDate) as { startTime?: string } | undefined;
+    const activeShiftStartMs = activeShift?.startTime ? new Date(activeShift.startTime).getTime() : null;
+    const isWithinActiveShiftWindow = (startTime?: string | null) => {
+      if (activeShiftStartMs === null) return true;
+      if (!startTime) return false;
+      const ms = new Date(startTime).getTime();
+      return Number.isFinite(ms) && ms >= activeShiftStartMs;
+    };
+
     const departmentSessions = this.db.prepare(`
       SELECT * FROM department_shift_sessions
       WHERE date = ?
@@ -2009,7 +2040,7 @@ export class DatabaseService implements IDatabaseService {
 
     const departmentSummaries = departments.map((department) => {
       const deptSessions = departmentSessions.filter((s) => s.department === department);
-      const activeSessions = deptSessions.filter((s) => s.status === 'active');
+      const activeSessions = deptSessions.filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
       const completedSessions = deptSessions.filter((s) => s.status === 'completed');
 
       let runningCost = 0;
@@ -2018,7 +2049,7 @@ export class DatabaseService implements IDatabaseService {
       let currentHourlyLaborCost = 0;
 
       if (department === 'warehouse') {
-        const activeEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'active');
+        const activeEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
         const completedEmployees = warehouseEmployeeShifts.filter((s) => s.status === 'completed');
 
         activeHeadcount = activeEmployees.length;
@@ -2042,7 +2073,8 @@ export class DatabaseService implements IDatabaseService {
       }
 
       const hasAnySession = deptSessions.length > 0 || (department === 'warehouse' && warehouseEmployeeShifts.length > 0);
-      const status = activeSessions.length > 0 || (department === 'warehouse' && activeHeadcount > 0)
+      const hasActiveLabor = department === 'warehouse' ? activeHeadcount > 0 : activeSessions.length > 0;
+      const status = hasActiveLabor
         ? 'active'
         : hasAnySession
           ? 'ended'
@@ -2282,9 +2314,10 @@ export class DatabaseService implements IDatabaseService {
     const totalPalletsLoaded = outbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
     const totalPalletsOffloaded = inbound.reduce((sum, c) => sum + this.getSafePalletCount(c.actualPallets, c.pallets), 0);
 
-    // Avg load/offload time only from records that have totalMinutes recorded
-    const outboundTimed = outbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
-    const inboundTimed = inbound.filter(c => c.totalMinutes != null && c.totalMinutes > 0);
+    // Ignore unrealistic legacy/outlier durations in dashboard averages.
+    const isValidDockDuration = (minutes: any) => Number.isFinite(minutes) && minutes > 0 && minutes <= 240;
+    const outboundTimed = outbound.filter(c => isValidDockDuration(c.totalMinutes));
+    const inboundTimed = inbound.filter(c => isValidDockDuration(c.totalMinutes));
     const avgLoadTime = outboundTimed.length > 0
       ? outboundTimed.reduce((sum, c) => sum + c.totalMinutes, 0) / outboundTimed.length
       : 0;
@@ -2340,7 +2373,7 @@ export class DatabaseService implements IDatabaseService {
       }
       operatorStats[normalizedName].loads++;
       operatorStats[normalizedName].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      if (c.totalMinutes != null && c.totalMinutes > 0) {
+      if (isValidDockDuration(c.totalMinutes)) {
         operatorStats[normalizedName].totalMinutes += c.totalMinutes;
         operatorStats[normalizedName].timedLoads++;
       }
@@ -2420,7 +2453,9 @@ export class DatabaseService implements IDatabaseService {
       'SELECT COUNT(*) as count FROM dock_checkins WHERE closedAt IS NULL'
     ).get() as any;
 
-    const totalDockHours = completedCheckins.reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
+    const totalDockHours = completedCheckins
+      .filter(c => isValidDockDuration(c.totalMinutes))
+      .reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
 
     // Get latest labor snapshot
     const latestLabor = this.db.prepare(
@@ -3645,6 +3680,70 @@ export class DatabaseService implements IDatabaseService {
       WHERE sessionId = ? 
       ORDER BY createdAt ASC
     `).all(sessionId);
+  }
+
+  getStorageBilling(): any {
+    const rows = (this.db.prepare(`
+      WITH monthly_movements AS (
+        SELECT
+          strftime('%Y-%m', closedAt) AS month,
+          SUM(CASE WHEN inboundOutbound = 'Inbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) AS palletsIn,
+          SUM(CASE WHEN inboundOutbound = 'Outbound' THEN COALESCE(actualPallets, pallets, 0) ELSE 0 END) AS palletsOut
+        FROM dock_checkins
+        WHERE closedAt IS NOT NULL
+          AND closedAt >= '2025-11-01'
+          AND COALESCE(actualPallets, pallets, 0) BETWEEN 1 AND 200
+        GROUP BY strftime('%Y-%m', closedAt)
+      ),
+      running_balance AS (
+        SELECT
+          month,
+          palletsIn,
+          palletsOut,
+          SUM(palletsIn - palletsOut) OVER (ORDER BY month) AS balance
+        FROM monthly_movements
+      )
+      SELECT
+        month,
+        CAST(palletsIn AS INTEGER) AS palletsIn,
+        CAST(palletsOut AS INTEGER) AS palletsOut,
+        MAX(CAST(balance AS INTEGER), 0) AS balance,
+        MAX(CAST(balance AS INTEGER), 0) * 40 AS monthlyCharge
+      FROM running_balance
+      ORDER BY month
+    `).all() as any[]).map((r: any) => {
+      const [year, mon] = (r.month || '').split('-');
+      const labels: Record<string, string> = {
+        '01':'Jan','02':'Feb','03':'Mar','04':'Apr','05':'May','06':'Jun',
+        '07':'Jul','08':'Aug','09':'Sep','10':'Oct','11':'Nov','12':'Dec',
+      };
+      return {
+        month: r.month,
+        monthLabel: `${labels[mon] || mon} ${year}`,
+        palletsIn: r.palletsIn || 0,
+        palletsOut: r.palletsOut || 0,
+        balance: r.balance || 0,
+        monthlyCharge: r.monthlyCharge || 0,
+      };
+    });
+
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currentBalance = rows.length > 0 ? rows[rows.length - 1].balance : 0;
+    const completedRows = rows.filter((r: any) => r.month < currentMonth);
+    const totalBilledComplete = completedRows.reduce((sum: number, r: any) => sum + r.monthlyCharge, 0);
+    const totalBilledAll = rows.reduce((sum: number, r: any) => sum + r.monthlyCharge, 0);
+    const totalPalletsIn = rows.reduce((sum: number, r: any) => sum + r.palletsIn, 0);
+    const totalPalletsOut = rows.reduce((sum: number, r: any) => sum + r.palletsOut, 0);
+
+    return {
+      months: rows,
+      currentBalance,
+      currentMonthCharge: currentBalance * 40,
+      totalBilledComplete,
+      totalBilledAll,
+      totalPalletsIn,
+      totalPalletsOut,
+    };
   }
 
   close() {

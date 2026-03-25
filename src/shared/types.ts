@@ -1,6 +1,6 @@
 // Shared type definitions across server and client
 
-export type DoorStatus = 'Open' | 'Offload' | 'Loading' | 'Blocked' | 'Waiting' | 'Parked' | 'Dropped' | 'Offline';
+export type DoorStatus = 'Open' | 'Offload' | 'Loading' | 'Checked In' | 'Blocked' | 'Waiting' | 'Parked' | 'Dropped' | 'Offline';
 
 export type InboundOutbound = 'Inbound' | 'Outbound';
 
@@ -100,7 +100,7 @@ export interface CreateCheckinRequest {
   checker: string;
   plateNumber: string;
   phoneNumber: string;
-  doorId: number;
+  doorId: number | null;
   status: DoorStatus;
   clientRequestId: string;
   hasAppointment: boolean;

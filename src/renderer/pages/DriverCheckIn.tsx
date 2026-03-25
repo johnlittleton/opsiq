@@ -208,6 +208,7 @@ const DriverCheckIn: React.FC = () => {
                   className="driver-checkin__select"
                   disabled={submitting}
                 >
+                  <option value="Checked In">Checked In</option>
                   <option value="Waiting">Waiting</option>
                   <option value="Offload">Offload</option>
                   <option value="Loading">Loading</option>

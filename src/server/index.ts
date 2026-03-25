@@ -274,6 +274,7 @@ async function calculateShippingReceivingKPI(date: string): Promise<ShippingRece
     Open: 0,
     Offload: 0,
     Loading: 0,
+    'Checked In': 0,
     Blocked: 0,
     Waiting: 0,
     Parked: 0,
@@ -744,6 +745,18 @@ app.get('/api/executive/analytics', async (req, res) => {
     res.json(analytics);
   } catch (error: any) {
     console.error('❌ Error in GET /api/executive/analytics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Storage Billing
+app.get('/api/storage/billing', async (req, res) => {
+  try {
+    console.log('📦 GET /api/storage/billing called');
+    const data = await db.getStorageBilling();
+    res.json(data);
+  } catch (error: any) {
+    console.error('❌ Error in GET /api/storage/billing:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1438,20 +1451,42 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-// Start server after database initialization
-async function startServer() {
-  // Wait for database initialization if using Postgres
-  if (process.env.DATABASE_URL) {
-    console.log('⏳ Waiting for PostgreSQL initialization...');
-    await db.initialize();
-    console.log('✓ PostgreSQL initialized and seeded');
+let dbInitializationPromise: Promise<void> | null = null;
+
+function ensureDatabaseInitialization(): Promise<void> {
+  if (!process.env.DATABASE_URL) {
+    return Promise.resolve();
   }
 
+  if (!dbInitializationPromise) {
+    dbInitializationPromise = (async () => {
+      console.log('⏳ Starting PostgreSQL initialization in background...');
+      await db.initialize();
+      console.log('✓ PostgreSQL initialized and seeded');
+    })().catch((error) => {
+      dbInitializationPromise = null;
+      console.error('❌ PostgreSQL initialization failed:', error);
+      throw error;
+    });
+  }
+
+  return dbInitializationPromise;
+}
+
+// Start server after database initialization
+async function startServer() {
   return new Promise((resolve, reject) => {
     httpServer.listen(PORT, () => {
       console.log(`✓ OpsIQ Server running on http://localhost:${PORT}`);
       console.log(`✓ Socket.IO ready for real-time updates`);
-      console.log(`✓ Database ready`);
+
+      if (process.env.DATABASE_URL) {
+        console.log('⏳ Database initialization continuing in background');
+        void ensureDatabaseInitialization();
+      } else {
+        console.log(`✓ Database ready`);
+      }
+
       resolve(undefined);
     }).on('error', (error) => {
       console.error('❌ Failed to start HTTP server:', error);

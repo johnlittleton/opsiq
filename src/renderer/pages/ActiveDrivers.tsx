@@ -272,13 +272,16 @@ const ActiveDrivers: React.FC = () => {
                         fontWeight: 600,
                         textTransform: 'uppercase',
                         letterSpacing: '0.5px',
-                        backgroundColor: checkin.status === 'Waiting' ? 'rgba(184, 119, 217, 0.2)' :
+                        backgroundColor: checkin.status === 'Checked In' ? 'rgba(229, 248, 255, 0.2)' :
+                                       checkin.status === 'Waiting' ? 'rgba(184, 119, 217, 0.2)' :
                                        checkin.status === 'Loading' ? 'rgba(250, 222, 42, 0.2)' :
                                        checkin.status === 'Offload' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
-                        color: checkin.status === 'Waiting' ? '#b877d9' :
+                        color: checkin.status === 'Checked In' ? '#ffffff' :
+                               checkin.status === 'Waiting' ? '#b877d9' :
                                checkin.status === 'Loading' ? '#fade2a' :
                                checkin.status === 'Offload' ? '#ef4444' : '#22c55e',
-                        border: `1px solid ${checkin.status === 'Waiting' ? 'rgba(184, 119, 217, 0.3)' :
+                        border: `1px solid ${checkin.status === 'Checked In' ? 'rgba(255, 255, 255, 0.5)' :
+                                              checkin.status === 'Waiting' ? 'rgba(184, 119, 217, 0.3)' :
                                               checkin.status === 'Loading' ? 'rgba(250, 222, 42, 0.3)' :
                                               checkin.status === 'Offload' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
                       }}>

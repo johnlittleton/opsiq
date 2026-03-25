@@ -6,13 +6,6 @@
   overflow: hidden;
 }
 
-.dock-board-mobile-legend-btn,
-.dock-board-mobile-chat-btn,
-.dock-board-mobile-legend,
-.dock-board-mobile-legend-backdrop {
-  display: none;
-}
-
 .dock-board-page__content {
   flex: 1;
   padding: 16px;
@@ -22,10 +15,6 @@
   justify-content: center;
   position: relative;
   height: calc(100vh - 80px);
-}
-
-.dock-board-page__mobile-grid {
-  display: none;
 }
 
 .dock-board-page__grid {
@@ -251,112 +240,5 @@
   .dock-tile {
     max-width: 90px;
     max-height: 90px;
-  }
-}
-
-@media (max-width: 900px) {
-  .dock-board-page {
-    overflow-x: hidden;
-    overflow-y: auto;
-    touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .dock-board-page__content {
-    display: none;
-  }
-
-  .dock-board-page__mobile-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-    max-width: 100%;
-    gap: 6px;
-    padding: calc(env(safe-area-inset-top) + 62px) 0 calc(env(safe-area-inset-bottom) + 190px);
-    margin: 0;
-    min-height: 100dvh;
-    box-sizing: border-box;
-  }
-
-  .dock-board-page__mobile-grid .dock-tile,
-  .dock-board-page__mobile-grid .dock-board-page__parked-truck {
-    width: 100%;
-    max-width: none;
-    max-height: none;
-    min-height: 114px;
-    aspect-ratio: 1 / 1;
-    margin: 0;
-  }
-
-  .dock-board-mobile-chat-btn {
-    position: fixed;
-    right: calc(env(safe-area-inset-right) + 10px);
-    top: max(52px, calc(env(safe-area-inset-top) + 10px));
-    z-index: 10160;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 72px;
-    padding: 8px 12px;
-    border-radius: 12px;
-    background: rgba(241, 196, 15, 0.2);
-    border: 2px solid #f1c40f;
-    color: #f1c40f;
-    font-size: 12px;
-    font-weight: 700;
-    touch-action: manipulation;
-    pointer-events: auto;
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .dock-board-mobile-legend-btn {
-    display: none;
-  }
-
-  .dock-board-mobile-legend-backdrop {
-    display: none;
-  }
-
-  .dock-board-mobile-legend {
-    position: fixed;
-    left: 10px;
-    right: 10px;
-    bottom: calc(env(safe-area-inset-bottom) + 8px);
-    z-index: 10095;
-    display: block;
-    width: auto;
-    max-height: min(30vh, 210px);
-    padding: 8px 10px;
-    border-radius: 12px;
-    background: rgba(16, 24, 39, 0.42);
-    border: 1px solid rgba(148, 163, 184, 0.38);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    transform: none;
-    transition: none;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    opacity: 1;
-    visibility: visible;
-    pointer-events: none;
-  }
-
-  .dock-board-mobile-legend .legend {
-    display: grid;
-    gap: 8px;
-  }
-
-  .dock-board-mobile-legend .legend__items {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  .dock-board-mobile-legend.open {
-    transform: none;
-    opacity: 1;
-    visibility: visible;
-    pointer-events: none;
   }
 }

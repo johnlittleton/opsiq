@@ -105,6 +105,7 @@ export function EditCheckinModal({ checkin, onClose, onSave }: EditCheckinModalP
                 onChange={(e) => setFormData({ ...formData, status: e.target.value as DoorStatus })}
                 required
               >
+                <option value="Checked In">Checked In</option>
                 <option value="Waiting">Waiting</option>
                 <option value="Loading">Loading</option>
                 <option value="Offload">Offload</option>

@@ -63,6 +63,14 @@
   box-shadow: var(--glow-offload-shadow);
 }
 
+.dock-tile[data-status="checked-in"] {
+  --current-glow: var(--glow-checked-in);
+  --current-glow-bright: var(--glow-checked-in-bright);
+  --current-glow-shadow: var(--glow-checked-in-shadow);
+  box-shadow: var(--glow-checked-in-shadow);
+  animation: pulse-glow 1.2s ease-in-out infinite;
+}
+
 .dock-tile[data-status="parked"] {
   --current-glow: var(--glow-parked);
   --current-glow-bright: var(--glow-parked-bright);

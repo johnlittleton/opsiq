@@ -30,48 +30,6 @@
   color: var(--text-muted);
 }
 
-.analytics-header-actions {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.analytics-date-selector {
-  display: flex;
-  gap: 10px;
-}
-
-.analytics-date-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.analytics-date-field label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.analytics-date-field input {
-  padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: var(--text);
-  font-size: 12px;
-}
-
-.analytics-date-field input:focus {
-  outline: none;
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--primary);
-}
-
 /* Today Button - Blue */
 .today-btn {
   background: none !important;
@@ -94,7 +52,7 @@
 }
 
 /* Back Button - Teal */
-.analytics-back-btn {
+.back-btn {
   background: none !important;
   color: #16a085 !important;
   border: 3px solid #16a085 !important;
@@ -108,13 +66,13 @@
   height: fit-content;
 }
 
-.analytics-back-btn:hover {
+.back-btn:hover {
   background: #16a085 !important;
   color: #000 !important;
   transform: translateY(-1px) !important;
 }
 
-.analytics-back-btn:active {
+.back-btn:active {
   transform: translateY(0) !important;
 }
 
@@ -265,27 +223,5 @@
   .chart-panel.labor-costs,
   .chart-panel.appointments {
     grid-column: span 1;
-  }
-}
-
-@media (max-width: 900px) {
-  .analytics-header {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .analytics-header-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .analytics-date-selector {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .analytics-date-field {
-    flex: 1;
-    min-width: 140px;
   }
 }

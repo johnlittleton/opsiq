@@ -37,6 +37,11 @@
   color: var(--glow-open);
 }
 
+.legend__dot--checked-in {
+  background: var(--glow-checked-in);
+  color: var(--glow-checked-in);
+}
+
 .legend__dot--loading {
   background: var(--glow-loading);
   color: var(--glow-loading);
