@@ -12,13 +12,14 @@
     "build": "npm run build:react && npm run build:electron && npm run build:server",
     "build:react": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json",
+    "build:server:railway": "npx tsc -p tsconfig.server.json",
     "build:server": "npm rebuild better-sqlite3 && tsc -p tsconfig.server.json",
     "start": "node dist/server/server/index.js",
     "start:electron": "electron .",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
     "publish:win": "npm run build && electron-builder --win --publish always",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "node -e \"const cp=require('child_process'); const isRailway=Boolean(process.env.RAILWAY_ENVIRONMENT||process.env.RAILWAY_SERVICE_ID||process.env.RAILWAY_PROJECT_ID); const isCI=process.env.CI==='true'; if(isRailway||isCI){console.log('Skipping electron-builder install-app-deps in CI/Railway'); process.exit(0);} try{require.resolve('electron-builder/package.json'); cp.execSync('npx electron-builder install-app-deps',{stdio:'inherit'});}catch(e){console.log('Skipping electron-builder install-app-deps (electron-builder not available)');}\""
   },
   "keywords": [
     "electron",
