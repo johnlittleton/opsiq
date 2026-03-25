@@ -110,7 +110,7 @@
     "publish": {
       "provider": "github",
       "owner": "johnlittleton",
-      "repo": "opsiq-updates"
+      "repo": "opsiq"
     }
   }
 }
