@@ -749,24 +749,20 @@ app.get('/api/executive/analytics', async (req, res) => {
   }
 });
 
+// Storage Billing
+app.get('/api/storage/billing', async (req, res) => {
+  try {
+    console.log('📦 GET /api/storage/billing called');
+    const data = await db.getStorageBilling();
+    res.json(data);
+  } catch (error: any) {
+    console.error('❌ Error in GET /api/storage/billing:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Production Costing Analytics
 app.get('/api/production/costing', async (req, res) => {
-  // Storage Billing
-  app.get('/api/storage/billing', async (req, res) => {
-    try {
-      console.log('📦 GET /api/storage/billing called');
-      const data = await db.getStorageBilling();
-      res.json(data);
-    } catch (error: any) {
-      console.error('❌ Error in GET /api/storage/billing:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Production Costing Analytics
-  app.get('/api/production/costing', async (req, res) => {
-    try {
-      const startDate = req.query.startDate as string;
   try {
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
