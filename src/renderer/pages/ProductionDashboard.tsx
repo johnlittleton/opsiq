@@ -6,6 +6,8 @@ import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
 
+const getTodayDateString = () => new Date().toISOString().slice(0, 10);
+
 const LINES = [
   { id: 1, name: 'Giro Line 1' },
   { id: 2, name: 'Giro Line 2' },
@@ -197,9 +199,10 @@ export default function ProductionDashboard() {
 
   const checkDriverAlerts = async () => {
     try {
+      const today = getTodayDateString();
       const [checkinsResponse, workOrdersResponse] = await Promise.all([
         fetch(`${API_BASE}/api/checkins`),
-        fetch(`${API_BASE}/api/production/work-orders`)
+        fetch(`${API_BASE}/api/production/work-orders?date=${today}`)
       ]);
 
       if (checkinsResponse.ok && workOrdersResponse.ok) {

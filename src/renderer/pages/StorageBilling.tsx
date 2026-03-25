@@ -39,12 +39,15 @@ const StorageBilling: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE}/api/storage/billing`);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(`${API_BASE}/api/storage/billing`, { signal: controller.signal });
+      window.clearTimeout(timeout);
       if (!response.ok) throw new Error('Failed to load storage billing data');
       const json = await response.json();
       setData(json);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.name === 'AbortError' ? 'Storage billing request timed out. Please try again.' : err.message);
     } finally {
       setLoading(false);
     }

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { API_BASE } from '../services/config';
 import './DriverWaitingTicker.css';
 
+const getTodayDateString = () => new Date().toISOString().slice(0, 10);
+
 interface DriverAlert {
   pickupNumber: string;
   lineName: string;
@@ -32,10 +34,11 @@ export default function DriverWaitingTicker({ lineFilter, inline = false }: Driv
 
   const fetchDriverAlerts = async () => {
     try {
+      const today = getTodayDateString();
       // Fetch both check-ins and active work orders
       const [checkinsResponse, workOrdersResponse] = await Promise.all([
         fetch(`${API_BASE}/api/checkins`),
-        fetch(`${API_BASE}/api/production/work-orders`)
+        fetch(`${API_BASE}/api/production/work-orders?date=${today}`)
       ]);
 
       if (checkinsResponse.ok && workOrdersResponse.ok) {

@@ -420,6 +420,9 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_audit_time ON checkin_audit_log(changed_at);
         CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
         CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
+        CREATE INDEX IF NOT EXISTS idx_work_orders_date_line_slot ON work_orders(date, line, slot);
+        CREATE INDEX IF NOT EXISTS idx_checkins_closed_at ON dock_checkins(closed_at);
+        CREATE INDEX IF NOT EXISTS idx_checkins_closed_inbound_outbound ON dock_checkins(closed_at, inbound_outbound);
         CREATE INDEX IF NOT EXISTS idx_pallet_tracker_order ON pallet_tracker_events(order_type, order_id, scanned_at);
         CREATE INDEX IF NOT EXISTS idx_pallet_tracker_tag ON pallet_tracker_events(order_type, order_id, pallet_tag);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
@@ -4314,6 +4317,7 @@ export class DatabaseService implements IDatabaseService {
   async getStorageBilling(): Promise<any> {
     const client = await this.pool.connect();
     try {
+      await client.query('SET LOCAL statement_timeout = 8000');
       const result = await client.query(`
         WITH monthly_movements AS (
           SELECT
