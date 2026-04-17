@@ -21,6 +21,9 @@ import ProductionCosting from './pages/ProductionCosting';
 import Settings from './pages/Settings';
 import LaborTracker from './pages/LaborTracker';
 import LaborHistory from './pages/LaborHistory';
+import LaborKiosk from './pages/LaborKiosk';
+import LaborKioskAdmin from './pages/LaborKioskAdmin';
+import LaborKioskHistory from './pages/LaborKioskHistory';
 import ProductionLaborPlanner from './pages/ProductionLaborPlanner';
 import ProductionLaborPlannerHistory from './pages/ProductionLaborPlannerHistory';
 import ProductionScheduler from './pages/ProductionScheduler';
@@ -43,7 +46,9 @@ const PUBLIC_ROUTES = [
   '/dashboard',
   '/dockboard-old',
   '/production',
-  '/shipping'
+  '/shipping',
+  '/labor-kiosk',
+  '/labor-kiosk-admin'
 ];
 
 const AppRoutes: React.FC = () => {
@@ -80,6 +85,9 @@ const AppRoutes: React.FC = () => {
       <Route path="/production-costing" element={<ProductionCosting />} />
       <Route path="/labor-tracker" element={<LaborTracker />} />
       <Route path="/labor-history" element={<LaborHistory />} />
+      <Route path="/labor-kiosk" element={<LaborKiosk />} />
+      <Route path="/labor-kiosk-admin" element={<LaborKioskAdmin />} />
+      <Route path="/labor-kiosk-history" element={<LaborKioskHistory />} />
       <Route path="/production-labor-planner" element={<ProductionLaborPlanner />} />
       <Route path="/production-labor-planner-history" element={<ProductionLaborPlannerHistory />} />
       <Route path="/production-scheduler" element={<ProductionScheduler />} />
@@ -150,7 +158,12 @@ const AppContent: React.FC = () => {
         </div>
       )}
 
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <AppRoutes />
       </Router>
     </>

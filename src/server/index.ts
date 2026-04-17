@@ -39,6 +39,126 @@ const io = new SocketServer(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
+const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+
+interface KioskAssistantTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+interface ChatCompletionPayload {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
+interface SessionUser {
+  id: number;
+  name: string;
+  role: string;
+}
+
+const toSafeText = (value: unknown, maxLen: number = 600): string => {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen);
+};
+
+const getAuthorizedUser = async (authorizationHeader?: string): Promise<SessionUser | null> => {
+  const sessionToken = authorizationHeader?.replace('Bearer ', '');
+  if (!sessionToken) {
+    return null;
+  }
+
+  return (await db.validateSession(sessionToken)) as SessionUser | null;
+};
+
+const buildKioskFallbackReply = (message: string, employeeName?: string): string => {
+  const lower = message.toLowerCase();
+  const firstName = employeeName?.split(' ')[0];
+
+  if (/(hello|hi|hey)/.test(lower)) {
+    return firstName
+      ? `Hi ${firstName}. I can help with clock-in, clock-out, and quick OpsIQ questions.`
+      : 'Hi. I can help with clock-in, clock-out, and quick OpsIQ questions.';
+  }
+
+  if (/(clock|badge|scan|time\s*clock|sign\s*in|sign\s*out)/.test(lower)) {
+    return 'Scan your badge once to clock in and scan again to clock out. If your badge fails, ask a supervisor to verify your employee ID in the Labor Tracker.';
+  }
+
+  if (/(break|lunch|policy|overtime)/.test(lower)) {
+    return 'I can share general guidance, but policy details should come from your supervisor or posted site policy. I can still help you navigate the kiosk steps.';
+  }
+
+  if (/(help|what can you do|how do i)/.test(lower)) {
+    return 'I can walk you through scanning, explain kiosk behavior, and answer basic OpsIQ workflow questions. Ask me one thing at a time for the fastest response.';
+  }
+
+  return 'I am ready to help with kiosk tasks and OpsIQ workflow questions. Ask me about clock-in, clock-out, badge scans, or shift tracking.';
+};
+
+const getKioskAssistantReply = async (message: string, history: KioskAssistantTurn[], employeeName?: string): Promise<string> => {
+  if (!OPENAI_API_KEY) {
+    return buildKioskFallbackReply(message, employeeName);
+  }
+
+  const systemPrompt = [
+    'You are OpsIQ Kiosk Assistant for a production floor timeclock.',
+    'Be concise, practical, and friendly. Keep replies under 70 words unless asked for detail.',
+    'Focus on badge scan guidance, clock-in/out steps, and shift workflow support.',
+    'Never invent company policy. If unknown, say you are not certain and suggest supervisor verification.',
+    'Avoid markdown and special formatting in responses.'
+  ].join(' ');
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    ...history.slice(-8).map((turn) => ({ role: turn.role, content: toSafeText(turn.text, 350) })),
+    {
+      role: 'user',
+      content: employeeName
+        ? `Employee: ${toSafeText(employeeName, 80)}. Question: ${toSafeText(message, 500)}`
+        : toSafeText(message, 500),
+    },
+  ];
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.5,
+        max_tokens: 180,
+        messages,
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.warn('Kiosk assistant OpenAI error:', response.status, body.slice(0, 400));
+      return buildKioskFallbackReply(message, employeeName);
+    }
+
+    const payload = (await response.json()) as ChatCompletionPayload;
+    const reply = payload?.choices?.[0]?.message?.content;
+    if (typeof reply === 'string' && reply.trim().length > 0) {
+      return reply.trim().slice(0, 900);
+    }
+  } catch (error) {
+    console.warn('Kiosk assistant request failed, using fallback:', error);
+  }
+
+  return buildKioskFallbackReply(message, employeeName);
+};
+
 // ==================== REST API ====================
 
 // Get all doors with checkins
@@ -688,6 +808,160 @@ app.post('/api/labor/warehouse/employees/:shiftId/overtime', async (req, res) =>
     res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// Department employee scan history (all departments)
+app.get('/api/labor/employees/shifts', async (req, res) => {
+  try {
+    const date = req.query.date as string | undefined;
+    const department = req.query.department as string | undefined;
+    const shifts = await db.getDepartmentEmployeeShifts(date, department);
+    res.json(shifts);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/labor/kiosk-employees', async (_req, res) => {
+  try {
+    const includeInactive = String(_req.query.includeInactive || '').toLowerCase() === 'true';
+
+    if (includeInactive) {
+      const user = await getAuthorizedUser(_req.headers.authorization);
+      if (!user || (user.role !== 'manager' && user.role !== 'executive')) {
+        return res.status(403).json({ error: 'Manager or executive access required' });
+      }
+    }
+
+    const employees = await db.getKioskEmployees(includeInactive);
+    res.json(employees);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/labor/kiosk-employees', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (user.role !== 'manager' && user.role !== 'executive') {
+      return res.status(403).json({ error: 'Only managers or executives can add employees' });
+    }
+
+    const employee = await db.createKioskEmployee({
+      department: req.body.department,
+      employeeId: req.body.employeeId,
+      employeeName: req.body.employeeName,
+      badgeCode: req.body.badgeCode,
+      createdBy: user.name,
+    });
+
+    res.status(201).json(employee);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/labor/kiosk-employees/:id', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (user.role !== 'manager' && user.role !== 'executive') {
+      return res.status(403).json({ error: 'Only managers or executives can edit employees' });
+    }
+
+    const employeeId = Number(req.params.id);
+    if (!Number.isFinite(employeeId) || employeeId <= 0) {
+      return res.status(400).json({ error: 'Valid employee id is required' });
+    }
+
+    const employee = await db.updateKioskEmployee(employeeId, {
+      department: req.body.department,
+      employeeId: req.body.employeeId,
+      employeeName: req.body.employeeName,
+      badgeCode: req.body.badgeCode,
+    });
+
+    res.json(employee);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/labor/kiosk-employees/:id/deactivate', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (user.role !== 'manager' && user.role !== 'executive') {
+      return res.status(403).json({ error: 'Only managers or executives can deactivate employees' });
+    }
+
+    const employeeId = Number(req.params.id);
+    if (!Number.isFinite(employeeId) || employeeId <= 0) {
+      return res.status(400).json({ error: 'Valid employee id is required' });
+    }
+
+    const employee = await db.deactivateKioskEmployee(employeeId);
+    res.json(employee);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Kiosk scan toggle endpoint: first scan clocks in, second scan clocks out
+app.post('/api/labor/employees/scan', async (req, res) => {
+  try {
+    const result = await db.scanDepartmentEmployee({
+      department: req.body.department,
+      employeeId: req.body.employeeId,
+      employeeName: req.body.employeeName,
+      scannedBy: req.body.scannedBy || 'Kiosk',
+      scanCode: req.body.scanCode,
+      overtimeHours: req.body.overtimeHours,
+    });
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Kiosk conversational assistant endpoint
+app.post('/api/kiosk/assistant/respond', async (req, res) => {
+  try {
+    const message = toSafeText(req.body?.message, 700);
+    if (!message) {
+      res.status(400).json({ error: 'Message is required' });
+      return;
+    }
+
+    const employeeName = toSafeText(req.body?.employeeName, 100) || undefined;
+    const context: KioskAssistantTurn[] = Array.isArray(req.body?.context)
+      ? req.body.context
+          .filter((turn: any) => turn && (turn.role === 'user' || turn.role === 'assistant'))
+          .map((turn: any) => ({
+            role: turn.role,
+            text: toSafeText(turn.text, 350),
+          }))
+      : [];
+
+    const reply = await getKioskAssistantReply(message, context, employeeName);
+    res.json({
+      reply,
+      provider: OPENAI_API_KEY ? 'openai' : 'local-fallback',
+      model: OPENAI_API_KEY ? OPENAI_MODEL : 'fallback-template',
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Assistant request failed' });
   }
 });
 

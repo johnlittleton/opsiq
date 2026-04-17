@@ -43,11 +43,13 @@ workflows:
         script: |
           set -euo pipefail
           mkdir -p build/ios/archive build/ios/ipa
+          APP_VERSION=$(node -e "process.stdout.write(require('./package.json').version)")
           RAW_BUILD_ID="${CM_BUILD_ID:-}"
           BUILD_NUMBER="${RAW_BUILD_ID//[^0-9]/}"
           if [[ -z "$BUILD_NUMBER" ]]; then
             BUILD_NUMBER="$(date +%s)"
           fi
+          echo "Using marketing version: $APP_VERSION"
           echo "Using build number: $BUILD_NUMBER"
           cat > /tmp/export_options.plist <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +77,7 @@ workflows:
             -configuration Release \
             -archivePath build/ios/archive/OpsIQMobile.xcarchive \
             archive \
+            MARKETING_VERSION="$APP_VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
             CODE_SIGN_STYLE=Manual \
             DEVELOPMENT_TEAM=ZL366VWFY8 \
@@ -105,4 +108,4 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: false
+        submit_to_testflight: true

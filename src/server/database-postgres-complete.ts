@@ -15,6 +15,7 @@ import {
   LaborSummary,
 } from '../shared/types';
 import { IDatabaseService } from './database-interface';
+import { DEFAULT_KIOSK_EMPLOYEES, VALID_KIOSK_DEPARTMENTS } from './kiosk-employees';
 
 // Helper to get local time as ISO string (without UTC conversion)
 function getLocalISOString(date: Date = new Date()): string {
@@ -261,6 +262,40 @@ export class DatabaseService implements IDatabaseService {
           started_by TEXT NOT NULL,
           ended_by TEXT,
           notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS department_employee_shifts (
+          id SERIAL PRIMARY KEY,
+          date TEXT NOT NULL,
+          department TEXT NOT NULL,
+          employee_id TEXT NOT NULL,
+          employee_name TEXT NOT NULL,
+          status TEXT NOT NULL,
+          start_time TIMESTAMP NOT NULL,
+          end_time TIMESTAMP,
+          overtime_hours REAL DEFAULT 0,
+          hourly_rate REAL NOT NULL,
+          overtime_multiplier REAL DEFAULT 1.5,
+          regular_labor_cost REAL DEFAULT 0,
+          overtime_labor_cost REAL DEFAULT 0,
+          total_labor_cost REAL DEFAULT 0,
+          started_by TEXT NOT NULL,
+          ended_by TEXT,
+          scan_code TEXT,
+          notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS kiosk_employees (
+          id SERIAL PRIMARY KEY,
+          department TEXT NOT NULL,
+          employee_id TEXT NOT NULL,
+          employee_name TEXT NOT NULL,
+          badge_code TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (department, employee_id)
         );
 
         CREATE TABLE IF NOT EXISTS checkin_audit_log (
@@ -566,8 +601,7 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Erasmo Sanchez', pin: '97531', role: 'manager' },
         { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
         { name: 'Sal', pin: '91356', role: 'manager' },
-        { name: 'Jacob', pin: '53782', role: 'manager' },
-        { name: 'Ernie', pin: '67419', role: 'manager' }
+        { name: 'Jacob', pin: '53782', role: 'manager' }
       ];
 
       for (const exec of executives) {
@@ -579,6 +613,28 @@ export class DatabaseService implements IDatabaseService {
         `, [exec.name, exec.pin, exec.role]);
       }
       console.log('✓ Synced 14 users with PINs (6 executives + 8 managers)');
+
+      await client.query('ALTER TABLE kiosk_employees ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true');
+      await client.query('UPDATE kiosk_employees SET is_active = true WHERE is_active IS NULL');
+
+      const kioskEmployeeCount = await client.query('SELECT COUNT(*) as count FROM kiosk_employees');
+      if (kioskEmployeeCount.rows[0].count === '0') {
+        for (const employee of DEFAULT_KIOSK_EMPLOYEES) {
+          await client.query(`
+            INSERT INTO kiosk_employees (department, employee_id, employee_name, badge_code, is_active, created_by)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (department, employee_id) DO NOTHING
+          `, [
+            employee.department,
+            employee.employeeId,
+            employee.employeeName,
+            employee.badgeCode || employee.employeeId,
+            true,
+            'System',
+          ]);
+        }
+        console.log(`✓ Seeded ${DEFAULT_KIOSK_EMPLOYEES.length} kiosk employees`);
+      }
 
       // Seed production dock statuses if empty
       const prodDockCount = await client.query('SELECT COUNT(*) as count FROM production_dock_statuses');
@@ -2075,6 +2131,11 @@ export class DatabaseService implements IDatabaseService {
       SET status = 'completed', end_time = NOW(), ended_by = 'System (auto-closed stale)'
       WHERE status = 'active' AND start_time < NOW() - INTERVAL '24 hours'
     `);
+    await this.pool.query(`
+      UPDATE department_employee_shifts
+      SET status = 'completed', end_time = NOW(), ended_by = 'System (auto-closed stale)'
+      WHERE status = 'active' AND start_time < NOW() - INTERVAL '24 hours'
+    `);
     const result = await this.pool.query(`
       SELECT * FROM department_shift_sessions
       WHERE date = $1
@@ -2225,6 +2286,314 @@ export class DatabaseService implements IDatabaseService {
     return this.toCamelCase(result.rows);
   }
 
+  async startDepartmentEmployeeShift(data: {
+    department: string;
+    employeeId: string;
+    employeeName: string;
+    startedBy: string;
+    scanCode?: string;
+    notes?: string;
+  }): Promise<any> {
+    const now = getLocalISOString();
+    const date = now.split('T')[0];
+    const department = this.normalizeDepartmentName(data.department);
+    const employeeId = (data.employeeId || '').trim();
+    const employeeName = (data.employeeName || '').trim();
+
+    if (!employeeId) {
+      throw new Error('employeeId is required');
+    }
+
+    if (!employeeName) {
+      throw new Error('employeeName is required');
+    }
+
+    const activeDeptResult = await this.pool.query(`
+      SELECT id FROM department_shift_sessions
+      WHERE date = $1 AND department = $2 AND status = 'active'
+      LIMIT 1
+    `, [date, department]);
+
+    // Allow kiosk scans even without a manually-started department session
+    // (kiosk data is the source of truth for headcount/cost)
+
+    const existingResult = await this.pool.query(`
+      SELECT id FROM department_employee_shifts
+      WHERE date = $1 AND department = $2 AND employee_id = $3 AND status = 'active'
+      LIMIT 1
+    `, [date, department, employeeId]);
+
+    if (existingResult.rows.length > 0) {
+      throw new Error(`${employeeName} already has an active ${department} shift`);
+    }
+
+    const hourlyRate = this.getDepartmentHourlyRate(department);
+    const result = await this.pool.query(`
+      INSERT INTO department_employee_shifts (
+        date, department, employee_id, employee_name, status, start_time,
+        hourly_rate, started_by, scan_code, notes
+      ) VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)
+      RETURNING *
+    `, [
+      date,
+      department,
+      employeeId,
+      employeeName,
+      now,
+      hourlyRate,
+      data.startedBy || 'Manager',
+      data.scanCode || null,
+      data.notes || null,
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async endDepartmentEmployeeShift(shiftId: number, data: {
+    endedBy: string;
+    overtimeHours?: number;
+    notes?: string;
+  }): Promise<any> {
+    const shiftResult = await this.pool.query('SELECT * FROM department_employee_shifts WHERE id = $1', [shiftId]);
+
+    if (shiftResult.rows.length === 0) {
+      throw new Error('Department employee shift not found');
+    }
+
+    const shift = this.toCamelCase(shiftResult.rows[0]);
+    if (shift.status !== 'active') {
+      throw new Error('Department employee shift is not active');
+    }
+
+    const now = getLocalISOString();
+    const overtimeHours = Math.max(0, Number(data.overtimeHours ?? shift.overtimeHours ?? 0));
+    const elapsedHours = Math.max(0, (new Date(now).getTime() - new Date(shift.startTime).getTime()) / (1000 * 60 * 60));
+    const regularLaborCost = elapsedHours * shift.hourlyRate;
+    const overtimeLaborCost = overtimeHours * shift.hourlyRate * (shift.overtimeMultiplier || 1.5);
+    const totalLaborCost = regularLaborCost + overtimeLaborCost;
+
+    const updateResult = await this.pool.query(`
+      UPDATE department_employee_shifts
+      SET status = 'completed',
+          end_time = $1,
+          overtime_hours = $2,
+          regular_labor_cost = $3,
+          overtime_labor_cost = $4,
+          total_labor_cost = $5,
+          ended_by = $6,
+          notes = $7
+      WHERE id = $8
+      RETURNING *
+    `, [
+      now,
+      overtimeHours,
+      Math.round(regularLaborCost * 100) / 100,
+      Math.round(overtimeLaborCost * 100) / 100,
+      Math.round(totalLaborCost * 100) / 100,
+      data.endedBy || 'Manager',
+      data.notes || shift.notes,
+      shiftId,
+    ]);
+
+    return this.toCamelCase(updateResult.rows[0]);
+  }
+
+  async getDepartmentEmployeeShifts(date?: string, department?: string): Promise<any[]> {
+    const targetDate = date || getLocalISOString().split('T')[0];
+    if (department) {
+      const normalizedDepartment = this.normalizeDepartmentName(department);
+      const result = await this.pool.query(`
+        SELECT * FROM department_employee_shifts
+        WHERE date = $1 AND department = $2
+        ORDER BY status ASC, employee_name ASC, start_time ASC
+      `, [targetDate, normalizedDepartment]);
+      return this.toCamelCase(result.rows);
+    }
+
+    const result = await this.pool.query(`
+      SELECT * FROM department_employee_shifts
+      WHERE date = $1
+      ORDER BY department ASC, status ASC, employee_name ASC, start_time ASC
+    `, [targetDate]);
+    return this.toCamelCase(result.rows);
+  }
+
+  async scanDepartmentEmployee(data: {
+    department: string;
+    employeeId: string;
+    employeeName: string;
+    scannedBy: string;
+    scanCode?: string;
+    overtimeHours?: number;
+  }): Promise<any> {
+    const date = getLocalISOString().split('T')[0];
+    const department = this.normalizeDepartmentName(data.department);
+    const employeeId = (data.employeeId || '').trim();
+
+    if (!employeeId) {
+      throw new Error('employeeId is required');
+    }
+
+    const activeResult = await this.pool.query(`
+      SELECT * FROM department_employee_shifts
+      WHERE date = $1 AND department = $2 AND employee_id = $3 AND status = 'active'
+      ORDER BY start_time DESC
+      LIMIT 1
+    `, [date, department, employeeId]);
+
+    if (activeResult.rows.length === 0) {
+      const started = await this.startDepartmentEmployeeShift({
+        department,
+        employeeId,
+        employeeName: data.employeeName,
+        startedBy: data.scannedBy || 'Kiosk',
+        scanCode: data.scanCode,
+        notes: `Kiosk scan in (${data.scanCode || employeeId})`,
+      });
+
+      return {
+        action: 'clock-in',
+        shift: started,
+      };
+    }
+
+    const activeShift = this.toCamelCase(activeResult.rows[0]);
+    const ended = await this.endDepartmentEmployeeShift(activeShift.id, {
+      endedBy: data.scannedBy || 'Kiosk',
+      overtimeHours: data.overtimeHours,
+      notes: `Kiosk scan out (${data.scanCode || employeeId})`,
+    });
+
+    return {
+      action: 'clock-out',
+      shift: ended,
+    };
+  }
+
+  async getKioskEmployees(includeInactive: boolean = false): Promise<any[]> {
+    const result = includeInactive
+      ? await this.pool.query(`
+          SELECT * FROM kiosk_employees
+          ORDER BY department ASC, employee_name ASC, employee_id ASC
+        `)
+      : await this.pool.query(`
+          SELECT * FROM kiosk_employees
+          WHERE is_active = true
+          ORDER BY department ASC, employee_name ASC, employee_id ASC
+        `);
+
+    return this.toCamelCase(result.rows);
+  }
+
+  async createKioskEmployee(data: {
+    department: string;
+    employeeId: string;
+    employeeName: string;
+    badgeCode?: string;
+    createdBy?: string;
+  }): Promise<any> {
+    const department = this.normalizeDepartmentName(data.department);
+    const employeeId = String(data.employeeId || '').trim().toUpperCase();
+    const employeeName = String(data.employeeName || '').trim();
+    const badgeCode = String(data.badgeCode || employeeId).trim();
+
+    if (!VALID_KIOSK_DEPARTMENTS.includes(department as any)) {
+      throw new Error('Valid department is required');
+    }
+
+    if (!employeeId) {
+      throw new Error('employeeId is required');
+    }
+
+    if (!employeeName) {
+      throw new Error('employeeName is required');
+    }
+
+    const existing = await this.pool.query(
+      'SELECT id FROM kiosk_employees WHERE department = $1 AND employee_id = $2 LIMIT 1',
+      [department, employeeId],
+    );
+
+    if (existing.rows.length > 0) {
+      throw new Error('Employee already exists in that department');
+    }
+
+    const result = await this.pool.query(`
+      INSERT INTO kiosk_employees (department, employee_id, employee_name, badge_code, is_active, created_by)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [department, employeeId, employeeName, badgeCode, true, data.createdBy || 'Manager']);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async updateKioskEmployee(id: number, data: {
+    department: string;
+    employeeId: string;
+    employeeName: string;
+    badgeCode?: string;
+  }): Promise<any> {
+    const existing = await this.pool.query('SELECT id FROM kiosk_employees WHERE id = $1 LIMIT 1', [id]);
+    if (existing.rows.length === 0) {
+      throw new Error('Employee not found');
+    }
+
+    const department = this.normalizeDepartmentName(data.department);
+    const employeeId = String(data.employeeId || '').trim().toUpperCase();
+    const employeeName = String(data.employeeName || '').trim();
+    const badgeCode = String(data.badgeCode || employeeId).trim();
+
+    if (!VALID_KIOSK_DEPARTMENTS.includes(department as any)) {
+      throw new Error('Valid department is required');
+    }
+
+    if (!employeeId) {
+      throw new Error('employeeId is required');
+    }
+
+    if (!employeeName) {
+      throw new Error('employeeName is required');
+    }
+
+    const conflict = await this.pool.query(
+      'SELECT id FROM kiosk_employees WHERE department = $1 AND employee_id = $2 AND id != $3 LIMIT 1',
+      [department, employeeId, id],
+    );
+
+    if (conflict.rows.length > 0) {
+      throw new Error('Another employee already uses this ID in that department');
+    }
+
+    const result = await this.pool.query(`
+      UPDATE kiosk_employees
+      SET department = $1,
+          employee_id = $2,
+          employee_name = $3,
+          badge_code = $4,
+          updated_at = NOW()
+      WHERE id = $5
+      RETURNING *
+    `, [department, employeeId, employeeName, badgeCode, id]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async deactivateKioskEmployee(id: number): Promise<any> {
+    const result = await this.pool.query(`
+      UPDATE kiosk_employees
+      SET is_active = false,
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      throw new Error('Employee not found');
+    }
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
   async getDepartmentLaborLive(date?: string): Promise<any> {
     const targetDate = date || getLocalISOString().split('T')[0];
     const departments = ['production', 'warehouse', 'qc', 'maintenance', 'food-safety', 'housekeeping'];
@@ -2255,46 +2624,70 @@ export class DatabaseService implements IDatabaseService {
       SELECT * FROM warehouse_employee_shifts
       WHERE date = $1
     `, [targetDate]);
+    const kioskEmployeeResult = await this.pool.query(`
+      SELECT * FROM department_employee_shifts
+      WHERE date = $1
+    `, [targetDate]);
 
     const departmentSessions = this.toCamelCase(sessionsResult.rows);
     const warehouseEmployeeShifts = this.toCamelCase(employeeResult.rows);
+    const kioskEmployeeShifts = this.toCamelCase(kioskEmployeeResult.rows);
 
     const departmentSummaries = departments.map((department) => {
       const deptSessions = departmentSessions.filter((s: any) => s.department === department);
       const activeSessions = deptSessions.filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
       const completedSessions = deptSessions.filter((s: any) => s.status === 'completed');
 
+      const kioskDeptShifts = kioskEmployeeShifts.filter((s: any) => s.department === department);
+      const activeKioskShifts = kioskDeptShifts.filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
+      const completedKioskShifts = kioskDeptShifts.filter((s: any) => s.status === 'completed');
+
       let runningCost = 0;
       let completedCost = completedSessions.reduce((sum: number, s: any) => sum + (s.totalLaborCost || 0), 0);
-      let activeHeadcount = activeSessions.reduce((sum: number, s: any) => sum + (s.startHeadcount || 0), 0);
+      completedCost += completedKioskShifts.reduce((sum: number, s: any) => sum + (s.totalLaborCost || 0), 0);
+      let activeHeadcount = 0;
       let currentHourlyLaborCost = 0;
 
       if (department === 'warehouse') {
         const activeEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
         const completedEmployees = warehouseEmployeeShifts.filter((s: any) => s.status === 'completed');
 
-        activeHeadcount = activeEmployees.length;
-        completedCost += completedEmployees.reduce((sum: number, s: any) => sum + (s.totalLaborCost || 0), 0);
-        currentHourlyLaborCost = activeEmployees.reduce((sum: number, shift: any) => {
-          return sum + (shift.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE);
-        }, 0);
+        const allActiveWarehouse = [
+          ...activeEmployees.map((s: any) => ({ startTime: s.startTime, hourlyRate: s.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE })),
+          ...activeKioskShifts.map((s: any) => ({ startTime: s.startTime, hourlyRate: s.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE })),
+        ];
 
-        runningCost = activeEmployees.reduce((sum: number, shift: any) => {
-          const elapsedHours = Math.max(0, (now.getTime() - new Date(shift.startTime).getTime()) / (1000 * 60 * 60));
-          return sum + (elapsedHours * (shift.hourlyRate || DatabaseService.DEFAULT_SR_HOURLY_WAGE));
+        activeHeadcount = allActiveWarehouse.length;
+        completedCost += completedEmployees.reduce((sum: number, s: any) => sum + (s.totalLaborCost || 0), 0);
+        currentHourlyLaborCost = allActiveWarehouse.reduce((sum: number, s: any) => sum + s.hourlyRate, 0);
+        runningCost = allActiveWarehouse.reduce((sum: number, s: any) => {
+          const elapsedHours = Math.max(0, (now.getTime() - new Date(s.startTime).getTime()) / (1000 * 60 * 60));
+          return sum + (elapsedHours * s.hourlyRate);
         }, 0);
       } else {
-        currentHourlyLaborCost = activeSessions.reduce((sum: number, session: any) => {
-          return sum + ((session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
-        }, 0);
-        runningCost = activeSessions.reduce((sum: number, session: any) => {
-          const elapsedHours = Math.max(0, (now.getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60));
-          return sum + (elapsedHours * (session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
-        }, 0);
+        if (activeKioskShifts.length > 0) {
+          activeHeadcount = activeKioskShifts.length;
+          currentHourlyLaborCost = activeKioskShifts.reduce((sum: number, s: any) => {
+            return sum + (s.hourlyRate || this.getDepartmentHourlyRate(department));
+          }, 0);
+          runningCost = activeKioskShifts.reduce((sum: number, s: any) => {
+            const elapsedHours = Math.max(0, (now.getTime() - new Date(s.startTime).getTime()) / (1000 * 60 * 60));
+            return sum + (elapsedHours * (s.hourlyRate || this.getDepartmentHourlyRate(department)));
+          }, 0);
+        } else {
+          activeHeadcount = activeSessions.reduce((sum: number, s: any) => sum + (s.startHeadcount || 0), 0);
+          currentHourlyLaborCost = activeSessions.reduce((sum: number, session: any) => {
+            return sum + ((session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
+          }, 0);
+          runningCost = activeSessions.reduce((sum: number, session: any) => {
+            const elapsedHours = Math.max(0, (now.getTime() - new Date(session.startTime).getTime()) / (1000 * 60 * 60));
+            return sum + (elapsedHours * (session.hourlyRate || this.getDepartmentHourlyRate(department)) * (session.startHeadcount || 0));
+          }, 0);
+        }
       }
 
-      const hasAnySession = deptSessions.length > 0 || (department === 'warehouse' && warehouseEmployeeShifts.length > 0);
-      const hasActiveLabor = department === 'warehouse' ? activeHeadcount > 0 : activeSessions.length > 0;
+      const hasAnySession = deptSessions.length > 0 || kioskDeptShifts.length > 0 || (department === 'warehouse' && warehouseEmployeeShifts.length > 0);
+      const hasActiveLabor = activeHeadcount > 0;
       const status = hasActiveLabor
         ? 'active'
         : hasAnySession
@@ -3961,8 +4354,7 @@ export class DatabaseService implements IDatabaseService {
       { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },
       { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
       { name: 'Sal', pin: '91356', role: 'manager' },
-      { name: 'Jacob', pin: '53782', role: 'manager' },
-      { name: 'Ernie', pin: '67419', role: 'manager' }
+      { name: 'Jacob', pin: '53782', role: 'manager' }
     ];
 
     for (const exec of executives) {
@@ -3972,7 +4364,7 @@ export class DatabaseService implements IDatabaseService {
       `, [exec.name, exec.pin, exec.role]);
     }
     
-    console.log('✓ Force-seeded 14 users (10 executives + 4 managers)');
+    console.log('✓ Force-seeded 13 users (10 executives + 3 managers)');
     return await this.getExecutives();
   }
 
