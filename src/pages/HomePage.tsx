@@ -91,12 +91,18 @@ export const HomePage: React.FC = () => {
       description: 'Site performance metrics and top operators',
       onClick: () => navigate('/executive'),
     }] : []),
-    {
+    ...((userRole === 'executive' || userRole === 'manager') ? [{
       icon: '💼',
-      title: 'Labor Tracker',
-      description: 'Track department headcount and labor costs',
+      title: 'Manager Dashboard',
+      description: 'Track department headcount and live performance',
       onClick: () => navigate('/labor-tracker'),
-    },
+    }] : []),
+    ...((userRole === 'executive' || userRole === 'manager') ? [{
+      icon: '📱',
+      title: 'Labor Kiosk',
+      description: 'Open the employee punch kiosk and admin access',
+      onClick: () => navigate('/labor-kiosk'),
+    }] : []),
   ];
 
   const handleMinimize = () => {
