@@ -108,7 +108,7 @@ const parseBadgeScan = (rawValue: string): ParsedBadgeScan | null => {
 
 export default function LaborKiosk() {
   const navigate = useNavigate();
-  const isDesktopShell = typeof window !== 'undefined' && Boolean(window.electron);
+  const isDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
   const [scanValue, setScanValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [assistantError, setAssistantError] = useState<string | null>(null);
