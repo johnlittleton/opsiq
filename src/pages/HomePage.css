@@ -1,36 +1,43 @@
 .home-page {
   width: 100%;
-  min-height: 100vh;
-  padding: calc(env(safe-area-inset-top, 0px) + 55px) 30px 30px;
+  height: 100%;
+  min-height: 100%;
+  padding: 0 30px calc(env(safe-area-inset-bottom, 0px) + 30px);
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .home-page__controls {
-  position: absolute;
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
-  min-height: 40px;
+  width: calc(100% + 60px);
+  margin: 0 -30px;
+  min-height: calc(env(safe-area-inset-top, 0px) + 40px);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: env(safe-area-inset-top, 0px) 16px 0 16px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 16px 8px;
   background: rgba(17, 24, 39, 0.8);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   z-index: 1000;
-  -webkit-app-region: drag;
 }
 
 .home-page__controls-left,
 .home-page__controls-right {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  -webkit-app-region: no-drag;
+}
+
+.home-page__controls-right {
+  justify-content: flex-end;
 }
 
 .home-page__control-button {
@@ -132,7 +139,7 @@
 
 .home-page__header {
   text-align: center;
-  margin-top: 35px;
+  margin-top: 24px;
   margin-bottom: 20px;
 }
 
