@@ -108,6 +108,7 @@ const parseBadgeScan = (rawValue: string): ParsedBadgeScan | null => {
 
 export default function LaborKiosk() {
   const navigate = useNavigate();
+  const isDesktopShell = typeof window !== 'undefined' && Boolean(window.electron);
   const [scanValue, setScanValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [assistantError, setAssistantError] = useState<string | null>(null);
@@ -558,7 +559,7 @@ export default function LaborKiosk() {
 
   return (
     <div className="labor-kiosk">
-      <TitleBar showLegend={false} />
+      {isDesktopShell && <TitleBar showLegend={false} />}
       <div className="labor-kiosk__container">
         <div className="labor-kiosk__layout">
           <section className="labor-kiosk__controls-pane">
