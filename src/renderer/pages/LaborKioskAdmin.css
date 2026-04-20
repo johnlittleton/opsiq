@@ -144,6 +144,12 @@
   gap: 10px;
 }
 
+.labor-kiosk-admin__list--active-scroll {
+  max-height: clamp(280px, 46vh, 560px);
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
 .labor-kiosk-admin__item {
   border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 12px;

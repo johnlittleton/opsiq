@@ -20,13 +20,43 @@ const LINES = [
 const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00'];
 
 const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
-const BAG_SIZES = ['4X5', '4X8', '5X6', '5X8', '6X3', '6X5', '7X4', '8X5', '9X3', '10X3', '10X4', '12X3', '15X2', '17X2', '17KG', '18X2', '18KG'];
+const BAG_SIZES = ['4X5', '4X8', '5X6', '5X8', '6X3', '6X5', '7X4', '8X5', '9X3', '10X3', '10X4', '12X3', '15X2', '15KG', '17X2', '17KG', '18X2', '18KG'];
 const CUSTOMERS = ['Kings River', 'Limoneira', 'Fresh Taste', 'Produce Depot', 'Slingshot', 'Vanguard'];
 const PRIORITIES = ['High', 'Normal', 'Low'];
 const COUNTRIES = ['USA', 'Mexico', 'Chile', 'Peru', 'South Africa', 'Spain', 'Australia', 'Morocco'];
+const ORDER_TYPES = [
+  { value: 'WO', label: 'Work Order' },
+  { value: 'SO', label: 'Bulk Sale' },
+] as const;
+
+type OrderType = 'WO' | 'SO';
+const ORDER_TYPE_TAG_REGEX = /\[TYPE:(WO|SO)\]/i;
+
+const normalizeOrderType = (value?: string | null): OrderType => {
+  return String(value || '').toUpperCase() === 'SO' ? 'SO' : 'WO';
+};
+
+const splitOrderTypeFromNotes = (notes?: string | null) => {
+  const source = String(notes || '');
+  const match = source.match(ORDER_TYPE_TAG_REGEX);
+  const orderType = normalizeOrderType(match?.[1]);
+  const cleanNotes = source
+    .replace(/\s*\[TYPE:(?:WO|SO)\]\s*/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return { orderType, notes: cleanNotes };
+};
+
+const buildNotesWithOrderType = (notes: string | null | undefined, orderType: OrderType) => {
+  const cleanNotes = String(notes || '').trim();
+  const tag = `[TYPE:${orderType}]`;
+  return cleanNotes ? `${cleanNotes} ${tag}` : tag;
+};
 
 interface WorkOrder {
   id: string;
+  orderType?: OrderType;
   line: number;
   slot: number;
   date: string;
@@ -75,6 +105,7 @@ export default function ProductionScheduler() {
   };
   
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | OrderType>('ALL');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [monthWorkOrders, setMonthWorkOrders] = useState<WorkOrder[]>([]);
@@ -169,6 +200,7 @@ export default function ProductionScheduler() {
         const rawData = await response.json();
         const data = rawData.map((wo: any) => ({
           ...wo,
+          ...splitOrderTypeFromNotes(wo.notes),
           plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
         }));
         setWorkOrders(data);
@@ -207,6 +239,7 @@ export default function ProductionScheduler() {
         const rawData = await response.json();
         const data = rawData.map((wo: any) => ({
           ...wo,
+          ...splitOrderTypeFromNotes(wo.notes),
           plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
         }));
         setMonthWorkOrders(data);
@@ -295,11 +328,15 @@ export default function ProductionScheduler() {
 
   const openModal = (line: number, slot: number, existingWO?: WorkOrder) => {
     if (existingWO) {
-      setEditingWorkOrder({ ...existingWO });
+      setEditingWorkOrder({
+        ...existingWO,
+        orderType: normalizeOrderType(existingWO.orderType),
+      });
     } else {
       setEditingWorkOrder({
         line,
         slot,
+        orderType: 'WO',
         date: selectedDateStr,
         status: 'Scheduled',
         completedCases: 0,
@@ -327,6 +364,9 @@ export default function ProductionScheduler() {
     // Check if this is an existing work order (has an id from the database)
     const isExisting = workOrders.some(wo => wo.id === enteredId);
     const plannedRate = Number(editingWorkOrder.plannedRunRate);
+    const orderType = normalizeOrderType(editingWorkOrder.orderType);
+    const { orderType: _ignoredOrderType, ...restWorkOrder } = editingWorkOrder;
+    const notesWithType = buildNotesWithOrderType(restWorkOrder.notes, orderType);
 
     if (!Number.isFinite(plannedRate) || plannedRate <= 0) {
       alert('Planned Run Rate (bags/min) is required and must be greater than 0.');
@@ -334,11 +374,12 @@ export default function ProductionScheduler() {
     }
     
     const woData = {
-      ...editingWorkOrder,
+      ...restWorkOrder,
       id: enteredId,
       line: editingWorkOrder.line,
       slot: editingWorkOrder.slot,
       date: selectedDateStr,
+      notes: notesWithType,
       status: editingWorkOrder.status || 'Scheduled',
       plannedRunRate: plannedRate,
       planned_run_rate: plannedRate
@@ -443,12 +484,16 @@ export default function ProductionScheduler() {
 
       const updatedWorkOrder = await response.json().catch(() => null);
       if (updatedWorkOrder) {
+          const normalizedUpdate = {
+            ...updatedWorkOrder,
+            ...splitOrderTypeFromNotes(updatedWorkOrder.notes),
+          };
         setWorkOrders(prev => prev.map(existing => (
           existing.id === id
             ? {
                 ...existing,
-                ...updatedWorkOrder,
-                plannedRunRate: updatedWorkOrder.plannedRunRate ?? updatedWorkOrder.planned_run_rate ?? existing.plannedRunRate
+                ...normalizedUpdate,
+                plannedRunRate: normalizedUpdate.plannedRunRate ?? normalizedUpdate.planned_run_rate ?? existing.plannedRunRate
               }
             : existing
         )));
@@ -487,12 +532,16 @@ export default function ProductionScheduler() {
         console.log('Completed cases updated successfully');
         const updatedWorkOrder = await response.json().catch(() => null);
         if (updatedWorkOrder) {
+          const normalizedUpdate = {
+            ...updatedWorkOrder,
+            ...splitOrderTypeFromNotes(updatedWorkOrder.notes),
+          };
           setWorkOrders(prev => prev.map(wo => (
             wo.id === id
               ? {
                   ...wo,
-                  ...updatedWorkOrder,
-                  plannedRunRate: updatedWorkOrder.plannedRunRate ?? updatedWorkOrder.planned_run_rate ?? wo.plannedRunRate
+                  ...normalizedUpdate,
+                  plannedRunRate: normalizedUpdate.plannedRunRate ?? normalizedUpdate.planned_run_rate ?? wo.plannedRunRate
                 }
               : wo
           )));
@@ -623,7 +672,7 @@ export default function ProductionScheduler() {
           className="work-order-card completed collapsed"
           onClick={() => openModal(line, slot, wo)}
         >
-          <div className="wo-number">WO: {wo.id}</div>
+          <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
           <div className="customer">{wo.customer || 'N/A'}</div>
           <div className="completion-badge">✓ Completed</div>
         </div>
@@ -637,7 +686,7 @@ export default function ProductionScheduler() {
           className="work-order-card scheduled"
           onClick={() => openModal(line, slot, wo)}
         >
-          <div className="wo-number">WO: {wo.id}</div>
+          <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
           <div className="wo-actions" onClick={(e) => e.stopPropagation()}>
             <button className="start-btn" onClick={() => startWorkOrder(wo.id)}>
               Start
@@ -653,7 +702,7 @@ export default function ProductionScheduler() {
         className="work-order-card active"
         onClick={() => openModal(line, slot, wo)}
       >
-        <div className="wo-number">WO: {wo.id}</div>
+        <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
         <div className="customer"><b>Customer:</b> {wo.customer || 'N/A'}</div>
         <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
         <div className="product"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
@@ -718,17 +767,21 @@ export default function ProductionScheduler() {
   };
 
   // Group work orders by status
+  const matchesOrderTypeFilter = (wo: WorkOrder) => {
+    return orderTypeFilter === 'ALL' || normalizeOrderType(wo.orderType) === orderTypeFilter;
+  };
+
   const activeWorkOrders = useMemo(
-    () => workOrders.filter(wo => wo.status === 'Active'),
-    [workOrders]
+    () => workOrders.filter(wo => wo.status === 'Active' && matchesOrderTypeFilter(wo)),
+    [workOrders, orderTypeFilter]
   );
   const scheduledWorkOrders = useMemo(
-    () => workOrders.filter(wo => wo.status === 'Scheduled'),
-    [workOrders]
+    () => workOrders.filter(wo => wo.status === 'Scheduled' && matchesOrderTypeFilter(wo)),
+    [workOrders, orderTypeFilter]
   );
   const completedWorkOrders = useMemo(
-    () => workOrders.filter(wo => wo.status === 'Completed'),
-    [workOrders]
+    () => workOrders.filter(wo => wo.status === 'Completed' && matchesOrderTypeFilter(wo)),
+    [workOrders, orderTypeFilter]
   );
 
   const getLineName = (lineId: number) => LINES.find(l => l.id === lineId)?.name || `Line ${lineId}`;
@@ -752,7 +805,10 @@ export default function ProductionScheduler() {
 
   const openWorkOrderModal = (wo: WorkOrder) => {
     setSelectedCalendarWO(wo);
-    setEditingWorkOrder({ ...wo });
+    setEditingWorkOrder({
+      ...wo,
+      orderType: normalizeOrderType(wo.orderType),
+    });
     setShowModal(true);
   };
 
@@ -762,6 +818,7 @@ export default function ProductionScheduler() {
     const duplicated = {
       ...editingWorkOrder,
       id: '',
+      orderType: normalizeOrderType(editingWorkOrder.orderType),
       status: 'Scheduled',
       completedCases: 0,
       startTimestamp: undefined,
@@ -851,6 +908,7 @@ export default function ProductionScheduler() {
         
         <div class="wo-section">
           <div class="wo-section-title">Product Information</div>
+          <div class="wo-row"><div class="wo-label">Order Type:</div><div class="wo-value">${normalizeOrderType(wo.orderType) === 'SO' ? 'Bulk Sale' : 'Work Order'}</div></div>
           <div class="wo-row"><div class="wo-label">Product:</div><div class="wo-value">${wo.product || 'N/A'}</div></div>
           <div class="wo-row"><div class="wo-label">Bag Size:</div><div class="wo-value">${wo.bagSize || 'N/A'}</div></div>
           <div class="wo-row"><div class="wo-label">Country of Origin:</div><div class="wo-value">${wo.countryOfOrigin || 'N/A'}</div></div>
@@ -1026,6 +1084,16 @@ export default function ProductionScheduler() {
               setSelectedDate(new Date(year, month - 1, day));
             }}
           />
+          <select
+            className="scheduler-order-type-filter"
+            value={orderTypeFilter}
+            onChange={(e) => setOrderTypeFilter(e.target.value as 'ALL' | OrderType)}
+            aria-label="Filter by order type"
+          >
+            <option value="ALL">All Types</option>
+            <option value="WO">WO Only</option>
+            <option value="SO">SO Only</option>
+          </select>
           <button className="print-page-btn" onClick={() => {
             if (window.electron?.printPage) {
               window.electron.printPage();
@@ -1111,6 +1179,16 @@ export default function ProductionScheduler() {
                 setSelectedDate(new Date(year, month - 1, day));
               }}
             />
+            <select
+              className="scheduler-order-type-filter"
+              value={orderTypeFilter}
+              onChange={(e) => setOrderTypeFilter(e.target.value as 'ALL' | OrderType)}
+              aria-label="Filter by order type"
+            >
+              <option value="ALL">All Types</option>
+              <option value="WO">WO Only</option>
+              <option value="SO">SO Only</option>
+            </select>
             <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
               📊 Dashboard
             </button>
@@ -1141,6 +1219,7 @@ export default function ProductionScheduler() {
                 <thead>
                   <tr>
                     <th>SO#</th>
+                    <th>Type</th>
                     <th>Line</th>
                     <th>Product</th>
                     <th className="col-bag">Bag</th>
@@ -1165,6 +1244,11 @@ export default function ProductionScheduler() {
                   {activeWorkOrders.map(wo => (
                     <tr key={wo.id} className="wo-row active-row" onClick={() => openModal(wo.line, wo.slot, wo)}>
                       <td><strong>#{wo.id}</strong></td>
+                      <td>
+                        <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
+                          {normalizeOrderType(wo.orderType)}
+                        </span>
+                      </td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
                       <td className="col-bag">{wo.bagSize || 'N/A'}</td>
@@ -1228,6 +1312,7 @@ export default function ProductionScheduler() {
                 <thead>
                   <tr>
                     <th>SO#</th>
+                    <th>Type</th>
                     <th>Line</th>
                     <th>Product</th>
                     <th className="col-bag">Bag</th>
@@ -1247,6 +1332,11 @@ export default function ProductionScheduler() {
                   {scheduledWorkOrders.map(wo => (
                     <tr key={wo.id} className="wo-row scheduled-row" onClick={() => openModal(wo.line, wo.slot, wo)}>
                       <td><strong>#{wo.id}</strong></td>
+                      <td>
+                        <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
+                          {normalizeOrderType(wo.orderType)}
+                        </span>
+                      </td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
                       <td className="col-bag">{wo.bagSize || 'N/A'}</td>
@@ -1289,6 +1379,7 @@ export default function ProductionScheduler() {
                 <thead>
                   <tr>
                     <th>SO#</th>
+                    <th>Type</th>
                     <th>Line</th>
                     <th>Product</th>
                     <th>Customer</th>
@@ -1302,6 +1393,11 @@ export default function ProductionScheduler() {
                   {completedWorkOrders.map(wo => (
                     <tr key={wo.id} className="wo-row completed-row" onClick={() => openModal(wo.line, wo.slot, wo)}>
                       <td><strong>#{wo.id}</strong></td>
+                      <td>
+                        <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
+                          {normalizeOrderType(wo.orderType)}
+                        </span>
+                      </td>
                       <td>{getLineName(wo.line)}</td>
                       <td>{wo.product || 'N/A'}</td>
                       <td>{wo.customer || 'N/A'}</td>
@@ -1337,6 +1433,17 @@ export default function ProductionScheduler() {
                     value={editingWorkOrder.id || ''}
                     onChange={(e) => setEditingWorkOrder({ ...editingWorkOrder, id: e.target.value })}
                   />
+                </div>
+                <div className="form-group">
+                  <label>Order Type</label>
+                  <select
+                    value={normalizeOrderType(editingWorkOrder.orderType)}
+                    onChange={(e) => setEditingWorkOrder({ ...editingWorkOrder, orderType: normalizeOrderType(e.target.value) })}
+                  >
+                    {ORDER_TYPES.map((typeOption) => (
+                      <option key={typeOption.value} value={typeOption.value}>{typeOption.label}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="form-row">

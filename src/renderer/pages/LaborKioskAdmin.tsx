@@ -341,7 +341,7 @@ export default function LaborKioskAdmin() {
               ) : null}
 
               {!loading && activeEmployees.length > 0 ? (
-                <div className="labor-kiosk-admin__list">
+                <div className="labor-kiosk-admin__list labor-kiosk-admin__list--active-scroll">
                   {activeEmployees.map((employee) => (
                     <article className="labor-kiosk-admin__item" key={employee.id}>
                       {editingId === employee.id ? (
