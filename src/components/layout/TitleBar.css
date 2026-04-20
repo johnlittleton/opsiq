@@ -10,6 +10,17 @@
   padding: 2px 0;
 }
 
+.title-bar--mobile {
+  position: sticky;
+  top: 0;
+  z-index: 1100;
+  min-height: calc(env(safe-area-inset-top, 0px) + 42px);
+  padding: calc(env(safe-area-inset-top, 0px) + 6px) 10px 6px;
+  background: rgba(19, 26, 39, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 .title-bar__drag-region {
   display: flex;
   align-items: center;
@@ -49,6 +60,11 @@
   overflow-x: auto;
   -webkit-app-region: no-drag;
   margin-left: 20px;
+}
+
+.title-bar__content--mobile {
+  margin-left: 10px;
+  gap: 8px;
 }
 
 .title-bar__menu {
@@ -120,6 +136,12 @@
   transition: all 0.15s;
   border-radius: 4px;
   -webkit-app-region: no-drag;
+}
+
+.title-bar__home-btn--mobile {
+  margin-right: 0;
+  font-size: 13px;
+  padding: 8px 14px;
 }
 
 .title-bar__home-btn:hover {

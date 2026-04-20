@@ -11,6 +11,7 @@ interface TitleBarProps {
 export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children }) => {
   const navigate = useNavigate();
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const isDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
 
   const handleMinimize = () => {
     if (window.electron) {
@@ -43,6 +44,17 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children
     }
     setShowViewMenu(false);
   };
+
+  if (!isDesktopShell) {
+    return (
+      <div className="title-bar title-bar--mobile">
+        <button className="title-bar__home-btn title-bar__home-btn--mobile" onClick={() => navigate('/')}>
+          Home
+        </button>
+        {children && <div className="title-bar__content title-bar__content--mobile">{children}</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="title-bar">

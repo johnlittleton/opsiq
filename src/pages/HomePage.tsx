@@ -8,6 +8,7 @@ export const HomePage: React.FC = () => {
   const { executiveName, userRole, logout } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const isDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
   
   const dockOperationsCards = [
     {
@@ -135,53 +136,64 @@ export const HomePage: React.FC = () => {
     <div className="home-page">
       {/* Window Controls */}
       <div className="home-page__controls">
-        <div className="home-page__controls-left">
-          <button 
-            className="home-page__control-button"
-            onClick={() => setShowViewMenu(!showViewMenu)}
-          >
-            View
-          </button>
-          {showViewMenu && (
-            <div className="home-page__dropdown">
-              <button className="home-page__dropdown-item" onClick={handleFullscreen}>
-                Toggle Fullscreen
-              </button>
-              <button className="home-page__dropdown-item" onClick={handleAlwaysOnTop}>
-                Always on Top
-              </button>
-              <div className="home-page__dropdown-divider" />
+        {isDesktopShell ? (
+          <>
+            <div className="home-page__controls-left">
               <button 
-                className="home-page__dropdown-item"
-                onClick={() => { setViewMode('compact'); setShowViewMenu(false); }}
+                className="home-page__control-button"
+                onClick={() => setShowViewMenu(!showViewMenu)}
               >
-                ✓ Compact View
+                View
               </button>
-              <button 
-                className="home-page__dropdown-item"
-                onClick={() => { setViewMode('grid'); setShowViewMenu(false); }}
-              >
-                {viewMode === 'grid' ? '✓ ' : ''}Grid View
+              {showViewMenu && (
+                <div className="home-page__dropdown">
+                  <button className="home-page__dropdown-item" onClick={handleFullscreen}>
+                    Toggle Fullscreen
+                  </button>
+                  <button className="home-page__dropdown-item" onClick={handleAlwaysOnTop}>
+                    Always on Top
+                  </button>
+                  <div className="home-page__dropdown-divider" />
+                  <button 
+                    className="home-page__dropdown-item"
+                    onClick={() => { setViewMode('compact'); setShowViewMenu(false); }}
+                  >
+                    ✓ Compact View
+                  </button>
+                  <button 
+                    className="home-page__dropdown-item"
+                    onClick={() => { setViewMode('grid'); setShowViewMenu(false); }}
+                  >
+                    {viewMode === 'grid' ? '✓ ' : ''}Grid View
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="home-page__controls-right">
+              <span className="home-page__user-name">{executiveName}</span>
+              <button className="home-page__logout-button" onClick={logout}>
+                Logout
+              </button>
+              <button className="home-page__window-button" onClick={handleMinimize}>
+                −
+              </button>
+              <button className="home-page__window-button" onClick={handleMaximize}>
+                □
               </button>
             </div>
-          )}
-        </div>
-        <div className="home-page__controls-right">
-          <span className="home-page__user-name">{executiveName}</span>
-          <button className="home-page__logout-button" onClick={logout}>
-            🚪 Logout
-          </button>
-          <button className="home-page__window-button" onClick={handleMinimize}>
-            −
-          </button>
-          <button className="home-page__window-button" onClick={handleMaximize}>
-            □
-          </button>
-        </div>
+          </>
+        ) : (
+          <div className="home-page__controls-right home-page__controls-right--mobile">
+            <span className="home-page__user-name">{executiveName}</span>
+            <button className="home-page__logout-button" onClick={logout}>
+              Logout
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="home-page__header">
-        <h1 className="home-page__title">OPSIQ Desktop</h1>
+        <h1 className="home-page__title">{isDesktopShell ? 'OPSIQ Desktop' : 'OPSIQ Mobile'}</h1>
         <p className="home-page__subtitle">Operations Intelligence Platform</p>
       </div>
 

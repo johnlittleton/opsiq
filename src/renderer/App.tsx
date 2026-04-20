@@ -104,6 +104,7 @@ const AppRoutes: React.FC = () => {
 const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
   const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatus | null>(null);
+  const isNativeShell = typeof window !== 'undefined' && window.location.protocol === 'capacitor:';
 
   useEffect(() => {
     initializeSync();
@@ -127,6 +128,20 @@ const AppContent: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    if (isNativeShell) {
+      document.body.classList.add('platform-capacitor');
+      return () => {
+        document.body.classList.remove('platform-capacitor');
+      };
+    }
+
+    document.body.classList.remove('platform-capacitor');
+    return undefined;
+  }, [isNativeShell]);
+
   const shouldShowBanner = updaterStatus && updaterStatus.state !== 'not-available';
 
   const bannerMessage = (() => {
@@ -140,7 +155,7 @@ const AppContent: React.FC = () => {
   })();
 
   return (
-    <>
+    <div className={isNativeShell ? 'app-shell app-shell--native' : 'app-shell'}>
       {shouldShowBanner && (
         <div className={`update-banner update-banner-${updaterStatus.state}`}>
           <span>{bannerMessage}</span>
@@ -166,7 +181,7 @@ const AppContent: React.FC = () => {
       >
         <AppRoutes />
       </Router>
-    </>
+    </div>
   );
 };
 

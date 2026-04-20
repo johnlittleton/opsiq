@@ -15,6 +15,26 @@ body,
   overflow: hidden;
 }
 
+.app-shell {
+  height: 100%;
+  width: 100%;
+}
+
+.app-shell--native {
+  height: 100%;
+  width: 100%;
+}
+
+body.platform-capacitor {
+  overscroll-behavior-y: contain;
+}
+
+body.platform-capacitor #root,
+body.platform-capacitor .app-shell,
+body.platform-capacitor .app-shell--native {
+  height: 100dvh;
+}
+
 body {
   font-family: var(--font);
   font-size: 13px;
@@ -155,6 +175,13 @@ a:hover {
   border: 1px solid var(--border-bright);
   box-shadow: var(--shadow-heavy);
   color: var(--text-bright);
+}
+
+body.platform-capacitor .update-banner {
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  min-width: 0;
+  width: calc(100vw - 24px);
+  max-width: 560px;
 }
 
 .update-banner-checking,
