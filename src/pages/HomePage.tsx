@@ -101,15 +101,10 @@ export const HomePage: React.FC = () => {
     },
   ];
 
-  const mobileDockCards = dockOperationsCards.filter((card) => card.title === 'Dock Dashboard');
-  const mobileAppointmentCards = appointmentCards.filter((card) => card.title === 'Appointment Scheduler');
-  const mobileProductionCards = productionCards.filter((card) => card.title === 'Production Dashboard');
-  const mobileManagementCards = managementCards.filter((card) => card.title === 'Executive Dashboard');
-
-  const displayDockCards = isMobileRuntime ? mobileDockCards : dockOperationsCards;
-  const displayAppointmentCards = isMobileRuntime ? mobileAppointmentCards : appointmentCards;
-  const displayProductionCards = isMobileRuntime ? mobileProductionCards : productionCards;
-  const displayManagementCards = isMobileRuntime ? mobileManagementCards : managementCards;
+  const displayDockCards = dockOperationsCards;
+  const displayAppointmentCards = appointmentCards;
+  const displayProductionCards = productionCards;
+  const displayManagementCards = managementCards;
 
   const handleMinimize = () => {
     if (window.electron) {

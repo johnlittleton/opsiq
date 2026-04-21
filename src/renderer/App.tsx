@@ -21,12 +21,17 @@ import ProductionCosting from './pages/ProductionCosting';
 import Settings from './pages/Settings';
 import LaborTracker from './pages/LaborTracker';
 import LaborHistory from './pages/LaborHistory';
+import LaborKiosk from './pages/LaborKiosk';
+import LaborKioskAdmin from './pages/LaborKioskAdmin';
+import LaborKioskHistory from './pages/LaborKioskHistory';
 import ProductionLaborPlanner from './pages/ProductionLaborPlanner';
 import ProductionLaborPlannerHistory from './pages/ProductionLaborPlannerHistory';
 import ProductionScheduler from './pages/ProductionScheduler';
 import ProductionDashboard from './pages/ProductionDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
+import PalletTracker from './pages/PalletTracker';
+import StorageBilling from './pages/StorageBilling';
 
 type UpdaterStatus = {
   state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -58,10 +63,34 @@ const MOBILE_ALLOWED_ROUTES = [
   '/',
   '/home',
   '/dockboard',
+  '/dockboard-old',
+  '/checkin',
+  '/active-drivers',
   '/scheduler',
+  '/history',
+  '/checkin-history',
+  '/appointment-history',
+  '/production',
+  '/production-kpi-history',
+  '/shipping',
+  '/executive-analytics',
+  '/production-costing',
+  '/labor-tracker',
+  '/labor-history',
+  '/labor-kiosk',
+  '/labor-kiosk-admin',
+  '/labor-kiosk-history',
+  '/production-labor-planner',
+  '/production-labor-planner-history',
+  '/production-scheduler',
   '/production-dashboard',
   '/dashboard',
   '/executive',
+  '/pallet-tracker',
+  '/work-order-history',
+  '/downtime-history',
+  '/settings',
+  '/storage-billing',
 ];
 
 const AppRoutes: React.FC = () => {
@@ -105,14 +134,19 @@ const AppRoutes: React.FC = () => {
       <Route path="/production-costing" element={<ProductionCosting />} />
       <Route path="/labor-tracker" element={<LaborTracker />} />
       <Route path="/labor-history" element={<LaborHistory />} />
+      <Route path="/labor-kiosk" element={<LaborKiosk />} />
+      <Route path="/labor-kiosk-admin" element={<LaborKioskAdmin />} />
+      <Route path="/labor-kiosk-history" element={<LaborKioskHistory />} />
       <Route path="/production-labor-planner" element={<ProductionLaborPlanner />} />
       <Route path="/production-labor-planner-history" element={<ProductionLaborPlannerHistory />} />
       <Route path="/production-scheduler" element={<ProductionScheduler />} />
       <Route path="/production-dashboard" element={<ProductionDashboard />} />
       <Route path="/dashboard" element={<ProductionDashboard />} />
+      <Route path="/pallet-tracker" element={<PalletTracker />} />
       <Route path="/work-order-history" element={<WorkOrderHistory />} />
       <Route path="/downtime-history" element={<DowntimeHistory />} />
       <Route path="/settings" element={<Settings />} />
+      <Route path="/storage-billing" element={<StorageBilling />} />
     </Routes>
   );
 };
@@ -144,9 +178,26 @@ const MobileHamburgerMenu: React.FC = () => {
     if (isMobileRuntime) {
       return [
         { label: 'Dock Dashboard', path: '/dockboard' },
+        { label: 'Driver Check-In', path: '/checkin' },
+        { label: 'Active Drivers', path: '/active-drivers' },
+        { label: 'Dock History', path: '/history' },
+        { label: 'Check-In History', path: '/checkin-history' },
         { label: 'Appointment Scheduler', path: '/scheduler' },
+        { label: 'Appointment History', path: '/appointment-history' },
+        { label: 'Production Scheduler', path: '/production-scheduler' },
         { label: 'Production Dashboard', path: '/production-dashboard' },
-        { label: 'Executive Dashboard', path: '/executive' }
+        { label: 'Work Order History', path: '/work-order-history' },
+        { label: 'Pallet Tracker', path: '/pallet-tracker' },
+        { label: 'Executive Dashboard', path: '/executive' },
+        { label: 'Executive Analytics', path: '/executive-analytics' },
+        { label: 'Production Costing', path: '/production-costing' },
+        { label: 'Labor Tracker', path: '/labor-tracker' },
+        { label: 'Labor History', path: '/labor-history' },
+        { label: 'Labor Kiosk', path: '/labor-kiosk' },
+        { label: 'Labor Kiosk Admin', path: '/labor-kiosk-admin' },
+        { label: 'Labor Kiosk History', path: '/labor-kiosk-history' },
+        { label: 'Storage Billing', path: '/storage-billing' },
+        { label: 'Settings', path: '/settings' }
       ];
     }
 
