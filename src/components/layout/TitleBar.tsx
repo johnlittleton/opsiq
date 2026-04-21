@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Legend } from '../common/Legend';
+import { isNativeIOSRuntime } from '../../renderer/utils/runtime';
 import './TitleBar.css';
 
 interface TitleBarProps {
@@ -11,7 +12,12 @@ interface TitleBarProps {
 export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children }) => {
   const navigate = useNavigate();
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const isNativeIOS = isNativeIOSRuntime();
   const isDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
+
+  if (isNativeIOS) {
+    return null;
+  }
 
   const handleMinimize = () => {
     if (window.electron) {

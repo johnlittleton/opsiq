@@ -231,3 +231,102 @@ body.platform-capacitor .update-banner {
   color: var(--text-bright);
   border-color: var(--border-bright);
 }
+
+.mobile-hamburger-trigger,
+.mobile-hamburger-panel,
+.mobile-hamburger-backdrop {
+  display: none;
+}
+
+body.ios-mobile,
+body.ios-mobile #root,
+body.ios-mobile .app-shell,
+body.ios-mobile .app-shell--native {
+  min-height: 100dvh;
+}
+
+body.ios-mobile .title-bar,
+body.ios-mobile .home-page__window-button {
+  display: none !important;
+}
+
+body.ios-mobile .home-page {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 58px);
+}
+
+body.ios-mobile .home-page__quick-access--compact,
+body.ios-mobile .home-page__quick-access--grid,
+body.ios-mobile .home-page__status {
+  grid-template-columns: 1fr;
+}
+
+body.ios-mobile .mobile-hamburger-trigger {
+  position: fixed;
+  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  left: calc(env(safe-area-inset-left, 0px) + 10px);
+  z-index: 10150;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border-bright);
+  background: var(--glass2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  box-shadow: var(--shadow-heavy);
+}
+
+body.ios-mobile .mobile-hamburger-trigger span {
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--text-bright);
+}
+
+body.ios-mobile .mobile-hamburger-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  background: rgba(5, 8, 16, 0.45);
+  border: none;
+  display: block;
+}
+
+body.ios-mobile .mobile-hamburger-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 10090;
+  width: min(82vw, 320px);
+  height: 100vh;
+  padding: max(60px, calc(env(safe-area-inset-top, 0px) + 20px)) 12px 16px;
+  background: color-mix(in oklab, var(--bg0) 90%, black 10%);
+  border-right: 1px solid var(--border-bright);
+  transform: translateX(-105%);
+  transition: transform 180ms ease;
+  display: block;
+}
+
+body.ios-mobile .mobile-hamburger-panel.open {
+  transform: translateX(0);
+}
+
+body.ios-mobile .mobile-hamburger-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  color: var(--text-bright);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+body.ios-mobile .mobile-hamburger-item.danger {
+  color: #fecaca;
+  border-color: color-mix(in oklab, var(--err) 45%, transparent);
+  background: color-mix(in oklab, var(--err) 12%, transparent);
+}

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { HashRouter as Router, Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import PinEntry from './components/PinEntry';
@@ -32,6 +32,7 @@ import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
 import StorageBilling from './pages/StorageBilling';
+import { isNativeIOSRuntime } from './utils/runtime';
 
 type UpdaterStatus = {
   state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
@@ -51,10 +52,24 @@ const PUBLIC_ROUTES = [
   '/labor-kiosk-admin'
 ];
 
+const MOBILE_ALLOWED_ROUTES = [
+  '/',
+  '/home',
+  '/dockboard',
+  '/scheduler',
+  '/production-dashboard',
+  '/dashboard',
+  '/executive',
+  '/labor-kiosk',
+  '/labor-kiosk-admin',
+  '/labor-kiosk-history'
+];
+
 const AppRoutes: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, login } = useAuth();
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+  const isNativeShell = isNativeIOSRuntime();
 
   const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
     login(name, role, sessionToken);
@@ -63,6 +78,10 @@ const AppRoutes: React.FC = () => {
   // Show PIN entry only for protected routes when not authenticated
   if (!isAuthenticated && !isPublicRoute) {
     return <PinEntry onSuccess={handlePinSuccess} />;
+  }
+
+  if (isAuthenticated && isNativeShell && !MOBILE_ALLOWED_ROUTES.includes(location.pathname)) {
+    return <Navigate to="/home" replace />;
   }
 
   return (
@@ -101,10 +120,74 @@ const AppRoutes: React.FC = () => {
     </Routes>
   );
 };
+
+const MobileHamburgerMenu: React.FC = () => {
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isOpen, setIsOpen] = useState(false);
+  const isNativeShell = isNativeIOSRuntime();
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location.pathname]);
+
+  if (!isAuthenticated || !isNativeShell) {
+    return null;
+  }
+
+  const navLinks = [
+    { label: 'Home', path: '/home' },
+    { label: 'Dock Dashboard', path: '/dockboard' },
+    { label: 'Scheduler', path: '/scheduler' },
+    { label: 'Production Dashboard', path: '/production-dashboard' },
+    { label: 'Executive Dashboard', path: '/executive' },
+    { label: 'Labor Kiosk', path: '/labor-kiosk' },
+  ];
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
+  return (
+    <>
+      <button
+        className="mobile-hamburger-trigger"
+        onClick={() => setIsOpen((current) => !current)}
+        aria-label="Open menu"
+        aria-expanded={isOpen}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      {isOpen && <button className="mobile-hamburger-backdrop" onClick={() => setIsOpen(false)} aria-label="Close menu" />}
+
+      <aside className={`mobile-hamburger-panel ${isOpen ? 'open' : ''}`}>
+        {navLinks.map((link) => (
+          <button
+            key={link.path}
+            className="mobile-hamburger-item"
+            onClick={() => {
+              navigate(link.path);
+              setIsOpen(false);
+            }}
+          >
+            {link.label}
+          </button>
+        ))}
+        <button className="mobile-hamburger-item danger" onClick={handleLogout}>Logout</button>
+      </aside>
+    </>
+  );
+};
+
 const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
   const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatus | null>(null);
-  const isNativeShell = typeof window !== 'undefined' && window.location.protocol === 'capacitor:';
+  const isNativeShell = isNativeIOSRuntime();
 
   useEffect(() => {
     initializeSync();
@@ -133,12 +216,15 @@ const AppContent: React.FC = () => {
 
     if (isNativeShell) {
       document.body.classList.add('platform-capacitor');
+      document.body.classList.add('ios-mobile');
       return () => {
         document.body.classList.remove('platform-capacitor');
+        document.body.classList.remove('ios-mobile');
       };
     }
 
     document.body.classList.remove('platform-capacitor');
+    document.body.classList.remove('ios-mobile');
     return undefined;
   }, [isNativeShell]);
 
@@ -179,6 +265,7 @@ const AppContent: React.FC = () => {
           v7_relativeSplatPath: true,
         }}
       >
+        <MobileHamburgerMenu />
         <AppRoutes />
       </Router>
     </div>

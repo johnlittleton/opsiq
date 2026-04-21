@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../renderer/context/AuthContext';
+import { isNativeIOSRuntime } from '../renderer/utils/runtime';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
@@ -8,7 +9,11 @@ export const HomePage: React.FC = () => {
   const { executiveName, userRole, logout } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
-  const isDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
+  const hasDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
+  const isMobileRuntime =
+    isNativeIOSRuntime() ||
+    (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
+  const isDesktopShell = hasDesktopShell && !isMobileRuntime;
   
   const dockOperationsCards = [
     {
@@ -106,6 +111,19 @@ export const HomePage: React.FC = () => {
     }] : []),
   ];
 
+  const displayDockCards = isMobileRuntime
+    ? dockOperationsCards.filter((card) => card.title === 'Dock Dashboard')
+    : dockOperationsCards;
+  const displayAppointmentCards = isMobileRuntime
+    ? appointmentCards.filter((card) => card.title === 'Appointment Scheduler')
+    : appointmentCards;
+  const displayProductionCards = isMobileRuntime
+    ? productionCards.filter((card) => card.title === 'Production Dashboard')
+    : productionCards;
+  const displayManagementCards = isMobileRuntime
+    ? managementCards.filter((card) => card.title === 'Executive Dashboard' || card.title === 'Labor Kiosk')
+    : managementCards;
+
   const handleMinimize = () => {
     if (window.electron) {
       window.electron.minimize();
@@ -200,7 +218,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Dock Operations</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {dockOperationsCards.map((card, index) => (
+          {displayDockCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -219,7 +237,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Appointments</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {appointmentCards.map((card, index) => (
+          {displayAppointmentCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -238,7 +256,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Production</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {productionCards.map((card, index) => (
+          {displayProductionCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -257,7 +275,7 @@ export const HomePage: React.FC = () => {
       <div className="home-page__section">
         <h2 className="home-page__section-title">Management</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {managementCards.map((card, index) => (
+          {displayManagementCards.map((card, index) => (
             <div 
               key={index} 
               className="home-page__card"
@@ -273,32 +291,34 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">System Status</h2>
-        <div className="home-page__status">
-          <div className="home-page__status-card">
-            <div className="home-page__status-indicator" />
-            <div className="home-page__status-content">
-              <div className="home-page__status-label">MAUI Blazor Runtime</div>
-              <div className="home-page__status-value">Active</div>
+      {!isMobileRuntime && (
+        <div className="home-page__section">
+          <h2 className="home-page__section-title">System Status</h2>
+          <div className="home-page__status">
+            <div className="home-page__status-card">
+              <div className="home-page__status-indicator" />
+              <div className="home-page__status-content">
+                <div className="home-page__status-label">MAUI Blazor Runtime</div>
+                <div className="home-page__status-value">Active</div>
+              </div>
             </div>
-          </div>
-          <div className="home-page__status-card">
-            <div className="home-page__status-indicator" />
-            <div className="home-page__status-content">
-              <div className="home-page__status-label">Navigation System</div>
-              <div className="home-page__status-value">Interactive</div>
+            <div className="home-page__status-card">
+              <div className="home-page__status-indicator" />
+              <div className="home-page__status-content">
+                <div className="home-page__status-label">Navigation System</div>
+                <div className="home-page__status-value">Interactive</div>
+              </div>
             </div>
-          </div>
-          <div className="home-page__status-card">
-            <div className="home-page__status-indicator" />
-            <div className="home-page__status-content">
-              <div className="home-page__status-label">Services</div>
-              <div className="home-page__status-value">Ready</div>
+            <div className="home-page__status-card">
+              <div className="home-page__status-indicator" />
+              <div className="home-page__status-content">
+                <div className="home-page__status-label">Services</div>
+                <div className="home-page__status-value">Ready</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
