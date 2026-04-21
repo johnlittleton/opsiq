@@ -6,8 +6,6 @@ import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
 
-const getTodayDateString = () => new Date().toISOString().slice(0, 10);
-
 const LINES = [
   { id: 1, name: 'Giro Line 1' },
   { id: 2, name: 'Giro Line 2' },
@@ -22,13 +20,14 @@ export default function ProductionDashboard() {
   const [searchParams] = useSearchParams();
   const lineParam = searchParams.get('line');
   const specificLine = lineParam ? parseInt(lineParam) : null;
-  interface CurrentShift {
-    shiftNumber: number;
-    shiftName: string;
-    startTime: string;
-    elapsedMinutes: number;
-    runningLaborCost: number;
-  }
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   
   console.log('🔧 ProductionDashboard - Line filter from URL:', lineParam, '→ specificLine:', specificLine);
   
@@ -46,11 +45,6 @@ export default function ProductionDashboard() {
   const [hasDriverAlerts, setHasDriverAlerts] = useState(false);
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
-  const [plannedShiftEndTime, setPlannedShiftEndTime] = useState<string | null>(null);
-  const [endingShift, setEndingShift] = useState(false);
-  const [showShiftReminder, setShowShiftReminder] = useState(false);
-  const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -63,18 +57,6 @@ export default function ProductionDashboard() {
     }, 1000); // Refresh every second to show live updates
     return () => clearInterval(interval);
   }, [selectedDate]); // Re-run if date changes
-
-  useEffect(() => {
-    fetchCurrentShift();
-    fetchPlannerShiftWindow();
-
-    const interval = setInterval(() => {
-      fetchCurrentShift();
-      fetchPlannerShiftWindow();
-    }, 60000);
-
-    return () => clearInterval(interval);
-  }, [selectedDate]);
 
   const fetchWorkOrders = async () => {
     try {
@@ -106,103 +88,11 @@ export default function ProductionDashboard() {
     }
   };
 
-  const fetchCurrentShift = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/labor/shift/current`);
-      if (!response.ok) {
-        setCurrentShift(null);
-        return;
-      }
-      const data = await response.json();
-      setCurrentShift(data);
-    } catch (error) {
-      console.error('Failed to fetch current shift:', error);
-      setCurrentShift(null);
-    }
-  };
-
-  const fetchPlannerShiftWindow = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/production-labor-planner?startDate=${selectedDate}&endDate=${selectedDate}`);
-      if (!response.ok) return;
-
-      const data = await response.json();
-      const endTime = data?.summary?.shiftEndTime || data?.plannerConfig?.shiftEndTime || null;
-      setPlannedShiftEndTime(endTime);
-    } catch (error) {
-      console.error('Failed to fetch labor planner shift window:', error);
-    }
-  };
-
-  const parseShiftTime = (baseDate: Date, timeLabel: string): Date | null => {
-    const match = String(timeLabel || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    if (!match) return null;
-
-    const hours12 = parseInt(match[1], 10);
-    const minutes = parseInt(match[2], 10);
-    const meridiem = match[3].toUpperCase();
-    let hours24 = hours12 % 12;
-    if (meridiem === 'PM') hours24 += 12;
-
-    const target = new Date(baseDate);
-    target.setHours(hours24, minutes, 0, 0);
-    return target;
-  };
-
-  const getShiftMinutesRemaining = (): number | null => {
-    if (!currentShift || !plannedShiftEndTime) return null;
-
-    const start = new Date(currentShift.startTime);
-    const plannedEnd = parseShiftTime(start, plannedShiftEndTime);
-    if (!plannedEnd) return null;
-
-    if (plannedEnd.getTime() < start.getTime()) {
-      plannedEnd.setDate(plannedEnd.getDate() + 1);
-    }
-
-    return Math.floor((plannedEnd.getTime() - Date.now()) / 60000);
-  };
-
-  const handleEndShift = async () => {
-    if (!currentShift) return;
-
-    const confirmEnd = window.confirm(
-      `End ${currentShift.shiftName} shift?\n\n` +
-      `Elapsed: ${Math.floor(currentShift.elapsedMinutes / 60)}h ${currentShift.elapsedMinutes % 60}m\n` +
-      `Running Cost: $${currentShift.runningLaborCost.toFixed(2)}`
-    );
-
-    if (!confirmEnd) return;
-
-    setEndingShift(true);
-    try {
-      const response = await fetch(`${API_BASE}/api/labor/shift/${currentShift.shiftNumber}/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endedBy: 'Scheduler Dashboard' }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || 'Failed to end shift');
-      }
-
-      await fetchCurrentShift();
-      alert(`${currentShift.shiftName} shift ended successfully.`);
-    } catch (error: any) {
-      console.error('Failed to end shift from production dashboard:', error);
-      alert(error.message || 'Failed to end shift');
-    } finally {
-      setEndingShift(false);
-    }
-  };
-
   const checkDriverAlerts = async () => {
     try {
-      const today = getTodayDateString();
       const [checkinsResponse, workOrdersResponse] = await Promise.all([
         fetch(`${API_BASE}/api/checkins`),
-        fetch(`${API_BASE}/api/production/work-orders?date=${today}`)
+        fetch(`${API_BASE}/api/production/work-orders`)
       ]);
 
       if (checkinsResponse.ok && workOrdersResponse.ok) {
@@ -214,12 +104,10 @@ export default function ProductionDashboard() {
         const hasAlerts = checkins.some((checkin: any) => {
           const isOutbound = checkin.inboundOutbound === 'Outbound';
           const isOpen = !checkin.closedAt;
-          const isWaiting = ['Checked In', 'Waiting', 'Parked', 'Open'].includes(checkin.status);
-          const matchingWO = activeWorkOrders.find((wo: any) => wo.id === checkin.pickupNumber);
-          if (!matchingWO) return false;
-          // In single-line mode, only alert for the specific line being viewed
-          if (specificLine && matchingWO.line !== specificLine) return false;
-          return isOutbound && isOpen && isWaiting;
+          const isWaiting = ['Waiting', 'Parked', 'Open'].includes(checkin.status);
+          const hasMatch = activeWorkOrders.some((wo: any) => wo.id === checkin.pickupNumber);
+          
+          return isOutbound && isOpen && isWaiting && hasMatch;
         });
         
         setHasDriverAlerts(hasAlerts);
@@ -381,7 +269,7 @@ export default function ProductionDashboard() {
     return checkins.some((checkin: any) => 
       checkin.inboundOutbound === 'Outbound' &&
       !checkin.closedAt &&
-      ['Checked In', 'Waiting', 'Parked', 'Open'].includes(checkin.status) &&
+      ['Waiting', 'Parked', 'Open'].includes(checkin.status) &&
       checkin.pickupNumber === activeWO.id
     );
   };
@@ -403,26 +291,14 @@ export default function ProductionDashboard() {
     ? LINES.find(line => line.id === specificLine)?.name || 'Production Dashboard'
     : 'Production Dashboard';
 
-  const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? 'single-line' : ''}`;
-  const minutesRemaining = getShiftMinutesRemaining();
-  const shiftKey = currentShift ? `${currentShift.shiftNumber}-${currentShift.startTime}` : null;
-  const showFlashingEndShift = !!currentShift && minutesRemaining !== null && minutesRemaining <= 15;
+  const dashboardClasses = `production-dashboard ${hasDriverAlerts && specificLine ? 'alert-active' : ''} ${specificLine ? (isMobileRuntime ? 'single-line-mobile' : 'single-line') : ''}`;
 
-  useEffect(() => {
-    if (specificLine || messengerOpen) return;
-    if (!shiftKey || minutesRemaining === null) return;
-
-    const withinReminderWindow = minutesRemaining >= 0 && minutesRemaining <= 10;
-    if (withinReminderWindow && remindedShiftKey !== shiftKey) {
-      setShowShiftReminder(true);
+  const handleBack = () => {
+    if (specificLine && isMobileRuntime) {
+      navigate('/production-dashboard');
+      return;
     }
-  }, [minutesRemaining, shiftKey, remindedShiftKey, messengerOpen, specificLine]);
-
-  const dismissShiftReminder = () => {
-    setShowShiftReminder(false);
-    if (shiftKey) {
-      setRemindedShiftKey(shiftKey);
-    }
+    navigate('/');
   };
 
   return (
@@ -436,22 +312,12 @@ export default function ProductionDashboard() {
       )}
       {specificLine && <DriverWaitingTicker lineFilter={specificLine} />}
       <div className="dashboard-header">
-        <button className="back-btn" onClick={() => navigate('/')}>← Home</button>
+        <button className="back-btn" onClick={handleBack}>
+          {specificLine && isMobileRuntime ? '← All Lines' : '← Home'}
+        </button>
         <h1>{pageTitle}</h1>
-        <div className="header-controls">
+          {!isMobileRuntime && <div className="header-controls">
           {!specificLine && <button className="schedule-btn" onClick={() => navigate('/production-scheduler')}>📋 Schedule</button>}
-          {!specificLine && currentShift && (
-            <button
-              className={`end-shift-btn ${showFlashingEndShift ? 'flash' : ''}`}
-              onClick={handleEndShift}
-              disabled={endingShift}
-              title={minutesRemaining !== null ? `Planned shift end in ${minutesRemaining} minute(s)` : 'End active shift'}
-            >
-              {endingShift
-                ? '⏳ Ending...'
-                : `🛑 End ${currentShift.shiftName}${minutesRemaining !== null ? ` (${minutesRemaining}m)` : ''}`}
-            </button>
-          )}
           {!specificLine && (
             <button 
               className="message-chat-btn" 
@@ -464,18 +330,8 @@ export default function ProductionDashboard() {
             </button>
           )}
           <button className="refresh-btn" onClick={fetchWorkOrders}>🔄 Refresh</button>
-        </div>
+          </div>}
       </div>
-
-      {!specificLine && showShiftReminder && (
-        <div className="shift-reminder-toast" role="status" aria-live="polite">
-          <div className="shift-reminder-title">Shift Reminder</div>
-          <div className="shift-reminder-text">
-            Reminder: planned shift time is approaching.
-          </div>
-          <button className="shift-reminder-dismiss" onClick={dismissShiftReminder}>Dismiss</button>
-        </div>
-      )}
 
       <div className="lines-grid">
         {displayLines.map(line => {
@@ -485,7 +341,7 @@ export default function ProductionDashboard() {
           const progress = wo && plannedCases > 0
             ? Math.round(((wo.completedCases || 0) / plannedCases) * 100)
             : 0;
-          const hasAlert = hasDriverAlertForLine(line.id);
+          const hasAlert = !specificLine && hasDriverAlertForLine(line.id);
 
           return (
             <div key={line.id} className={`line-card ${status} ${hasAlert ? 'driver-alert' : ''}`}>
@@ -496,6 +352,21 @@ export default function ProductionDashboard() {
                   {status === 'running' ? 'RUNNING' : status === 'stopped' ? 'STOPPED' : 'IDLE'}
                 </div>
               </div>
+
+              {isMobileRuntime && !specificLine && (
+                <button
+                  type="button"
+                  className="line-full-view-btn"
+                  onTouchStart={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    navigate(`/production-dashboard?line=${line.id}`);
+                  }}
+                  onClick={() => navigate(`/production-dashboard?line=${line.id}`)}
+                >
+                  Full View
+                </button>
+              )}
 
               {wo ? (
                 <div className="job-info">

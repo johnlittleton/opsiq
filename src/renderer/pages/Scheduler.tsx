@@ -26,6 +26,15 @@ interface Appointment {
 }
 
 const Scheduler: React.FC = () => {
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
+
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -297,7 +306,7 @@ const Scheduler: React.FC = () => {
   return (
     <div className="scheduler">
       <TitleBar showLegend={false}>
-        <div className="scheduler__title-controls">
+        {!isMobileRuntime && <div className="scheduler__title-controls">
           <div className="scheduler__view-toggle">
             <button
               className={`scheduler__view-btn ${view === 'list' ? 'scheduler__view-btn--active' : ''}`}
@@ -376,7 +385,7 @@ const Scheduler: React.FC = () => {
           <button onClick={() => openModal(new Date())} className="scheduler__btn scheduler__btn--primary">
             + New Appointment
           </button>
-        </div>
+        </div>}
       </TitleBar>
       
       <div className="scheduler__content">        {view === 'timeslot' ? (

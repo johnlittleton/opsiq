@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../renderer/context/AuthContext';
-import { isNativeIOSRuntime } from '../renderer/utils/runtime';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { executiveName, userRole, logout } = useAuth();
+  const { executiveName, logout } = useAuth();
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
-  const hasDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
   const isMobileRuntime =
-    isNativeIOSRuntime() ||
-    (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches);
-  const isDesktopShell = hasDesktopShell && !isMobileRuntime;
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   
   const dockOperationsCards = [
     {
@@ -82,47 +84,32 @@ export const HomePage: React.FC = () => {
       description: 'View completed work orders',
       onClick: () => navigate('/work-order-history'),
     },
-    {
-      icon: '🏷️',
-      title: 'Pallet Tracker',
-      description: 'Scan build-in and finished-out pallets by order',
-      onClick: () => navigate('/pallet-tracker'),
-    },
   ];
 
   const managementCards = [
-    ...(userRole === 'executive' ? [{
+    {
       icon: '📊',
       title: 'Executive Dashboard',
       description: 'Site performance metrics and top operators',
       onClick: () => navigate('/executive'),
-    }] : []),
-    ...((userRole === 'executive' || userRole === 'manager') ? [{
+    },
+    {
       icon: '💼',
-      title: 'Manager Dashboard',
-      description: 'Track department headcount and live performance',
+      title: 'Labor Tracker',
+      description: 'Track department headcount and labor costs',
       onClick: () => navigate('/labor-tracker'),
-    }] : []),
-    ...((userRole === 'executive' || userRole === 'manager') ? [{
-      icon: '📱',
-      title: 'Labor Kiosk',
-      description: 'Open the employee punch kiosk and admin access',
-      onClick: () => navigate('/labor-kiosk'),
-    }] : []),
+    },
   ];
 
-  const displayDockCards = isMobileRuntime
-    ? dockOperationsCards.filter((card) => card.title === 'Dock Dashboard')
-    : dockOperationsCards;
-  const displayAppointmentCards = isMobileRuntime
-    ? appointmentCards.filter((card) => card.title === 'Appointment Scheduler')
-    : appointmentCards;
-  const displayProductionCards = isMobileRuntime
-    ? productionCards.filter((card) => card.title === 'Production Dashboard')
-    : productionCards;
-  const displayManagementCards = isMobileRuntime
-    ? managementCards.filter((card) => card.title === 'Executive Dashboard' || card.title === 'Labor Kiosk')
-    : managementCards;
+  const mobileDockCards = dockOperationsCards.filter((card) => card.title === 'Dock Dashboard');
+  const mobileAppointmentCards = appointmentCards.filter((card) => card.title === 'Appointment Scheduler');
+  const mobileProductionCards = productionCards.filter((card) => card.title === 'Production Dashboard');
+  const mobileManagementCards = managementCards.filter((card) => card.title === 'Executive Dashboard');
+
+  const displayDockCards = isMobileRuntime ? mobileDockCards : dockOperationsCards;
+  const displayAppointmentCards = isMobileRuntime ? mobileAppointmentCards : appointmentCards;
+  const displayProductionCards = isMobileRuntime ? mobileProductionCards : productionCards;
+  const displayManagementCards = isMobileRuntime ? mobileManagementCards : managementCards;
 
   const handleMinimize = () => {
     if (window.electron) {
@@ -154,9 +141,9 @@ export const HomePage: React.FC = () => {
     <div className="home-page">
       {/* Window Controls */}
       <div className="home-page__controls">
-        {isDesktopShell ? (
-          <>
-            <div className="home-page__controls-left">
+        <div className="home-page__controls-left">
+          {!isMobileRuntime && (
+            <>
               <button 
                 className="home-page__control-button"
                 onClick={() => setShowViewMenu(!showViewMenu)}
@@ -186,32 +173,29 @@ export const HomePage: React.FC = () => {
                   </button>
                 </div>
               )}
-            </div>
-            <div className="home-page__controls-right">
-              <span className="home-page__user-name">{executiveName}</span>
-              <button className="home-page__logout-button" onClick={logout}>
-                Logout
-              </button>
+            </>
+          )}
+        </div>
+        <div className="home-page__controls-right">
+          <span className="home-page__user-name">{executiveName}</span>
+          <button className="home-page__logout-button" onClick={logout}>
+            🚪 Logout
+          </button>
+          {!isMobileRuntime && (
+            <>
               <button className="home-page__window-button" onClick={handleMinimize}>
                 −
               </button>
               <button className="home-page__window-button" onClick={handleMaximize}>
                 □
               </button>
-            </div>
-          </>
-        ) : (
-          <div className="home-page__controls-right home-page__controls-right--mobile">
-            <span className="home-page__user-name">{executiveName}</span>
-            <button className="home-page__logout-button" onClick={logout}>
-              Logout
-            </button>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       <div className="home-page__header">
-        <h1 className="home-page__title">{isDesktopShell ? 'OPSIQ Desktop' : 'OPSIQ Mobile'}</h1>
+        <h1 className="home-page__title">OPSIQ Desktop</h1>
         <p className="home-page__subtitle">Operations Intelligence Platform</p>
       </div>
 

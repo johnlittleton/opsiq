@@ -270,89 +270,6 @@
   transform: translateY(-1px) !important;
 }
 
-.shift-reminder-toast {
-  position: fixed;
-  top: 92px;
-  left: 16px;
-  width: min(360px, calc(100vw - 32px));
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.97), rgba(30, 41, 59, 0.97));
-  border: 2px solid rgba(245, 158, 11, 0.8);
-  border-radius: 10px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 24px rgba(245, 158, 11, 0.35);
-  padding: 12px 14px;
-  z-index: 9800;
-}
-
-.shift-reminder-title {
-  color: #f59e0b;
-  font-size: 0.95rem;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.shift-reminder-text {
-  color: #f3f6fa;
-  font-size: 0.85rem;
-  line-height: 1.35;
-}
-
-.shift-reminder-dismiss {
-  margin-top: 10px;
-  background: none;
-  color: #f59e0b;
-  border: 2px solid #f59e0b;
-  border-radius: 8px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.shift-reminder-dismiss:hover {
-  background: #f59e0b;
-  color: #000;
-}
-
-/* End Shift Button - Red */
-.end-shift-btn {
-  background: none !important;
-  color: #ef4444 !important;
-  border: 3px solid #ef4444 !important;
-  padding: 6px 12px !important;
-  border-radius: 12px !important;
-  cursor: pointer !important;
-  font-weight: 700 !important;
-  font-size: 0.75rem !important;
-  transition: all 0.2s !important;
-}
-
-.end-shift-btn:hover:not(:disabled) {
-  background: #ef4444 !important;
-  color: #000 !important;
-  transform: translateY(-1px) !important;
-}
-
-.end-shift-btn:disabled {
-  opacity: 0.65;
-  cursor: not-allowed !important;
-}
-
-@keyframes end-shift-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.25);
-    border-color: #ef4444;
-  }
-  50% {
-    box-shadow: 0 0 14px 4px rgba(239, 68, 68, 0.55);
-    border-color: #ff7a7a;
-  }
-}
-
-.end-shift-btn.flash {
-  animation: end-shift-pulse 1s ease-in-out infinite;
-}
-
 .lines-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -399,6 +316,28 @@
   margin-bottom: 3px;
   padding-bottom: 3px;
   border-bottom: 1px solid #2a3142;
+}
+
+.line-full-view-btn {
+  margin-bottom: 6px;
+  align-self: flex-start;
+  background: none;
+  color: #2ecc71;
+  border: 2px solid #2ecc71;
+  border-radius: 10px;
+  padding: 4px 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 3;
+}
+
+.line-full-view-btn:active {
+  transform: scale(0.98);
 }
 
 .line-header h3 {
@@ -633,4 +572,19 @@
   background: rgba(40, 167, 69, 0.2);
   color: #28a745;
   border: 1px solid #28a745;
+}
+
+/* iPhone single-line drill-in keeps mobile header and back navigation visible */
+.production-dashboard.single-line-mobile {
+  padding-top: 8px;
+}
+
+.production-dashboard.single-line-mobile .lines-grid {
+  grid-template-columns: 1fr;
+  padding: 8px;
+}
+
+.production-dashboard.single-line-mobile .line-card {
+  min-height: auto;
+  padding: 10px;
 }

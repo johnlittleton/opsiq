@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
@@ -17,49 +17,24 @@ interface CurrentShift {
   elapsedMinutes: number;
   currentWarehouseHeadcount: number;
   currentProductionHeadcount: number;
-  currentWarehouseLaborCost?: number;
-  currentProductionLaborCost?: number;
   runningLaborCost: number;
-}
-
-interface DepartmentLaborRow {
-  department: string;
-  status: 'active' | 'ended' | 'not-started';
-  activeHeadcount: number;
-  runningLaborCost: number;
-  completedLaborCost: number;
-  totalLaborCost: number;
-}
-
-interface DepartmentLaborSummary {
-  date: string;
-  departments: DepartmentLaborRow[];
-  totals: {
-    activeHeadcount: number;
-    runningLaborCost: number;
-    totalLaborCost: number;
-  };
-}
-
-interface DepartmentShiftSession {
-  id: number;
-  department: string;
-  teamName?: string | null;
-  status: 'active' | 'completed';
-  startTime: string;
-  endTime?: string | null;
 }
 
 const ExecutiveDashboard: React.FC = () => {
   console.log('ExecutiveDashboard component rendering...');
   const navigate = useNavigate();
+  const isMobileRuntime =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios' ||
+      window.matchMedia('(max-width: 900px)').matches
+    );
   const { executiveName, userRole, logout } = useAuth();
   const [metrics, setMetrics] = useState<ExecutiveMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentShift, setCurrentShift] = useState<CurrentShift | null>(null);
-  const [departmentLaborSummary, setDepartmentLaborSummary] = useState<DepartmentLaborSummary | null>(null);
-  const [departmentSessions, setDepartmentSessions] = useState<DepartmentShiftSession[]>([]);
-  const [departmentLaborWarning, setDepartmentLaborWarning] = useState<string | null>(null);
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
@@ -78,29 +53,20 @@ const ExecutiveDashboard: React.FC = () => {
     endDate: getLocalDateString(new Date()),
   });
 
-  const [viewMode, setViewMode] = useState<'selected' | 'alltime'>('selected');
-
-  // Refs so the 60s interval always reads the latest state without stale closures
-  const viewModeRef = useRef<'selected' | 'alltime'>('selected');
-  const dateRangeRef = useRef(dateRange);
-  viewModeRef.current = viewMode;
-  dateRangeRef.current = dateRange;
-
   // Load metrics
   useEffect(() => {
     console.log('ExecutiveDashboard useEffect triggered, loading metrics...');
     loadMetrics();
-  }, [dateRange, viewMode]);
+  }, [dateRange]);
 
   const loadMetrics = async () => {
     try {
       setLoading(true);
       console.log('📅 Date Range Query:', { startDate: dateRange.startDate, endDate: dateRange.endDate });
       console.log('Fetching executive metrics from:', `${API_BASE}/api/executive/metrics`);
-      const url = viewMode === 'alltime'
-        ? `${API_BASE}/api/executive/metrics?allTime=true`
-        : `${API_BASE}/api/executive/metrics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
-      const response = await fetch(url);
+      const response = await fetch(
+        `${API_BASE}/api/executive/metrics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
+      );
       console.log('Response status:', response.status);
       if (!response.ok) throw new Error('Failed to load metrics');
       const data = await response.json();
@@ -124,7 +90,6 @@ const ExecutiveDashboard: React.FC = () => {
         avgOffloadTimeMinutes: 0,
         avgPalletsPerTruck: 0,
         topOperators: [],
-        topLineLeads: [],
         totalDockTimeHours: 0,
         dockUtilization: 0,
         completedToday: 0,
@@ -132,15 +97,11 @@ const ExecutiveDashboard: React.FC = () => {
         shippingReceivingLaborCostPerHour: 0,
         productionLaborCostPerHour: 0,
         totalShiftLaborCost: 0,
-        laborCostYTD: 0,
-        laborCostPreviousDay: 0,
         currentHeadcount: 0,
         warehouseHeadcount: 0,
         productionHeadcount: 0,
         totalCasesCompleted: 0,
-        totalBagsCompleted: 0,
         casesCompletedYTD: 0,
-        bagsCompletedYTD: 0,
         bestPerformingLine: null,
       });
     } finally {
@@ -150,12 +111,7 @@ const ExecutiveDashboard: React.FC = () => {
 
   const setToday = () => {
     const today = getLocalDateString(new Date());
-    setViewMode('selected');
     setDateRange({ startDate: today, endDate: today });
-  };
-
-  const setAllTime = () => {
-    setViewMode('alltime');
   };
 
   // Load current active shift
@@ -188,80 +144,17 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
-  const fetchDepartmentLaborLive = async () => {
-    try {
-      const todayLocal = getLocalDateString(new Date());
-      const response = await fetch(`${API_BASE}/api/labor/departments/live?date=${todayLocal}`);
-      if (!response.ok) {
-        setDepartmentLaborWarning('Combined labor tracker feed is not available on the current server deployment.');
-        return;
-      }
-
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        setDepartmentLaborWarning('Combined labor tracker feed is not deployed on the current server yet.');
-        return;
-      }
-
-      const data = await response.json();
-      setDepartmentLaborSummary(data);
-      setDepartmentLaborWarning(null);
-    } catch (error) {
-      console.error('❌ Failed to fetch department labor summary:', error);
-      setDepartmentLaborWarning('Failed to load the combined labor tracker feed.');
-    }
-  };
-
-  const fetchDepartmentSessions = async () => {
-    try {
-      const todayLocal = getLocalDateString(new Date());
-      const response = await fetch(`${API_BASE}/api/labor/departments/sessions?date=${todayLocal}`);
-      if (!response.ok) {
-        return;
-      }
-
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        return;
-      }
-
-      const data = await response.json();
-      if (Array.isArray(data)) {
-        setDepartmentSessions(data);
-      }
-    } catch (error) {
-      console.error('❌ Failed to fetch department sessions:', error);
-    }
-  };
-
-  // Auto-update shift and refresh active labor metrics frequently for near real-time status.
+  // Auto-update shift every minute (without reloading all metrics)
   useEffect(() => {
+    // Initial fetch for shift only (metrics already loaded by dateRange useEffect)
     fetchCurrentShift();
-    fetchDepartmentLaborLive();
-    fetchDepartmentSessions();
-
+    
+    // Set up interval to update shift only every 60 seconds
     const interval = setInterval(() => {
-      fetchCurrentShift();
-      fetchDepartmentLaborLive();
-      fetchDepartmentSessions();
-
-      // Silently refresh activeNow — always live regardless of mode
-      // Uses refs to read current viewMode/dateRange without stale closures
-      (async () => {
-        try {
-          const vMode = viewModeRef.current;
-          const dRange = dateRangeRef.current;
-          const url = vMode === 'alltime'
-            ? `${API_BASE}/api/executive/metrics?allTime=true`
-            : `${API_BASE}/api/executive/metrics?startDate=${dRange.startDate}&endDate=${dRange.endDate}`;
-          const resp = await fetch(url);
-          if (!resp.ok) return;
-          const data = await resp.json();
-          setMetrics(prev => prev ? { ...prev, activeNow: data.activeNow } : prev);
-        } catch {}
-      })();
-    }, 10000);
-
+      fetchCurrentShift(); // Only update shift, not metrics
+    }, 60000);
+    
+    // Cleanup
     return () => clearInterval(interval);
   }, []);
 
@@ -306,40 +199,6 @@ const ExecutiveDashboard: React.FC = () => {
     );
   }
 
-  const combinedRunningLaborCost = departmentLaborSummary?.totals?.runningLaborCost ?? currentShift?.runningLaborCost ?? 0;
-  const combinedActiveHeadcount = departmentLaborSummary?.totals?.activeHeadcount
-    ?? (currentShift ? currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount : 0);
-  const combinedHourlyLaborCost = departmentLaborSummary?.totals?.currentHourlyLaborCost
-    ?? 0;
-  const activeDepartmentSessions = departmentSessions.filter((session) => session.status === 'active');
-  const hasLiveDepartmentLabor = combinedActiveHeadcount > 0 || combinedRunningLaborCost > 0;
-  // Use the authoritative shift_sessions start time when available; it is always scoped to today
-  // and can never be a stale multi-day-old department session.
-  const derivedTrackerStartTime = currentShift?.startTime
-    ? new Date(currentShift.startTime).getTime()
-    : activeDepartmentSessions.length > 0
-      ? activeDepartmentSessions
-          .map((session) => new Date(session.startTime).getTime())
-          .filter((value) => Number.isFinite(value))
-          .sort((a, b) => a - b)[0]
-      : null;
-  // Prefer server-computed labor burn-rate math because it is resilient to timezone
-  // parsing issues in raw timestamp strings.
-  const elapsedFromLaborSummary = combinedHourlyLaborCost > 0
-    ? Math.max(0, Math.floor((combinedRunningLaborCost / combinedHourlyLaborCost) * 60))
-    : null;
-  const elapsedFromTimestamps = derivedTrackerStartTime
-    ? Math.max(0, Math.floor((Date.now() - derivedTrackerStartTime) / 60000))
-    : null;
-  const derivedElapsedMinutes = elapsedFromLaborSummary
-    ?? elapsedFromTimestamps
-    ?? (currentShift?.elapsedMinutes ?? 0);
-  const showShiftTrackerPanel = hasLiveDepartmentLabor;
-  const trackerTitle = activeDepartmentSessions.length > 0 ? 'Department Tracker' : (currentShift?.shiftName || 'Department Tracker');
-  const selectedRangeLaborTotal = Number(metrics.totalShiftLaborCost || 0);
-  const laborCostYTD = Number(metrics.laborCostYTD || 0);
-  const laborCostPreviousDay = Number(metrics.laborCostPreviousDay || 0);
-
   return (
     <div className="executive-dashboard" style={{ backgroundColor: '#1a1a2e', minHeight: '100vh' }}>
       <TitleBar showLegend={false} />
@@ -349,21 +208,16 @@ const ExecutiveDashboard: React.FC = () => {
           <div>
             <h1 style={{ color: 'white' }}>Executive Dashboard</h1>
             <p className="subtitle">Site Performance Overview • Logged in as: {executiveName}</p>
-            {departmentLaborWarning && (
-              <p className="subtitle" style={{ color: '#f59e0b', marginTop: '6px' }}>
-                {departmentLaborWarning}
-              </p>
-            )}
           </div>
           
-          <div className="header-actions">
-              <div className="date-selector">
+          {!isMobileRuntime && <div className="header-actions">
+            <div className="date-selector">
               <div className="date-field">
                 <label>Start Date</label>
                 <input
                   type="date"
                   value={dateRange.startDate}
-                  onChange={(e) => { setViewMode('selected'); setDateRange({ ...dateRange, startDate: e.target.value }); }}
+                  onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
                 />
               </div>
               <div className="date-field">
@@ -371,7 +225,7 @@ const ExecutiveDashboard: React.FC = () => {
                 <input
                   type="date"
                   value={dateRange.endDate}
-                  onChange={(e) => { setViewMode('selected'); setDateRange({ ...dateRange, endDate: e.target.value }); }}
+                  onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
                 />
               </div>
             </div>
@@ -383,15 +237,10 @@ const ExecutiveDashboard: React.FC = () => {
               }
             }}>🖨️ Print</button>
             <button className="today-btn" onClick={setToday}>📅 Today</button>
-            <button
-              className={`alltime-btn${viewMode === 'alltime' ? ' alltime-btn--active' : ''}`}
-              onClick={setAllTime}
-            >🌐 All Time</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
-            <button className="storage-btn" onClick={() => navigate('/storage-billing')}>📦 Storage Billing</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
-          </div>
+          </div>}
         </div>
 
         {/* Top-Level KPIs */}
@@ -462,80 +311,48 @@ const ExecutiveDashboard: React.FC = () => {
             icon="📥"
             compact
           />
-          <div className="performance-cards-row">
-            {/* Top Operators Card - Wide */}
-            <div className="top-operator-card">
-              <div className="top-operator-header">
-                <div className="top-operator-title">🏆 Top Operators</div>
-              </div>
-              <div className="top-operator-list">
-                {metrics.topOperators && metrics.topOperators.length > 0 ? (
-                  metrics.topOperators.map((operator, index) => {
-                    let medal = '';
-                    if (index === 0) medal = '🥇';
-                    else if (index === 1) medal = '🥈';
-                    else if (index === 2) medal = '🥉';
-                    else if (index === 3 || index === 4) medal = '👍';
-                    
-                    return (
-                      <div key={operator.operatorName} className="operator-row">
-                        <span className="operator-rank">#{index + 1}</span>
-                        {medal && <span className="operator-medal">{medal}</span>}
-                        <span className="operator-name-stats">
-                          {operator.operatorName} - {operator.totalLoads} Load{operator.totalLoads !== 1 ? 's' : ''} • {operator.totalPallets} Pallet{operator.totalPallets !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="no-data-small">No data</div>
-                )}
-              </div>
+          {/* Top Operators Card - Wide */}
+          <div className="top-operator-card">
+            <div className="top-operator-header">
+              <div className="top-operator-title">🏆 Top Operators</div>
             </div>
-            <div className="top-operator-card top-line-leads-card">
-              <div className="top-operator-header">
-                <div className="top-operator-title">🏭 Line Lead Performance</div>
-              </div>
-              <div className="top-operator-list top-line-leads-list">
-                {metrics.topLineLeads && metrics.topLineLeads.length > 0 ? (
-                  metrics.topLineLeads.map((lead, index) => {
-                    let medal = '';
-                    if (index === 0) medal = '🥇';
-                    else if (index === 1) medal = '🥈';
-                    else if (index === 2) medal = '🥉';
-                    else if (index === 3 || index === 4) medal = '👍';
-
-                    return (
-                      <div key={lead.leadName} className="operator-row">
-                        <span className="operator-rank">#{index + 1}</span>
-                        {medal && <span className="operator-medal">{medal}</span>}
-                        <span className="operator-name-stats">
-                          {lead.leadName} - {lead.totalCases.toLocaleString()} Cases • {lead.totalBags.toLocaleString()} Bags
-                        </span>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="no-data-small">No data</div>
-                )}
-              </div>
+            <div className="top-operator-list">
+              {metrics.topOperators && metrics.topOperators.length > 0 ? (
+                metrics.topOperators.map((operator, index) => {
+                  let medal = '';
+                  if (index === 0) medal = '🥇';
+                  else if (index === 1) medal = '🥈';
+                  else if (index === 2) medal = '🥉';
+                  else if (index === 3 || index === 4) medal = '👍';
+                  
+                  return (
+                    <div key={operator.operatorName} className="operator-row">
+                      <span className="operator-rank">#{index + 1}</span>
+                      {medal && <span className="operator-medal">{medal}</span>}
+                      <span className="operator-name-stats">
+                        {operator.operatorName} - {operator.totalLoads} Load{operator.totalLoads !== 1 ? 's' : ''} • {operator.totalPallets} Pallet{operator.totalPallets !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="no-data-small">No data</div>
+              )}
             </div>
           </div>
         </div>
 
         {/* Active Shift Tracker - Live Updates Every Minute */}
-        {showShiftTrackerPanel && (
+        {currentShift && (
           <GlassPanel className="shift-tracker-panel">
             <div className="shift-tracker-header">
               <div className="shift-tracker-title">
                 <div className="shift-badge">
                   <div className="pulse-dot"></div>
-                  <span className="shift-name">{trackerTitle}</span>
+                  <span className="shift-name">{currentShift.shiftName}</span>
                   <span className="shift-status">ACTIVE</span>
                 </div>
-                <span className="shift-start">
-                  Started {new Date(currentShift?.startTime || derivedTrackerStartTime || Date.now()).toLocaleTimeString()}
-                </span>
+                <span className="shift-start">Started {new Date(currentShift.startTime).toLocaleTimeString()}</span>
               </div>
               <div className="auto-update-indicator">
                 <span className="update-icon">🔄</span>
@@ -549,7 +366,7 @@ const ExecutiveDashboard: React.FC = () => {
                 <div className="metric-content">
                   <div className="metric-label">Elapsed Time</div>
                   <div className="metric-value">
-                    {Math.floor(derivedElapsedMinutes / 60)}h {derivedElapsedMinutes % 60}m
+                    {Math.floor(currentShift.elapsedMinutes / 60)}h {currentShift.elapsedMinutes % 60}m
                   </div>
                 </div>
               </div>
@@ -557,12 +374,12 @@ const ExecutiveDashboard: React.FC = () => {
               <div className="shift-metric labor-cost">
                 <div className="metric-icon">💰</div>
                 <div className="metric-content">
-                  <div className="metric-label">Elapsed Labor Cost</div>
+                  <div className="metric-label">Running Labor Cost</div>
                   <div className="metric-value cost-value">
-                    ${combinedRunningLaborCost.toFixed(2)}
+                    ${currentShift.runningLaborCost.toFixed(2)}
                   </div>
                   <div className="metric-rate">
-                    ${(combinedRunningLaborCost / (derivedElapsedMinutes || 1)).toFixed(2)}/min
+                    ${(currentShift.runningLaborCost / (currentShift.elapsedMinutes || 1)).toFixed(2)}/min
                   </div>
                 </div>
               </div>
@@ -572,10 +389,10 @@ const ExecutiveDashboard: React.FC = () => {
                 <div className="metric-content">
                   <div className="metric-label">Active Workers</div>
                   <div className="metric-value">
-                    {combinedActiveHeadcount}
+                    {currentShift.currentWarehouseHeadcount + currentShift.currentProductionHeadcount}
                   </div>
                   <div className="metric-breakdown">
-                    All tracked departments combined
+                    Warehouse: {currentShift.currentWarehouseHeadcount} • Production: {currentShift.currentProductionHeadcount}
                   </div>
                 </div>
               </div>
@@ -606,56 +423,39 @@ const ExecutiveDashboard: React.FC = () => {
           </div>
         </GlassPanel>
 
-        {/* Labor Cost Summary (restored bottom tiles) */}
+        {/* Labor Cost Summary */}
         <GlassPanel className="labor-summary">
           <h2>Labor Cost Summary</h2>
           <div className="labor-grid">
             <div className="labor-card sr-card">
               <div className="labor-header">
-                <h3>S&R Hourly</h3>
-                <span className="icon">🏭</span>
+                <h3>Warehouse</h3>
+                <div className="icon">📦</div>
               </div>
-              <div className="labor-value">${Number(metrics.shippingReceivingLaborCostPerHour || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="labor-subtitle">Current hourly cost</div>
+              <div className="labor-value">${(metrics.shippingReceivingLaborCostPerHour || 0).toFixed(2)}/hr</div>
+              <div className="labor-subtitle">{metrics.warehouseHeadcount || 0} employees</div>
             </div>
-
+            
             <div className="labor-card prod-card">
               <div className="labor-header">
-                <h3>Production Hourly</h3>
-                <span className="icon">⚙️</span>
+                <h3>Production</h3>
+                <div className="icon">🏭</div>
               </div>
-              <div className="labor-value">${Number(metrics.productionLaborCostPerHour || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="labor-subtitle">Current hourly cost</div>
+              <div className="labor-value">${(metrics.productionLaborCostPerHour || 0).toFixed(2)}/hr</div>
+              <div className="labor-subtitle">{metrics.productionHeadcount || 0} employees</div>
             </div>
-
+            
             <div className="labor-card total-card">
               <div className="labor-header">
-                <h3>{viewMode === 'alltime' ? 'All-Time Labor Cost' : 'Selected Period'}</h3>
-                <span className="icon">💵</span>
+                <h3>Total Shift Labor Cost</h3>
+                <div className="icon">💰</div>
               </div>
-              <div className="labor-value">${selectedRangeLaborTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="labor-subtitle">{viewMode === 'alltime' ? 'Cumulative labor total' : `${dateRange.startDate} to ${dateRange.endDate}`}</div>
-            </div>
-
-            <div className="labor-card previous-card">
-              <div className="labor-header">
-                <h3>Previous Day</h3>
-                <span className="icon">📆</span>
-              </div>
-              <div className="labor-value">${laborCostPreviousDay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="labor-subtitle">Yesterday total labor</div>
-            </div>
-
-            <div className="labor-card ytd-card">
-              <div className="labor-header">
-                <h3>YTD Labor Cost</h3>
-                <span className="icon">📈</span>
-              </div>
-              <div className="labor-value">${laborCostYTD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              <div className="labor-subtitle">Jan 1 to today</div>
+              <div className="labor-value">${(metrics.totalShiftLaborCost || 0).toFixed(2)}</div>
+              <div className="labor-subtitle">{metrics.currentHeadcount || 0} employees</div>
             </div>
           </div>
         </GlassPanel>
+
 
       </div>
     </div>

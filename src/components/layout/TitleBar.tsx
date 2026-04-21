@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Legend } from '../common/Legend';
-import { isNativeIOSRuntime } from '../../renderer/utils/runtime';
 import './TitleBar.css';
 
 interface TitleBarProps {
@@ -12,8 +11,14 @@ interface TitleBarProps {
 export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children }) => {
   const navigate = useNavigate();
   const [showViewMenu, setShowViewMenu] = useState(false);
-  const isNativeIOS = isNativeIOSRuntime();
-  const isDesktopShell = typeof window !== 'undefined' && Boolean((window as any).electron);
+
+  const isNativeIOS =
+    typeof window !== 'undefined' &&
+    (
+      window.location.protocol === 'capacitor:' ||
+      (window as any).Capacitor?.isNativePlatform?.() === true ||
+      (window as any).Capacitor?.getPlatform?.() === 'ios'
+    );
 
   if (isNativeIOS) {
     return null;
@@ -50,17 +55,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children
     }
     setShowViewMenu(false);
   };
-
-  if (!isDesktopShell) {
-    return (
-      <div className="title-bar title-bar--mobile">
-        <button className="title-bar__home-btn title-bar__home-btn--mobile" onClick={() => navigate('/')}>
-          Home
-        </button>
-        {children && <div className="title-bar__content title-bar__content--mobile">{children}</div>}
-      </div>
-    );
-  }
 
   return (
     <div className="title-bar">
