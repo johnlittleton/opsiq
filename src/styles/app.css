@@ -215,18 +215,18 @@ a:hover {
   body,
   #root {
     min-height: 100dvh;
-    overflow: auto !important;
+    overflow: hidden;
   }
 
   body {
-    overflow: auto;
     touch-action: pan-x pan-y;
-    -webkit-overflow-scrolling: touch;
   }
 
   #root {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   [class*="page"],
@@ -348,18 +348,18 @@ a:hover {
   body.ios-mobile,
   #root.ios-mobile {
     min-height: 100dvh;
-    overflow: auto !important;
+    overflow: hidden;
   }
 
   body.ios-mobile {
-    overflow: auto;
     touch-action: pan-x pan-y;
-    -webkit-overflow-scrolling: touch;
   }
 
   #root.ios-mobile {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   body.ios-mobile .title-bar,
