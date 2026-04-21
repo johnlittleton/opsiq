@@ -454,10 +454,8 @@ a:hover {
   }
 
   body.ios-mobile .dock-board-page {
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: visible;
     touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
   }
 
   body.ios-mobile .dock-board-page__content {
@@ -470,9 +468,9 @@ a:hover {
     width: 100%;
     max-width: 100%;
     gap: 6px;
-    padding: calc(env(safe-area-inset-top) + 62px) 0 calc(env(safe-area-inset-bottom) + 190px);
+    padding: calc(env(safe-area-inset-top) + 62px) 12px calc(env(safe-area-inset-bottom) + 20px);
     margin: 0;
-    min-height: 100dvh;
+    min-height: auto;
     box-sizing: border-box;
   }
 
@@ -523,8 +521,7 @@ a:hover {
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
     opacity: 1;
     visibility: visible;
     pointer-events: none;

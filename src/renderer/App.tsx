@@ -177,6 +177,7 @@ const MobileHamburgerMenu: React.FC = () => {
   const getPageNavLinks = (pathname: string) => {
     if (isMobileRuntime) {
       return [
+        { label: 'Home', path: '/home' },
         { label: 'Dock Dashboard', path: '/dockboard' },
         { label: 'Driver Check-In', path: '/checkin' },
         { label: 'Active Drivers', path: '/active-drivers' },
@@ -184,18 +185,24 @@ const MobileHamburgerMenu: React.FC = () => {
         { label: 'Check-In History', path: '/checkin-history' },
         { label: 'Appointment Scheduler', path: '/scheduler' },
         { label: 'Appointment History', path: '/appointment-history' },
+        { label: 'Production KPI', path: '/production' },
+        { label: 'KPI History', path: '/production-kpi-history' },
         { label: 'Production Scheduler', path: '/production-scheduler' },
         { label: 'Production Dashboard', path: '/production-dashboard' },
-        { label: 'Work Order History', path: '/work-order-history' },
-        { label: 'Pallet Tracker', path: '/pallet-tracker' },
+        { label: 'Production Costing', path: '/production-costing' },
+        { label: 'Production Labor Planner', path: '/production-labor-planner' },
+        { label: 'Labor Planner History', path: '/production-labor-planner-history' },
+        { label: 'Shipping & Receiving KPI', path: '/shipping' },
         { label: 'Executive Dashboard', path: '/executive' },
         { label: 'Executive Analytics', path: '/executive-analytics' },
-        { label: 'Production Costing', path: '/production-costing' },
         { label: 'Labor Tracker', path: '/labor-tracker' },
         { label: 'Labor History', path: '/labor-history' },
         { label: 'Labor Kiosk', path: '/labor-kiosk' },
         { label: 'Labor Kiosk Admin', path: '/labor-kiosk-admin' },
         { label: 'Labor Kiosk History', path: '/labor-kiosk-history' },
+        { label: 'Work Order History', path: '/work-order-history' },
+        { label: 'Downtime History', path: '/downtime-history' },
+        { label: 'Pallet Tracker', path: '/pallet-tracker' },
         { label: 'Storage Billing', path: '/storage-billing' },
         { label: 'Settings', path: '/settings' }
       ];
