@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
@@ -41,6 +42,9 @@ app.use(express.json());
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
 const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
+const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim();
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'wWWn96OtTHu1sn8SRGEr';
+const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID?.trim() || 'eleven_multilingual_v2';
 
 interface KioskAssistantTurn {
   role: 'user' | 'assistant';
@@ -157,6 +161,43 @@ const getKioskAssistantReply = async (message: string, history: KioskAssistantTu
   }
 
   return buildKioskFallbackReply(message, employeeName);
+};
+
+const getKioskSpeechAudio = async (text: string): Promise<Buffer | null> => {
+  if (!ELEVENLABS_API_KEY || !ELEVENLABS_VOICE_ID) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+        'xi-api-key': ELEVENLABS_API_KEY,
+      },
+      body: JSON.stringify({
+        text: toSafeText(text, 900),
+        model_id: ELEVENLABS_MODEL_ID,
+        voice_settings: {
+          stability: 0.45,
+          similarity_boost: 0.8,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.warn('Kiosk ElevenLabs error:', response.status, body.slice(0, 400));
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (error) {
+    console.warn('Kiosk ElevenLabs request failed:', error);
+    return null;
+  }
 };
 
 // ==================== REST API ====================
@@ -962,6 +1003,28 @@ app.post('/api/kiosk/assistant/respond', async (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Assistant request failed' });
+  }
+});
+
+app.post('/api/kiosk/assistant/speak', async (req, res) => {
+  try {
+    const text = toSafeText(req.body?.text, 900);
+    if (!text) {
+      res.status(400).json({ error: 'Text is required' });
+      return;
+    }
+
+    const audio = await getKioskSpeechAudio(text);
+    if (!audio) {
+      res.status(503).json({ error: 'Voice service unavailable' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(audio);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Voice synthesis failed' });
   }
 });
 

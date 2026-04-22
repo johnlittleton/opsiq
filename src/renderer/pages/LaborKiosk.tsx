@@ -118,6 +118,8 @@ export default function LaborKiosk() {
   const [isListening, setIsListening] = useState(false);
   const [assistantQuery, setAssistantQuery] = useState('');
   const [lastScannedEmployee, setLastScannedEmployee] = useState<string>('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
   const [lastScan, setLastScan] = useState<LastScanSummary | null>(null);
   const [assistantTurns, setAssistantTurns] = useState<AssistantTurn[]>([
     {
@@ -328,6 +330,18 @@ export default function LaborKiosk() {
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+
+      window.speechSynthesis?.cancel();
     };
   }, []);
 
@@ -379,32 +393,12 @@ export default function LaborKiosk() {
   };
 
   const speakScanMessage = async (employeeName: string, actionType: 'clock-in' | 'clock-out') => {
-    if (!window.speechSynthesis) {
-      return;
-    }
-
     const message =
       actionType === 'clock-in'
         ? `Hello ${employeeName}. You have scanned in. Have a great shift.`
         : `Great job today ${employeeName}. You have scanned out.`;
 
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.rate = 0.98;
-    utterance.pitch = 1.0;
-
-    const synth = window.speechSynthesis;
-    const preferredVoice = await getPreferredNaturalVoice(synth);
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-
-    await new Promise<void>((resolve) => {
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-
-      synth.cancel();
-      synth.speak(utterance);
-    });
+    await speakText(message);
   };
 
   const ensureDepartmentSession = async (department: KioskDepartmentKey) => {
@@ -451,7 +445,71 @@ export default function LaborKiosk() {
     };
   }, [scanValue, isSpeaking]);
 
+  const playServerSpeech = async (text: string) => {
+    const response = await fetch(`${API_BASE}/api/kiosk/assistant/speak`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Voice service unavailable');
+    }
+
+    const audioBlob = await response.blob();
+    if (!audioBlob.size) {
+      throw new Error('Voice audio was empty');
+    }
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+
+    const audioUrl = URL.createObjectURL(audioBlob);
+    audioUrlRef.current = audioUrl;
+
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => reject(new Error('Audio playback failed'));
+      void audio.play().catch(reject);
+    }).finally(() => {
+      if (audioRef.current === audio) {
+        audioRef.current = null;
+      }
+
+      if (audioUrlRef.current === audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        audioUrlRef.current = null;
+      }
+    });
+  };
+
   const speakAssistantReply = async (text: string) => {
+    if (!window.speechSynthesis) {
+      try {
+        await playServerSpeech(text);
+      } catch {
+        return;
+      }
+      return;
+    }
+
+    try {
+      await playServerSpeech(text);
+      return;
+    } catch {
+      // Fall back to browser speech when ElevenLabs is not configured or playback fails.
+    }
+
     if (!window.speechSynthesis) {
       return;
     }
@@ -473,6 +531,10 @@ export default function LaborKiosk() {
       synth.cancel();
       synth.speak(utterance);
     });
+  };
+
+  const speakText = async (text: string) => {
+    await speakAssistantReply(text);
   };
 
   const askAssistant = async (rawQuestion: string) => {
