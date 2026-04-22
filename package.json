@@ -27,7 +27,7 @@
     "production",
     "kpi"
   ],
-  "author": "Slingshot Transportation, Inc",
+  "author": "John Littleton",
   "license": "PROPRIETARY",
   "engines": {
     "node": "20.x"
