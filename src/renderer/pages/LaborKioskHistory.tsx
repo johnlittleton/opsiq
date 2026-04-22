@@ -110,7 +110,7 @@ export default function LaborKioskHistory() {
   const filteredShifts = useMemo(() => {
     const search = searchTerm.trim().toLowerCase();
 
-    return shifts.filter((shift) => {
+    const filtered = shifts.filter((shift) => {
       if (statusFilter !== 'all' && shift.status !== statusFilter) {
         return false;
       }
@@ -133,6 +133,11 @@ export default function LaborKioskHistory() {
         String(DEPARTMENT_LABELS[shift.department] || shift.department).toLowerCase().includes(search)
       );
     });
+    
+    // Sort alphabetically by employee name
+    return filtered.sort((a, b) => 
+      (a.employeeName || '').localeCompare(b.employeeName || '')
+    );
   }, [departmentFilter, employeeById, searchTerm, shifts, statusFilter]);
 
   const stats = useMemo(() => {
