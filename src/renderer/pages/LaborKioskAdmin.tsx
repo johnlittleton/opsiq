@@ -58,12 +58,12 @@ export default function LaborKioskAdmin() {
   const [editBadgeCode, setEditBadgeCode] = useState('');
 
   const activeEmployees = useMemo(
-    () => employees.filter((employee) => isEmployeeActive(employee)),
+    () => employees.filter((employee) => isEmployeeActive(employee)).sort((a, b) => (a.name || '').localeCompare(b.name || '')),
     [employees],
   );
 
   const inactiveEmployees = useMemo(
-    () => employees.filter((employee) => !isEmployeeActive(employee)),
+    () => employees.filter((employee) => !isEmployeeActive(employee)).sort((a, b) => (a.name || '').localeCompare(b.name || '')),
     [employees],
   );
 

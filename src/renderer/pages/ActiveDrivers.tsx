@@ -25,7 +25,10 @@ const ActiveDrivers: React.FC = () => {
     setLoading(true);
     try {
       const data = await apiClient.getActiveCheckins();
-      setCheckins(data);
+      const sorted = data.sort((a, b) => 
+        (a.driverName || '').localeCompare(b.driverName || '')
+      );
+      setCheckins(sorted);
       setError(null);
     } catch (error) {
       console.error('Failed to load active checkins:', error);

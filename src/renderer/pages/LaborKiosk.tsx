@@ -130,6 +130,7 @@ export default function LaborKiosk() {
   const assistantInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const lastHandledScanRef = useRef<{ code: string; at: number } | null>(null);
+  const lastScanTimeoutRef = useRef<any>(null);
 
   const speechRecognitionSupported = useMemo(() => {
     if (typeof window === 'undefined') return false;
@@ -231,7 +232,7 @@ export default function LaborKiosk() {
 
     const now = Date.now();
     const lastHandled = lastHandledScanRef.current;
-    if (lastHandled && lastHandled.code === parsedScan.rawCode && now - lastHandled.at < 1500) {
+    if (lastHandled && lastHandled.code === parsedScan.rawCode && now - lastHandled.at < 800) {
       return;
     }
 
@@ -274,6 +275,12 @@ export default function LaborKiosk() {
       });
 
       setLastScannedEmployee(resolvedName);
+      
+      // Clear any existing timeout
+      if (lastScanTimeoutRef.current) {
+        clearTimeout(lastScanTimeoutRef.current);
+      }
+      
       setLastScan({
         action: payload.action,
         employeeId: payload.shift.employeeId,
@@ -282,6 +289,12 @@ export default function LaborKiosk() {
         startTime: payload.shift.startTime,
         endTime: payload.shift.endTime,
       });
+
+      // Auto-clear the employee display after 4 seconds
+      lastScanTimeoutRef.current = setTimeout(() => {
+        setLastScan(null);
+        lastScanTimeoutRef.current = null;
+      }, 4000);
 
       await speakScanMessage(resolvedName, payload.action);
       setIsSpeaking(false);
