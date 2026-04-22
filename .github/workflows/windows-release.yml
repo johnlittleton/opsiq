@@ -40,7 +40,7 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build Windows release artifacts
-        run: npm run dist:win
+        run: npm run build && npx electron-builder --win --publish never
 
       - name: Validate updates repo token
         shell: bash
