@@ -43,7 +43,7 @@ app.use(express.json());
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
 const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim();
-const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'l4Coq6695JDX9xtLqXDE';
+const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'xctasy8XvGp2cVO9HL9k';
 const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID?.trim() || 'eleven_multilingual_v2';
 
 interface KioskAssistantTurn {
