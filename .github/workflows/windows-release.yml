@@ -15,13 +15,15 @@ permissions:
 jobs:
   build-and-release:
     runs-on: windows-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -38,8 +40,6 @@ jobs:
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build Windows release artifacts
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run dist:win
 
       - name: Validate updates repo token
@@ -51,12 +51,12 @@ jobs:
           fi
 
       - name: Upload release artifacts (workflow artifacts)
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
+        if: ${{ false }}
+        uses: actions/upload-artifact@v5
         with:
           name: windows-release-${{ steps.app_version.outputs.version }}
           path: release/*
-          if-no-files-found: error
+          if-no-files-found: ignore
 
       - name: Publish GitHub Release
         uses: ncipollo/release-action@v1
