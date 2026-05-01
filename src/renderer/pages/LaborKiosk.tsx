@@ -297,7 +297,11 @@ export default function LaborKiosk() {
         lastScanTimeoutRef.current = null;
       }, 4000);
 
-      await speakScanMessage(resolvedName, payload.action);
+      try {
+        await speakScanMessage(resolvedName, payload.action);
+      } catch {
+        setError('Scan saved, but kiosk voice is unavailable right now.');
+      }
       setIsSpeaking(false);
 
       setScanValue('');
@@ -344,53 +348,6 @@ export default function LaborKiosk() {
       window.speechSynthesis?.cancel();
     };
   }, []);
-
-  const getPreferredNaturalVoice = async (synth: SpeechSynthesis) => {
-    let voices = synth.getVoices();
-
-    if (!voices.length) {
-      voices = await new Promise<SpeechSynthesisVoice[]>((resolve) => {
-        const timeout = window.setTimeout(() => {
-          synth.onvoiceschanged = null;
-          resolve(synth.getVoices());
-        }, 1200);
-
-        synth.onvoiceschanged = () => {
-          window.clearTimeout(timeout);
-          synth.onvoiceschanged = null;
-          resolve(synth.getVoices());
-        };
-      });
-    }
-
-    if (!voices.length) {
-      return null;
-    }
-
-    const preferredNamePatterns = [
-      /samantha/i,
-      /karen/i,
-      /moira/i,
-      /daniel/i,
-      /siri/i,
-      /enhanced/i,
-      /google us english/i,
-    ];
-
-    for (const pattern of preferredNamePatterns) {
-      const matched = voices.find((voice) => pattern.test(voice.name));
-      if (matched) {
-        return matched;
-      }
-    }
-
-    const enUsVoice = voices.find((voice) => /en-US/i.test(voice.lang));
-    if (enUsVoice) {
-      return enUsVoice;
-    }
-
-    return voices[0] || null;
-  };
 
   const speakScanMessage = async (employeeName: string, actionType: 'clock-in' | 'clock-out') => {
     const message =
@@ -494,43 +451,7 @@ export default function LaborKiosk() {
   };
 
   const speakAssistantReply = async (text: string) => {
-    if (!window.speechSynthesis) {
-      try {
-        await playServerSpeech(text);
-      } catch {
-        return;
-      }
-      return;
-    }
-
-    try {
-      await playServerSpeech(text);
-      return;
-    } catch {
-      // Fall back to browser speech when ElevenLabs is not configured or playback fails.
-    }
-
-    if (!window.speechSynthesis) {
-      return;
-    }
-
-    const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.98;
-    utterance.pitch = 1.0;
-
-    const preferredVoice = await getPreferredNaturalVoice(synth);
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-
-    await new Promise<void>((resolve) => {
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
-
-      synth.cancel();
-      synth.speak(utterance);
-    });
+    await playServerSpeech(text);
   };
 
   const speakText = async (text: string) => {
@@ -570,8 +491,13 @@ export default function LaborKiosk() {
 
       setAssistantTurns((prev) => [...prev, { role: 'assistant', text: reply }]);
       setIsSpeaking(true);
-      await speakAssistantReply(reply);
-      setIsSpeaking(false);
+      try {
+        await speakAssistantReply(reply);
+      } catch {
+        setAssistantError('Assistant reply received, but kiosk voice is unavailable right now.');
+      } finally {
+        setIsSpeaking(false);
+      }
       assistantInputRef.current?.focus();
     } catch (assistantErr: any) {
       setAssistantError(assistantErr.message || 'Assistant request failed');
