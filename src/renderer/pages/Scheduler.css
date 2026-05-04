@@ -735,7 +735,7 @@
 }
 
 .scheduler__door-tile-label {
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text-bright);
   letter-spacing: -0.02em;
@@ -775,8 +775,8 @@
 
 /* Time text displayed side by side */
 .scheduler__time-text {
-  padding: 2px 1px;
-  font-size: 9px;
+  padding: 1px 1px;
+  font-size: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
   border-radius: 2px;
