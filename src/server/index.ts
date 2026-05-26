@@ -46,6 +46,66 @@ const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY?.trim();
 const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'xctasy8XvGp2cVO9HL9k';
 const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID?.trim() || 'eleven_multilingual_v2';
 
+const CAMERA_LINE_COUNT = 6;
+
+interface CameraLineConfig {
+  lineId: number;
+  cameraId: string | null;
+  cameraIp: string | null;
+  enabled: boolean;
+  updatedAt: string;
+}
+
+interface CameraLineRuntime {
+  totalBags: number;
+  lastEventAt: string | null;
+  status: 'online' | 'offline' | 'unassigned';
+}
+
+interface CameraCounterEvent {
+  cameraId: string;
+  totalBags: number;
+  timestamp?: string;
+}
+
+const buildInitialCameraConfigs = (): CameraLineConfig[] => {
+  return Array.from({ length: CAMERA_LINE_COUNT }, (_, index) => ({
+    lineId: index + 1,
+    cameraId: null,
+    cameraIp: null,
+    enabled: false,
+    updatedAt: getLocalISOString(),
+  }));
+};
+
+const cameraLineConfigs: CameraLineConfig[] = buildInitialCameraConfigs();
+
+const cameraLineRuntime: Record<number, CameraLineRuntime> = Object.fromEntries(
+  Array.from({ length: CAMERA_LINE_COUNT }, (_, index) => [
+    index + 1,
+    {
+      totalBags: 0,
+      lastEventAt: null,
+      status: 'unassigned',
+    },
+  ])
+) as Record<number, CameraLineRuntime>;
+
+const normalizeCameraId = (value: unknown): string => String(value || '').trim().toUpperCase();
+
+const findLineByCameraId = (cameraId: string): CameraLineConfig | undefined => {
+  return cameraLineConfigs.find((config) => normalizeCameraId(config.cameraId) === cameraId);
+};
+
+const getCameraLineSnapshot = () => {
+  return cameraLineConfigs
+    .map((config) => ({
+      ...config,
+      runtime: cameraLineRuntime[config.lineId],
+    }))
+    .sort((a, b) => a.lineId - b.lineId);
+};
+
 interface KioskAssistantTurn {
   role: 'user' | 'assistant';
   text: string;
@@ -410,6 +470,148 @@ app.get('/api/kpi/production-scheduler', async (req, res) => {
     res.json(kpi);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ==================== CAMERA LINE COUNTERS (DEV) ====================
+
+// Read camera-to-line mapping and live totals.
+app.get('/api/counters/camera-lines', async (_req, res) => {
+  res.json(getCameraLineSnapshot());
+});
+
+// Upsert one line mapping. Ensures one camera can only belong to one line.
+app.put('/api/counters/camera-lines/:lineId', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    if (!Number.isInteger(lineId) || lineId < 1 || lineId > CAMERA_LINE_COUNT) {
+      return res.status(400).json({ error: `lineId must be between 1 and ${CAMERA_LINE_COUNT}` });
+    }
+
+    const cameraId = normalizeCameraId(req.body.cameraId);
+    const cameraIp = String(req.body.cameraIp || '').trim() || null;
+    const enabled = req.body.enabled !== false;
+
+    if (!cameraId) {
+      return res.status(400).json({ error: 'cameraId is required' });
+    }
+
+    const duplicate = cameraLineConfigs.find(
+      (config) => config.lineId !== lineId && normalizeCameraId(config.cameraId) === cameraId
+    );
+
+    if (duplicate) {
+      return res.status(409).json({
+        error: `cameraId ${cameraId} is already assigned to line ${duplicate.lineId}`,
+      });
+    }
+
+    const target = cameraLineConfigs.find((config) => config.lineId === lineId);
+    if (!target) {
+      return res.status(404).json({ error: 'line not found' });
+    }
+
+    target.cameraId = cameraId;
+    target.cameraIp = cameraIp;
+    target.enabled = enabled;
+    target.updatedAt = getLocalISOString();
+
+    cameraLineRuntime[lineId].status = enabled ? 'offline' : 'unassigned';
+
+    const snapshot = getCameraLineSnapshot();
+    io.emit('camera-lines:updated', snapshot);
+
+    return res.json({ success: true, line: target, runtime: cameraLineRuntime[lineId] });
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Receive cumulative bag total from camera processor and map by cameraId.
+app.post('/api/counters/camera-events', async (req, res) => {
+  try {
+    const event = req.body as CameraCounterEvent;
+    const cameraId = normalizeCameraId(event.cameraId);
+    const totalBags = Number(event.totalBags);
+    const timestamp = String(event.timestamp || getLocalISOString());
+
+    if (!cameraId) {
+      return res.status(400).json({ error: 'cameraId is required' });
+    }
+    if (!Number.isFinite(totalBags) || totalBags < 0) {
+      return res.status(400).json({ error: 'totalBags must be a non-negative number' });
+    }
+
+    const line = findLineByCameraId(cameraId);
+    if (!line || !line.enabled) {
+      return res.status(404).json({ error: `cameraId ${cameraId} is not mapped to an enabled line` });
+    }
+
+    const runtime = cameraLineRuntime[line.lineId];
+    const previousTotal = runtime.totalBags;
+    runtime.totalBags = totalBags;
+    runtime.lastEventAt = timestamp;
+    runtime.status = 'online';
+
+    const deltaBags = Math.max(0, totalBags - previousTotal);
+
+    const payload = {
+      lineId: line.lineId,
+      cameraId,
+      totalBags,
+      deltaBags,
+      timestamp,
+      status: runtime.status,
+    };
+
+    io.emit('camera-count:updated', payload);
+
+    return res.json({ success: true, ...payload });
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+// Dev helper to simulate line increments without cameras.
+app.post('/api/counters/camera-events/dev-simulate', async (req, res) => {
+  try {
+    const lineId = Number(req.body.lineId);
+    const increment = Number(req.body.increment ?? 1);
+
+    if (!Number.isInteger(lineId) || lineId < 1 || lineId > CAMERA_LINE_COUNT) {
+      return res.status(400).json({ error: `lineId must be between 1 and ${CAMERA_LINE_COUNT}` });
+    }
+    if (!Number.isFinite(increment) || increment < 0) {
+      return res.status(400).json({ error: 'increment must be a non-negative number' });
+    }
+
+    const config = cameraLineConfigs.find((line) => line.lineId === lineId);
+    if (!config || !config.cameraId) {
+      return res.status(400).json({ error: `line ${lineId} does not have a cameraId assigned` });
+    }
+
+    const runtime = cameraLineRuntime[lineId];
+    const totalBags = runtime.totalBags + increment;
+    const timestamp = getLocalISOString();
+    runtime.totalBags = totalBags;
+    runtime.lastEventAt = timestamp;
+    runtime.status = 'online';
+
+    const payload = {
+      lineId,
+      cameraId: config.cameraId,
+      totalBags,
+      deltaBags: increment,
+      timestamp,
+      status: runtime.status,
+      simulated: true,
+    };
+
+    io.emit('camera-count:updated', payload);
+
+    return res.json({ success: true, ...payload });
+  } catch (error: any) {
+    return res.status(400).json({ error: error.message });
   }
 });
 

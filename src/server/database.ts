@@ -338,7 +338,6 @@ export class DatabaseService implements IDatabaseService {
       CREATE INDEX IF NOT EXISTS idx_dept_emp_shifts_employee ON department_employee_shifts(employeeId);
       CREATE INDEX IF NOT EXISTS idx_kiosk_employees_department ON kiosk_employees(department);
       CREATE INDEX IF NOT EXISTS idx_kiosk_employees_employee ON kiosk_employees(employeeId);
-      CREATE INDEX IF NOT EXISTS idx_kiosk_employees_active ON kiosk_employees(isActive);
 
       CREATE TABLE IF NOT EXISTS work_orders (
         id TEXT PRIMARY KEY,
@@ -708,10 +707,19 @@ export class DatabaseService implements IDatabaseService {
       upsertExec.run(exec.name, exec.pin, exec.role, now, now);
     }
 
+    // Migration: add isActive to executives if missing (older local DBs)
+    const execColumns = this.db.pragma('table_info(executives)') as any[];
+    const execColumnNames = execColumns.map((c: any) => String(c.name));
+    if (!execColumnNames.includes('isActive')) {
+      this.db.exec('ALTER TABLE executives ADD COLUMN isActive INTEGER DEFAULT 1');
+      this.db.exec('UPDATE executives SET isActive = 1 WHERE isActive IS NULL');
+    }
+
     const kioskEmployeeColumns = this.db.pragma('table_info(kiosk_employees)') as any[];
     const kioskEmployeeColumnNames = kioskEmployeeColumns.map((column) => String(column.name));
     if (!kioskEmployeeColumnNames.includes('isActive')) {
       this.db.exec('ALTER TABLE kiosk_employees ADD COLUMN isActive INTEGER NOT NULL DEFAULT 1');
+      this.db.exec('CREATE INDEX IF NOT EXISTS idx_kiosk_employees_active ON kiosk_employees(isActive)');
     }
 
     this.db.prepare('UPDATE kiosk_employees SET isActive = 1 WHERE isActive IS NULL').run();
