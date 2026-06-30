@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import screenshot from 'screenshot-desktop';
 import { PNG } from 'pngjs';
-import pixelmatch from 'pixelmatch';
 
 interface CaptureRegion {
   x: number;
@@ -287,14 +286,10 @@ export class WindowCaptureService {
           continue;
         }
 
-        const diff = new PNG({ width: regionFrame.width, height: regionFrame.height });
-        const motionPixels = pixelmatch(
-          state.previousRegionPng.data,
-          regionFrame.data,
-          diff.data,
-          regionFrame.width,
-          regionFrame.height,
-          { threshold: line.diffThreshold }
+        const motionPixels = this.countChangedPixels(
+          state.previousRegionPng,
+          regionFrame,
+          line.diffThreshold
         );
 
         state.previousRegionPng = regionFrame;
@@ -318,6 +313,29 @@ export class WindowCaptureService {
     } finally {
       this.isScanning = false;
     }
+  }
+
+  private countChangedPixels(previous: PNG, current: PNG, diffThreshold: number): number {
+    if (previous.width !== current.width || previous.height !== current.height) {
+      return current.width * current.height;
+    }
+
+    const threshold = Math.max(0, Math.min(1, diffThreshold));
+    const perPixelChannelDelta = threshold * 255;
+    let changed = 0;
+
+    for (let i = 0; i < current.data.length; i += 4) {
+      const dr = Math.abs(current.data[i] - previous.data[i]);
+      const dg = Math.abs(current.data[i + 1] - previous.data[i + 1]);
+      const db = Math.abs(current.data[i + 2] - previous.data[i + 2]);
+
+      const avgDelta = (dr + dg + db) / 3;
+      if (avgDelta > perPixelChannelDelta) {
+        changed += 1;
+      }
+    }
+
+    return changed;
   }
 
   private cropFrame(frame: PNG, region: CaptureRegion): PNG | null {
