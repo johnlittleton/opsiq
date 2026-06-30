@@ -257,6 +257,39 @@ export default function LaborKioskAdmin() {
     }
   };
 
+  const deleteEmployee = async (employee: KioskEmployee) => {
+    if (!authToken) {
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete ${employee.employeeName} from kiosk employee roster?`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setSuccess(null);
+
+      const response = await fetch(`${API_BASE}/api/labor/kiosk-employees/${employee.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: 'Failed to delete employee' }));
+        throw new Error(payload.error || 'Failed to delete employee');
+      }
+
+      setSuccess(`${employee.employeeName} was deleted.`);
+      await fetchEmployees(authToken);
+    } catch (deleteError: any) {
+      setError(deleteError.message || 'Failed to delete employee');
+    }
+  };
+
   return (
     <div className="labor-kiosk-admin">
       <TitleBar showLegend={false} />
@@ -397,6 +430,9 @@ export default function LaborKioskAdmin() {
                           <span>{employee.employeeId}</span>
                           <span>{DEPARTMENT_LABELS[employee.department]}</span>
                         </div>
+                      </div>
+                      <div className="labor-kiosk-admin__item-actions">
+                        <button type="button" onClick={() => void deleteEmployee(employee)}>Delete</button>
                       </div>
                     </article>
                   ))}

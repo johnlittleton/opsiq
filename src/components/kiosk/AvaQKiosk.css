@@ -1,0 +1,376 @@
+/* ============================================================
+   AvaQ Full-Screen Kiosk
+   The only thing on this page is AvaQ.
+   ============================================================ */
+
+/* Root — covers the entire viewport, no scroll */
+.avaq-fs {
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(3, 10, 24, 0.62), rgba(2, 8, 20, 0.72)),
+    url("/Background.png") center center / cover no-repeat fixed;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #e8f2ff;
+  user-select: none;
+}
+
+/* Avatar canvas — fills the whole background */
+.avaq-fs__avatar {
+  position: absolute;
+  inset: 0;
+}
+
+.avaq-fs__avatar .avaq-agent {
+  width: 100%;
+  height: 100%;
+}
+
+.avaq-fs__avatar .avaq-agent__canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.avaq-fs__avatar .avaq-fbx-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background:
+    /* Spotlight on avatar */
+    radial-gradient(circle at 50% 45%, rgba(56, 189, 248, 0.2), transparent 55%),
+    /* Tech glow left */
+    radial-gradient(ellipse 400px 600px at 15% 50%, rgba(59, 130, 246, 0.08), transparent 100%),
+    /* Tech glow right */
+    radial-gradient(ellipse 400px 600px at 85% 50%, rgba(139, 92, 246, 0.08), transparent 100%),
+    /* Vignette edges */
+    radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.4) 100%);
+}
+
+.avaq-fs__avatar .avaq-fbx-avatar__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Wordmark — top-center floating */
+.avaq-fs__wordmark {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.avaq-fs__wordmark-a {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #ffffff;
+  text-shadow: 0 0 24px rgba(56, 152, 255, 0.7);
+}
+
+.avaq-fs__wordmark-sub {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  color: rgba(140, 190, 255, 0.7);
+  text-transform: uppercase;
+}
+
+/* Subtitle — bottom of avatar, above controls */
+.avaq-fs__subtitle {
+  position: absolute;
+  bottom: 190px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, 88vw);
+  text-align: center;
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #ffffff;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  padding: 12px 20px;
+  background: rgba(5, 13, 26, 0.55);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+}
+
+/* Controls bar — pinned at very bottom */
+.avaq-fs__controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px 28px;
+  background: linear-gradient(to top, rgba(5, 13, 26, 0.96) 0%, rgba(5, 13, 26, 0) 100%);
+}
+
+/* Mic button */
+.avaq-fs__mic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 36px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(15, 30, 70, 0.7);
+  color: #c8dfff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  backdrop-filter: blur(8px);
+  touch-action: none;
+}
+
+.avaq-fs__mic:hover:not(:disabled) {
+  background: rgba(30, 60, 130, 0.85);
+  border-color: rgba(100, 160, 255, 0.6);
+}
+
+.avaq-fs__mic--on {
+  background: rgba(37, 99, 235, 0.88) !important;
+  border-color: #60a5fa !important;
+  color: #ffffff !important;
+  transform: scale(1.04);
+  box-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
+  animation: avaq-pulse 1.4s ease-in-out infinite;
+}
+
+.avaq-fs__mic:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes avaq-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(96, 165, 250, 0.4); }
+  50%       { box-shadow: 0 0 36px rgba(96, 165, 250, 0.8); }
+}
+
+/* Text fallback row */
+.avaq-fs__text-row {
+  display: flex;
+  gap: 8px;
+  width: min(620px, 90vw);
+}
+
+.avaq-fs__text-input {
+  flex: 1;
+  background: rgba(15, 30, 70, 0.7);
+  border: 1px solid rgba(100, 140, 220, 0.35);
+  border-radius: 12px;
+  color: #dce9ff;
+  font-size: 16px;
+  padding: 12px 16px;
+  backdrop-filter: blur(8px);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.avaq-fs__text-input::placeholder {
+  color: rgba(120, 160, 220, 0.55);
+}
+
+.avaq-fs__text-input:focus {
+  border-color: rgba(100, 160, 255, 0.7);
+}
+
+.avaq-fs__send {
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.avaq-fs__send:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.avaq-fs__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Tiny gear — always in bottom-right */
+.avaq-fs__gear {
+  position: absolute;
+  bottom: 14px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: rgba(100, 140, 200, 0.4);
+  cursor: pointer;
+  padding: 6px;
+  transition: color 0.2s;
+  z-index: 20;
+}
+
+.avaq-fs__gear:hover {
+  color: rgba(140, 180, 255, 0.85);
+}
+
+/* ── Overlays ── */
+.avaq-fs__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 8, 18, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  backdrop-filter: blur(4px);
+}
+
+.avaq-fs__box {
+  background: #0d1e3d;
+  border: 1px solid #1f3d7a;
+  border-radius: 16px;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: 280px;
+}
+
+.avaq-fs__box h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #c8dfff;
+  font-weight: 700;
+}
+
+.avaq-fs__pin-input {
+  width: 100%;
+  text-align: center;
+  font-size: 28px;
+  letter-spacing: 0.3em;
+  background: #07132a;
+  border: 1px solid #2a4a8a;
+  border-radius: 10px;
+  color: #e8f2ff;
+  padding: 12px;
+  outline: none;
+}
+
+.avaq-fs__pin-input:focus {
+  border-color: #4c8ef0;
+}
+
+.avaq-fs__pin-error {
+  color: #f87171;
+  font-size: 13px;
+}
+
+.avaq-fs__box-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.avaq-fs__box-btn {
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.avaq-fs__box-btn:hover {
+  background: #1d4ed8;
+}
+
+.avaq-fs__box-btn--ghost {
+  background: transparent;
+  border: 1px solid #2a4a8a;
+  color: #8aaee8;
+}
+
+.avaq-fs__box-btn--ghost:hover {
+  background: #17274a;
+}
+
+/* Admin panel — slides up from bottom */
+.avaq-fs__admin {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #0a1830;
+  border-top: 1px solid #1f3566;
+  z-index: 25;
+  padding: 0 0 24px;
+}
+
+.avaq-fs__admin-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid #1f3566;
+  font-size: 14px;
+  font-weight: 700;
+  color: #c8dfff;
+}
+
+.avaq-fs__admin-bar button {
+  background: transparent;
+  border: none;
+  color: #8aaee8;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.avaq-fs__admin-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.avaq-fs__admin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #8aaee8;
+}
+
+.avaq-fs__admin-row input[type="text"],
+.avaq-fs__admin-row input:not([type="checkbox"]) {
+  background: #07132a;
+  border: 1px solid #2a4a8a;
+  border-radius: 8px;
+  color: #dce9ff;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.avaq-fs__admin-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}

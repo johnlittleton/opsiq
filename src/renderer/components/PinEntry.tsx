@@ -7,7 +7,7 @@ import opsiqLogo from '../../../assets/opsiq-logo.png';
 import atlasLogo from '../../../assets/atlas-logo.png';
 
 interface PinEntryProps {
-  onSuccess: (executiveName: string, userRole: string) => void;
+  onSuccess: (executiveName: string, userRole: string, sessionToken: string) => void;
 }
 
 export default function PinEntry({ onSuccess }: PinEntryProps) {
@@ -47,7 +47,7 @@ export default function PinEntry({ onSuccess }: PinEntryProps) {
       const data = await response.json();
 
       if (data.success) {
-        onSuccess(data.name, data.role);
+        onSuccess(data.name, data.role, data.sessionToken || '');
       } else {
         setError('Invalid PIN');
         setPin('');

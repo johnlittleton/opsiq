@@ -23,6 +23,12 @@ export const HomePage: React.FC = () => {
       onClick: () => navigate('/checkin'),
     },
     {
+      icon: '🤖',
+      title: 'Driver Avatar',
+      description: 'Open the dedicated avatar stage view',
+      onClick: () => navigate('/driver-avatar'),
+    },
+    {
       icon: '👥',
       title: 'Active Drivers',
       description: 'View and manage currently checked-in drivers',
@@ -85,6 +91,12 @@ export const HomePage: React.FC = () => {
   ];
 
   const managementCards = [
+    ...((userRole === 'executive' || userRole === 'manager') ? [{
+      icon: '🤖',
+      title: 'AI Dual Entry',
+      description: 'Mirror Famous WMS entries with runner status and exception review',
+      onClick: () => navigate('/ai-dual-entry'),
+    }] : []),
     ...(userRole === 'executive' ? [{
       icon: '📊',
       title: 'Executive Dashboard',

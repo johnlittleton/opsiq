@@ -1,0 +1,217 @@
+.rigged-avatar {
+  position: relative;
+  width: min(92vw, 520px);
+  aspect-ratio: 1;
+}
+
+.rigged-avatar__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(56, 189, 248, 0.22);
+  box-shadow:
+    inset 0 0 44px rgba(56, 189, 248, 0.14),
+    0 0 44px rgba(56, 189, 248, 0.18);
+}
+
+.rigged-avatar__ring::before,
+.rigged-avatar__ring::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+}
+
+.rigged-avatar__ring::before {
+  inset: 34px;
+  border: 1px dashed rgba(125, 211, 252, 0.28);
+}
+
+.rigged-avatar__ring::after {
+  inset: 72px;
+  border: 1px solid rgba(30, 64, 175, 0.35);
+}
+
+.rigged-avatar__layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rigged-avatar__layer img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.rigged-avatar__layer--torso {
+  z-index: 1;
+  clip-path: polygon(10% 59%, 90% 59%, 98% 100%, 2% 100%);
+  filter: drop-shadow(0 24px 32px rgba(2, 6, 23, 0.5));
+}
+
+.rigged-avatar__layer--head {
+  z-index: 2;
+  clip-path: polygon(18% 8%, 82% 8%, 92% 66%, 8% 66%);
+  transform-origin: 50% 62%;
+  filter: drop-shadow(0 10px 22px rgba(14, 165, 233, 0.25));
+}
+
+.rigged-avatar__eye,
+.rigged-avatar__mouth {
+  position: absolute;
+  z-index: 3;
+}
+
+.rigged-avatar__eye {
+  width: 7.2%;
+  height: 2.4%;
+  min-height: 8px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.82);
+  box-shadow:
+    0 0 18px rgba(56, 189, 248, 0.8),
+    0 0 8px rgba(103, 232, 249, 0.8) inset;
+  top: 42.3%;
+}
+
+.rigged-avatar__eye--left {
+  left: 41%;
+}
+
+.rigged-avatar__eye--right {
+  left: 52.8%;
+}
+
+.rigged-avatar__mouth {
+  width: 6.4%;
+  min-width: 24px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(125, 211, 252, 0.88);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+  top: 52.6%;
+  left: 50%;
+  transform: translateX(-50%) scaleY(0.28);
+  opacity: 0;
+}
+
+.rigged-avatar--idle .rigged-avatar__layer--head {
+  animation: rigHeadIdle 3s ease-in-out infinite;
+}
+
+.rigged-avatar--idle .rigged-avatar__eye,
+.rigged-avatar--listening .rigged-avatar__eye {
+  animation: rigBlink 6s ease-in-out infinite;
+}
+
+.rigged-avatar--listening .rigged-avatar__ring {
+  animation: rigRingSpin 14s linear infinite;
+}
+
+.rigged-avatar--listening .rigged-avatar__layer--head {
+  animation: rigHeadListen 1.4s ease-in-out infinite;
+}
+
+.rigged-avatar--speaking .rigged-avatar__ring {
+  animation: rigRingSpin 8s linear infinite;
+}
+
+.rigged-avatar--speaking .rigged-avatar__layer--head {
+  animation: rigHeadTalk 0.38s ease-in-out infinite;
+}
+
+.rigged-avatar--speaking .rigged-avatar__eye {
+  animation: rigEyeTalk 0.24s ease-in-out infinite;
+}
+
+.rigged-avatar--speaking .rigged-avatar__mouth {
+  opacity: 0.96;
+  animation: rigMouthTalk 0.18s ease-in-out infinite;
+}
+
+@keyframes rigRingSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rigHeadIdle {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  50% {
+    transform: rotate(0.8deg) translateY(-2px);
+  }
+}
+
+@keyframes rigHeadListen {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-1.4deg) translateY(-1px);
+  }
+}
+
+@keyframes rigHeadTalk {
+  0%,
+  100% {
+    transform: rotate(-0.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(0.8deg) translateY(-2px);
+  }
+}
+
+@keyframes rigBlink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+    opacity: 0.95;
+  }
+  94% {
+    transform: scaleY(0.1);
+    opacity: 0.72;
+  }
+}
+
+@keyframes rigEyeTalk {
+  0%,
+  100% {
+    opacity: 0.84;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes rigMouthTalk {
+  0%,
+  100% {
+    transform: translateX(-50%) scaleY(0.28);
+    height: 6px;
+  }
+  50% {
+    transform: translateX(-50%) scaleY(1);
+    height: 18px;
+  }
+}
+
+@media (max-width: 900px) {
+  .rigged-avatar {
+    width: min(94vw, 500px);
+  }
+}
+
+@media (max-width: 640px) {
+  .rigged-avatar {
+    width: min(96vw, 380px);
+  }
+}

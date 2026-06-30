@@ -11,6 +11,11 @@ updates/
 *.db-journal
 *.db-wal
 *.db-shm
+data/camera-edge-state.json
+data/argus-compat-state.json
+data/window-capture-state.json
+data/dual-entry-runner-state.json
+runner-config.json
 
 # Environment
 .env

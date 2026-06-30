@@ -17,6 +17,8 @@ interface CostingData {
     totalOrders: number;
     activeLineCount: number;
     supportHeadcount: number;
+    managerHourlyOverhead?: number;
+    kpiTargetCostPerCase?: number;
   };
   byProduct: Array<{
     product: string;
@@ -58,6 +60,8 @@ interface CostingData {
     totalTimeHours: number;
     casesPerHour: number;
     bagsPerHour: number;
+    overKpi?: boolean;
+    kpiVariance?: number;
   }>;
   bestPerformer: {
     product: string;
@@ -115,6 +119,8 @@ const ProductionCosting: React.FC = () => {
           totalOrders: 0,
           activeLineCount: 0,
           supportHeadcount: 6,
+          managerHourlyOverhead: 0,
+          kpiTargetCostPerCase: 1.25,
         },
         byProduct: [],
         byBagSize: [],
@@ -262,6 +268,12 @@ const ProductionCosting: React.FC = () => {
                 subtitle={`${(costingData.totals.totalOrders || 0).toLocaleString()} work orders`}
                 variant="green"
               />
+              <StatPanel
+                title="KPI Target / Case"
+                value={`$${(costingData.totals.kpiTargetCostPerCase || 1.25).toFixed(2)}`}
+                subtitle="Production labor KPI"
+                variant="blue"
+              />
             </div>
 
             {/* Best/Worst Performers */}
@@ -402,11 +414,13 @@ const ProductionCosting: React.FC = () => {
                       <th className="align-right">Support Labor</th>
                       <th className="align-right">Total Labor</th>
                       <th className="align-right">Cost Per Case</th>
+                      <th className="align-right">KPI Variance</th>
+                      <th className="align-center">KPI Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {costingData.byLine.map((item, idx) => (
-                      <tr key={idx}>
+                      <tr key={idx} className={item.overKpi ? 'kpi-row--miss' : 'kpi-row--hit'}>
                         <td className="line-number">Line {item.lineNumber}</td>
                         <td className="number">{item.totalCases.toLocaleString()}</td>
                         <td className="number">{(item.totalBags || 0).toLocaleString()}</td>
@@ -417,6 +431,14 @@ const ProductionCosting: React.FC = () => {
                         <td className="currency">${(item.supportLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.totalLaborCost || 0).toFixed(2)}</td>
                         <td className="currency">${(item.costPerCase || 0).toFixed(3)}</td>
+                        <td className={`number ${item.overKpi ? 'kpi-variance--miss' : 'kpi-variance--hit'}`}>
+                          {(item.kpiVariance || 0) >= 0 ? '+' : ''}${(item.kpiVariance || 0).toFixed(3)}
+                        </td>
+                        <td className="align-center">
+                          <span className={`kpi-pill ${item.overKpi ? 'kpi-pill--miss' : 'kpi-pill--hit'}`}>
+                            {item.overKpi ? 'Above KPI' : 'On Target'}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -430,7 +452,9 @@ const ProductionCosting: React.FC = () => {
               <ul>
                 <li><strong>Direct Labor:</strong> Assigned workers per work order × elapsed hours × hourly wage.</li>
                 <li><strong>Support Labor:</strong> Fixed shared crew of 6 people (2 taggers, 2 strappers, 1 floor lead, 1 lumper) allocated across active lines for the selected period.</li>
+                <li><strong>Pack Room Management Overhead:</strong> Includes Ryan + Sal annual salaries prorated hourly and allocated across active production lines.</li>
                 <li><strong>Cost Per Case:</strong> (Direct + Support labor) ÷ total cases produced. This is labor-only costing.</li>
+                <li><strong>KPI Target:</strong> Production labor KPI target is $1.25 per case. Rows marked "Above KPI" are missing target.</li>
                 <li><strong>Historical Averages:</strong> Use these metrics as baseline for quoting new customers with similar products.</li>
                 <li><strong>Efficiency Analysis:</strong> Lower cost per case = more efficient production. Consider when negotiating pricing.</li>
                 <li><strong>Line Performance:</strong> Cases/hour shows throughput. Higher is better for capacity planning.</li>

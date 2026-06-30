@@ -1,0 +1,47 @@
+{
+  "initialDelayMs": 400,
+  "betweenKeysDelayMs": 60,
+  "beforeHeaderKeys": "",
+  "afterHeaderKeys": "{TAB}",
+  "afterEachHeaderFieldKeys": "{TAB}",
+  "headerFieldOrder": [
+    "receiptNo",
+    "receiveDate",
+    "poNumber",
+    "orderNumber",
+    "whseLoc",
+    "ref",
+    "lotId",
+    "carrierId",
+    "description",
+    "access",
+    "inventoryQnt",
+    "receiveType"
+  ],
+  "receiveTypeMap": {
+    "Grower": "G",
+    "Transfer": "T",
+    "PO": "P",
+    "Misc": "M"
+  },
+  "lineEntryStartKeys": "{TAB}",
+  "afterEachLineFieldKeys": "{TAB}",
+  "lineFieldOrder": [
+    "commodity",
+    "style",
+    "size",
+    "grade",
+    "label",
+    "region",
+    "method",
+    "color",
+    "invQnt",
+    "invUom",
+    "variety",
+    "palletCopies",
+    "lotId",
+    "productDescription"
+  ],
+  "nextLineKeys": "{DOWN}",
+  "finalizationKeys": ""
+}
