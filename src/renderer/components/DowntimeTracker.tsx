@@ -42,6 +42,7 @@ export default function DowntimeTracker() {
 
   const [showModal, setShowModal] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [activeDowntimes, setActiveDowntimes] = useState<Downtime[]>([]);
   const [line, setLine] = useState(1);
   const [reason, setReason] = useState('');
@@ -57,7 +58,7 @@ export default function DowntimeTracker() {
   }, []);
 
   useEffect(() => {
-    if (activeDowntimes.length > 0) {
+    if (activeDowntimes.length > 0 && !isMinimized) {
       setIsExpanded(true);
       return;
     }
@@ -65,7 +66,7 @@ export default function DowntimeTracker() {
     if (!showModal) {
       setIsExpanded(false);
     }
-  }, [activeDowntimes.length, showModal]);
+  }, [activeDowntimes.length, showModal, isMinimized]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -131,6 +132,7 @@ export default function DowntimeTracker() {
       });
 
       if (response.ok) {
+        setIsMinimized(false);
         setIsExpanded(true);
         setShowModal(false);
         setReason('');
@@ -190,13 +192,13 @@ export default function DowntimeTracker() {
           <button
             className="downtime-tracker__collapse-btn"
             onClick={() => {
-              if (activeDowntimes.length === 0 && !showModal) {
-                setIsExpanded(false);
-              }
+              setShowModal(false);
+              setIsExpanded(false);
+              setIsMinimized(true);
             }}
-            title={activeDowntimes.length > 0 ? 'End active downtimes before collapsing' : 'Collapse downtime tracker'}
+            title="Minimize downtime tracker"
           >
-            ×
+            —
           </button>
         </div>
       )}
@@ -204,11 +206,15 @@ export default function DowntimeTracker() {
       <button
         className="btn-downtime"
         onClick={() => {
+          setIsMinimized(false);
           setIsExpanded(true);
           setShowModal(true);
         }}
       >
         {isExpanded ? '⏱️ Log Downtime' : '⏱️ Downtime'}
+        {!isExpanded && activeDowntimes.length > 0 && (
+          <span className="downtime-active-pill">{activeDowntimes.length}</span>
+        )}
       </button>
 
       {isExpanded && activeDowntimes.length > 0 && (
