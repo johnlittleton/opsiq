@@ -179,8 +179,8 @@ export default function DowntimeTracker() {
 
   return (
     <div
-      className={`downtime-tracker downtime-tracker--floating ${isExpanded ? 'downtime-tracker--expanded' : 'downtime-tracker--collapsed'}`}
-      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+      className={`downtime-tracker ${isExpanded ? 'downtime-tracker--floating downtime-tracker--expanded' : 'downtime-tracker--collapsed'}`}
+      style={isExpanded ? { left: `${position.x}px`, top: `${position.y}px` } : undefined}
     >
       {isExpanded && (
         <div className="downtime-tracker__header">
