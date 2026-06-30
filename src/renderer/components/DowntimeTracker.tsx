@@ -41,6 +41,7 @@ export default function DowntimeTracker() {
   };
 
   const [showModal, setShowModal] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [activeDowntimes, setActiveDowntimes] = useState<Downtime[]>([]);
   const [line, setLine] = useState(1);
   const [reason, setReason] = useState('');
@@ -54,6 +55,17 @@ export default function DowntimeTracker() {
     const interval = setInterval(fetchActiveDowntimes, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (activeDowntimes.length > 0) {
+      setIsExpanded(true);
+      return;
+    }
+
+    if (!showModal) {
+      setIsExpanded(false);
+    }
+  }, [activeDowntimes.length, showModal]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -119,6 +131,7 @@ export default function DowntimeTracker() {
       });
 
       if (response.ok) {
+        setIsExpanded(true);
         setShowModal(false);
         setReason('');
         setNotes('');
@@ -165,15 +178,40 @@ export default function DowntimeTracker() {
   };
 
   return (
-    <div className="downtime-tracker downtime-tracker--floating" style={{ left: `${position.x}px`, top: `${position.y}px` }}>
-      <div className="downtime-tracker__drag-handle" onMouseDown={beginDrag}>
-        ⠿ Downtime Tracker
-      </div>
-      <button className="btn-downtime" onClick={() => setShowModal(true)}>
-        ⏱️ Log Downtime
+    <div
+      className={`downtime-tracker downtime-tracker--floating ${isExpanded ? 'downtime-tracker--expanded' : 'downtime-tracker--collapsed'}`}
+      style={{ left: `${position.x}px`, top: `${position.y}px` }}
+    >
+      {isExpanded && (
+        <div className="downtime-tracker__header">
+          <div className="downtime-tracker__drag-handle" onMouseDown={beginDrag}>
+            ⠿ Downtime Tracker
+          </div>
+          <button
+            className="downtime-tracker__collapse-btn"
+            onClick={() => {
+              if (activeDowntimes.length === 0 && !showModal) {
+                setIsExpanded(false);
+              }
+            }}
+            title={activeDowntimes.length > 0 ? 'End active downtimes before collapsing' : 'Collapse downtime tracker'}
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      <button
+        className="btn-downtime"
+        onClick={() => {
+          setIsExpanded(true);
+          setShowModal(true);
+        }}
+      >
+        {isExpanded ? '⏱️ Log Downtime' : '⏱️ Downtime'}
       </button>
 
-      {activeDowntimes.length > 0 && (
+      {isExpanded && activeDowntimes.length > 0 && (
         <div className="active-downtimes">
           <h3>Active Downtime</h3>
           {activeDowntimes.map(dt => (

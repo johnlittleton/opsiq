@@ -13,6 +13,21 @@
   padding: 10px;
 }
 
+.downtime-tracker--collapsed {
+  width: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.downtime-tracker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .downtime-tracker__drag-handle {
   cursor: move;
   user-select: none;
@@ -21,6 +36,23 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   margin-bottom: 8px;
+}
+
+.downtime-tracker__collapse-btn {
+  margin-bottom: 8px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #556079;
+  background: rgba(26, 31, 43, 0.9);
+  color: #c9d2e3;
+  font-size: 1rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.downtime-tracker__collapse-btn:hover {
+  border-color: #7b879f;
+  color: #ffffff;
 }
 
 .btn-downtime {
