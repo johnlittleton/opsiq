@@ -36,6 +36,10 @@ export class DatabaseService implements IDatabaseService {
   private static readonly MAX_REASONABLE_PALLETS = 200;
   private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
   private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
+  private static readonly PROD_COST_KPI_PER_CASE = 1.25;
+  private static readonly PACK_MANAGER_ANNUAL_SALARY = 135000;
+  private static readonly ASSISTANT_PACK_MANAGER_ANNUAL_SALARY = 75000;
+  private static readonly ANNUAL_WORK_HOURS = 2080;
   private static readonly DEFAULT_PROD_HOURLY_WAGE = 24.5;
 
   constructor(dbPath?: string) {
@@ -663,7 +667,7 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Michelle', pin: '57263', role: 'manager' },
         { name: 'Izzy', pin: '69384', role: 'executive' },
         { name: 'John', pin: '78420', role: 'executive' },
-        { name: 'Ryan', pin: '34090', role: 'manager' },
+        { name: 'Ryan', pin: '34090', role: 'executive' },
         { name: 'Victor Roman', pin: '86214', role: 'manager' },
         { name: 'Erasmo Sanchez', pin: '97531', role: 'manager' },
         { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
@@ -2262,15 +2266,20 @@ export class DatabaseService implements IDatabaseService {
       throw new Error('employeeName is required');
     }
 
+    const now = getLocalISOString();
     const existing = this.db.prepare(`
-      SELECT id FROM kiosk_employees WHERE department = ? AND employeeId = ?
-    `).get(department, employeeId) as { id: number } | undefined;
+      SELECT * FROM kiosk_employees WHERE department = ? AND employeeId = ?
+    `).get(department, employeeId) as any;
 
     if (existing) {
-      throw new Error('Employee already exists in that department');
+      this.db.prepare(`
+        UPDATE kiosk_employees
+        SET employeeName = ?, badgeCode = ?, isActive = 1, updatedAt = ?
+        WHERE id = ?
+      `).run(employeeName, badgeCode, now, existing.id);
+      return this.db.prepare('SELECT * FROM kiosk_employees WHERE id = ?').get(existing.id);
     }
 
-    const now = getLocalISOString();
     const result = this.db.prepare(`
       INSERT INTO kiosk_employees (department, employeeId, employeeName, badgeCode, isActive, createdBy, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -2350,6 +2359,11 @@ export class DatabaseService implements IDatabaseService {
     `).run(now, id);
 
     return this.db.prepare('SELECT * FROM kiosk_employees WHERE id = ?').get(id);
+  }
+
+  deleteKioskEmployee(id: number): boolean {
+    const result = this.db.prepare('DELETE FROM kiosk_employees WHERE id = ?').run(id);
+    return result.changes > 0;
   }
 
   scanDepartmentEmployee(data: {
@@ -3045,6 +3059,9 @@ export class DatabaseService implements IDatabaseService {
   getProductionCostingAnalytics(startDate?: string, endDate?: string): any {
     const PROD_HOURLY_WAGE = 24.50;
     const SHARED_SUPPORT_HEADCOUNT = 6; // 2 taggers + 2 strappers + 1 floor lead + 1 lumper
+    const managerHourlyOverhead = (
+      DatabaseService.PACK_MANAGER_ANNUAL_SALARY + DatabaseService.ASSISTANT_PACK_MANAGER_ANNUAL_SALARY
+    ) / DatabaseService.ANNUAL_WORK_HOURS;
     const today = getLocalISOString().split('T')[0];
     const start = startDate || today;
     const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
@@ -3066,6 +3083,7 @@ export class DatabaseService implements IDatabaseService {
     });
     const activeLineCount = activeLines.size > 0 ? activeLines.size : 1;
     const supportWorkersPerLine = SHARED_SUPPORT_HEADCOUNT / activeLineCount;
+    const managerHourlyOverheadPerLine = managerHourlyOverhead / activeLineCount;
 
     // Aggregate by commodity/product
     const productBreakdown: Record<string, {
@@ -3114,6 +3132,8 @@ export class DatabaseService implements IDatabaseService {
       totalTimeHours: number;
       casesPerHour: number;
       bagsPerHour: number;
+      overKpi?: boolean;
+      kpiVariance?: number;
     }> = {};
 
     workOrders.forEach(wo => {
@@ -3121,7 +3141,9 @@ export class DatabaseService implements IDatabaseService {
       // labor = number of workers, elapsedMs = time spent
       const timeHours = (wo.elapsedMs || 0) / (1000 * 60 * 60);
       const directLaborCost = (wo.labor || 0) * timeHours * PROD_HOURLY_WAGE;
-      const supportLaborCost = supportWorkersPerLine * timeHours * PROD_HOURLY_WAGE;
+      const supportLaborCost =
+        supportWorkersPerLine * timeHours * PROD_HOURLY_WAGE +
+        managerHourlyOverheadPerLine * timeHours;
       const laborCost = directLaborCost + supportLaborCost;
 
       // Product aggregation
@@ -3226,6 +3248,8 @@ export class DatabaseService implements IDatabaseService {
       l.costPerCase = l.totalCases > 0 ? l.totalLaborCost / l.totalCases : 0;
       l.casesPerHour = l.totalTimeHours > 0 ? l.totalCases / l.totalTimeHours : 0;
       l.bagsPerHour = l.totalTimeHours > 0 ? l.totalBags / l.totalTimeHours : 0;
+      l.kpiVariance = l.costPerCase - DatabaseService.PROD_COST_KPI_PER_CASE;
+      l.overKpi = l.kpiVariance > 0;
     });
 
     // Sort arrays
@@ -3256,6 +3280,8 @@ export class DatabaseService implements IDatabaseService {
         totalOrders: workOrders.length,
         activeLineCount,
         supportHeadcount: SHARED_SUPPORT_HEADCOUNT,
+        managerHourlyOverhead: Math.round(managerHourlyOverhead * 100) / 100,
+        kpiTargetCostPerCase: DatabaseService.PROD_COST_KPI_PER_CASE,
       },
       byProduct: products,
       byBagSize: bagSizes,

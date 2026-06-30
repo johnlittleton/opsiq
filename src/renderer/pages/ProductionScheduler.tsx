@@ -19,9 +19,9 @@ const LINES = [
 
 const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00'];
 
-const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
+const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Argentina', 'Dry Inventory'];
 const BAG_SIZES = ['4X5', '4X8', '5X6', '5X8', '6X3', '6X5', '7X4', '8X5', '9X3', '10X3', '10X4', '12X3', '15X2', '15KG', '17X2', '17KG', '18X2', '18KG'];
-const CUSTOMERS = ['Kings River', 'Limoneira', 'Fresh Taste', 'Produce Depot', 'Slingshot', 'Vanguard'];
+const CUSTOMERS = ['Kings River', 'Sunkist', 'ESU', 'Fresh Taste', 'Four Star', 'SAFCO', 'Vanguard', 'SlingShot', 'Produce Depot', 'Buffalo Repack', 'Burnack'];
 const PRIORITIES = ['High', 'Normal', 'Low'];
 const COUNTRIES = ['USA', 'Mexico', 'Chile', 'Peru', 'South Africa', 'Spain', 'Australia', 'Morocco'];
 const ORDER_TYPES = [

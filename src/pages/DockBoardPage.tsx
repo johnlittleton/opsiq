@@ -17,8 +17,20 @@ export const DockBoardPage: React.FC = () => {
   const [, setTick] = useState(0);
   const [editingCheckin, setEditingCheckin] = useState<DockCheckin | null>(null);
   const [parkedTrucks, setParkedTrucks] = useState<DockCheckin[]>([]);
+  const [appointmentsToday, setAppointmentsToday] = useState<any[]>([]);
+  const [activeCheckins, setActiveCheckins] = useState<DockCheckin[]>([]);
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [dockAlertsMinimized, setDockAlertsMinimized] = useState(false);
+
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const normalize = (value: unknown): string => String(value || '').trim().toLowerCase();
   
   // Initialize data sync on mount
   useEffect(() => {
@@ -40,6 +52,27 @@ export const DockBoardPage: React.FC = () => {
     fetchParkedTrucks();
     // Refresh every 10 seconds
     const interval = setInterval(fetchParkedTrucks, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch today's appointments and active check-ins for dock alerting
+  useEffect(() => {
+    const fetchDockAlertData = async () => {
+      try {
+        const today = getLocalDateString(new Date());
+        const [appointments, checkins] = await Promise.all([
+          apiClient.getAppointments({ startDate: today, endDate: today }),
+          apiClient.getActiveCheckins(),
+        ]);
+        setAppointmentsToday(Array.isArray(appointments) ? appointments : []);
+        setActiveCheckins((Array.isArray(checkins) ? checkins : []) as DockCheckin[]);
+      } catch (error) {
+        console.error('Failed to fetch dock alert data:', error);
+      }
+    };
+
+    fetchDockAlertData();
+    const interval = setInterval(fetchDockAlertData, 15000);
     return () => clearInterval(interval);
   }, []);
   
@@ -128,6 +161,48 @@ export const DockBoardPage: React.FC = () => {
     }
   };
 
+  const openAppointments = appointmentsToday.filter((apt: any) => {
+    const status = normalize(apt?.status);
+    return status !== 'completed' && status !== 'cancelled' && status !== 'closed';
+  });
+
+  const notCheckedInAppointments = openAppointments.filter((apt: any) => {
+    const aptPickup = normalize(apt?.pickupNumber);
+    const aptCompany = normalize(apt?.company);
+    const aptType = normalize(apt?.type);
+    const aptDoor = Number(apt?.doorId || 0);
+
+    return !activeCheckins.some((checkin: DockCheckin) => {
+      const checkinPickup = normalize(checkin.pickupNumber);
+      const checkinCompany = normalize(checkin.company);
+      const checkinType = normalize(checkin.inboundOutbound);
+      const checkinDoor = Number(checkin.doorId || 0);
+
+      if (aptPickup && checkinPickup && aptPickup === checkinPickup) return true;
+      if (aptDoor > 0 && checkinDoor > 0 && aptDoor === checkinDoor && aptType && checkinType === aptType) return true;
+      return !!aptCompany && aptCompany === checkinCompany && aptType && checkinType === aptType;
+    });
+  });
+
+  const delayedCheckins = activeCheckins.filter((checkin: DockCheckin) => {
+    const startMs = new Date(checkin.createdAt || checkin.statusStartTime || checkin.updatedAt).getTime();
+    if (!Number.isFinite(startMs)) return false;
+    const elapsedMinutes = (Date.now() - startMs) / (1000 * 60);
+    return elapsedMinutes >= 60;
+  });
+
+  const missedCheckinAlerts = notCheckedInAppointments.map((apt: any) => ({
+    id: `appt-${apt.id}`,
+    message: `${apt.type || 'N/A'} ${apt.pickupNumber ? `#${apt.pickupNumber}` : apt.company || 'Unknown'}`,
+  }));
+
+  const delayedCheckinAlerts = delayedCheckins.map((checkin: DockCheckin) => ({
+    id: `delay-${checkin.id}`,
+    message: `${checkin.inboundOutbound} ${checkin.pickupNumber ? `#${checkin.pickupNumber}` : checkin.company}`,
+  }));
+
+  const dockAlerts = [...missedCheckinAlerts, ...delayedCheckinAlerts];
+
   return (
     <div className="dock-board-page">
       <MessageBanner 
@@ -148,6 +223,49 @@ export const DockBoardPage: React.FC = () => {
       </TitleBar>
       
       <div className="dock-board-page__content">
+        {dockAlerts.length > 0 && !dockAlertsMinimized && (
+          <div className="dock-board-alert" role="alert" aria-live="assertive">
+            <div className="dock-board-alert__header">
+              <span>⚠ Dock Alerts ({dockAlerts.length})</span>
+              <button
+                type="button"
+                className="dock-board-alert__minimize"
+                onClick={() => setDockAlertsMinimized(true)}
+              >
+                Minimize
+              </button>
+            </div>
+
+            {missedCheckinAlerts.length > 0 && (
+              <div className="dock-board-alert__group">
+                <div className="dock-board-alert__group-title">Missed Check-In ({missedCheckinAlerts.length})</div>
+                {missedCheckinAlerts.map((alert) => (
+                  <div key={alert.id} className="dock-board-alert__item">{alert.message}</div>
+                ))}
+              </div>
+            )}
+
+            {delayedCheckinAlerts.length > 0 && (
+              <div className="dock-board-alert__group">
+                <div className="dock-board-alert__group-title">Over 60 Minutes ({delayedCheckinAlerts.length})</div>
+                {delayedCheckinAlerts.map((alert) => (
+                  <div key={alert.id} className="dock-board-alert__item">{alert.message}</div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {dockAlerts.length > 0 && dockAlertsMinimized && (
+          <button
+            type="button"
+            className="dock-board-alert-minimized"
+            onClick={() => setDockAlertsMinimized(false)}
+          >
+            ⚠ Dock Alerts ({dockAlerts.length})
+          </button>
+        )}
+
         <div className="dock-board-page__grid">
           {allDoors.map((door) => (
             <DockTile

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type MouseEvent as ReactMouseEvent } from 'react';
 import { API_BASE } from '../services/config';
 import './DowntimeTracker.css';
 
@@ -32,17 +32,60 @@ interface Downtime {
 }
 
 export default function DowntimeTracker() {
+  const initialPosition = () => {
+    if (typeof window === 'undefined') return { x: 24, y: 140 };
+    return {
+      x: Math.max(24, window.innerWidth - 420),
+      y: Math.max(24, window.innerHeight - 360),
+    };
+  };
+
   const [showModal, setShowModal] = useState(false);
   const [activeDowntimes, setActiveDowntimes] = useState<Downtime[]>([]);
   const [line, setLine] = useState(1);
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState(initialPosition);
 
   useEffect(() => {
     fetchActiveDowntimes();
     const interval = setInterval(fetchActiveDowntimes, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const panelWidth = 390;
+      const panelHeight = 320;
+      const nextX = Math.min(Math.max(8, event.clientX - dragOffset.x), window.innerWidth - panelWidth);
+      const nextY = Math.min(Math.max(8, event.clientY - dragOffset.y), window.innerHeight - panelHeight);
+      setPosition({ x: nextX, y: nextY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
+
+  const beginDrag = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    setIsDragging(true);
+    setDragOffset({
+      x: event.clientX - position.x,
+      y: event.clientY - position.y,
+    });
+  };
 
   const fetchActiveDowntimes = async () => {
     try {
@@ -122,7 +165,10 @@ export default function DowntimeTracker() {
   };
 
   return (
-    <div className="downtime-tracker">
+    <div className="downtime-tracker downtime-tracker--floating" style={{ left: `${position.x}px`, top: `${position.y}px` }}>
+      <div className="downtime-tracker__drag-handle" onMouseDown={beginDrag}>
+        ⠿ Downtime Tracker
+      </div>
       <button className="btn-downtime" onClick={() => setShowModal(true)}>
         ⏱️ Log Downtime
       </button>

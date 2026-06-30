@@ -601,6 +601,16 @@
   font-family: inherit;
 }
 
+.scheduler__customer-select {
+  color: #000;
+  background: #fff;
+}
+
+.scheduler__customer-select option {
+  color: #000;
+  background: #fff;
+}
+
 .scheduler__form-actions {
   display: flex;
   justify-content: space-between;

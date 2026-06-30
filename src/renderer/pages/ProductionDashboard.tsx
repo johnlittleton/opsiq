@@ -17,6 +17,8 @@ const LINES = [
   { id: 6, name: 'Regrade' }
 ];
 
+const LABOR_KPI_TARGET_PER_CASE = 1.25;
+
 export default function ProductionDashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -41,7 +43,10 @@ export default function ProductionDashboard() {
   };
   
   const [workOrders, setWorkOrders] = useState<any[]>([]);
+  const [costingData, setCostingData] = useState<any | null>(null);
+  const [laborInputs, setLaborInputs] = useState<Record<number, number>>({});
   const [checkins, setCheckins] = useState<any[]>([]);
+  const [activeDowntimeLines, setActiveDowntimeLines] = useState<Set<number>>(new Set());
   const [selectedDate] = useState(getLocalDateString(new Date()));
   const [hasDriverAlerts, setHasDriverAlerts] = useState(false);
   const [messengerOpen, setMessengerOpen] = useState(false);
@@ -51,14 +56,20 @@ export default function ProductionDashboard() {
   const [endingShift, setEndingShift] = useState(false);
   const [showShiftReminder, setShowShiftReminder] = useState(false);
   const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
+  const [kpiAlertsMinimized, setKpiAlertsMinimized] = useState(false);
+  const [rateAlertsMinimized, setRateAlertsMinimized] = useState(false);
 
   useEffect(() => {
     fetchWorkOrders();
+    fetchCostingData();
     fetchCheckins();
+    fetchActiveDowntimes();
     checkDriverAlerts();
     const interval = setInterval(() => {
       fetchWorkOrders();
+      fetchCostingData();
       fetchCheckins();
+      fetchActiveDowntimes();
       checkDriverAlerts();
     }, 1000); // Refresh every second to show live updates
     return () => clearInterval(interval);
@@ -103,6 +114,31 @@ export default function ProductionDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch check-ins:', error);
+    }
+  };
+
+  const fetchCostingData = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/production/costing?startDate=${selectedDate}&endDate=${selectedDate}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setCostingData(data);
+    } catch (error) {
+      console.error('Failed to fetch production costing data:', error);
+    }
+  };
+
+  const fetchActiveDowntimes = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/production/downtime`);
+      if (!response.ok) return;
+      const data = await response.json();
+      const active = Array.isArray(data)
+        ? data.filter((d: any) => !d.endTime && Number.isFinite(Number(d.line))).map((d: any) => Number(d.line))
+        : [];
+      setActiveDowntimeLines(new Set(active));
+    } catch (error) {
+      console.error('Failed to fetch active downtimes:', error);
     }
   };
 
@@ -237,12 +273,69 @@ export default function ProductionDashboard() {
     return wo;
   };
 
+  const updateLineLabor = async (lineId: number) => {
+    const wo = getActiveWorkOrder(lineId);
+    if (!wo) return;
+
+    const currentLabor = Number(wo.labor || 0);
+    const requestedLabor = Number(laborInputs[lineId] ?? currentLabor);
+    const normalizedLabor = Number.isFinite(requestedLabor) ? Math.max(0, Math.round(requestedLabor)) : currentLabor;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/production/work-orders/${wo.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ labor: normalizedLabor }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: 'Failed to update labor' }));
+        throw new Error(payload.error || 'Failed to update labor');
+      }
+
+      setLaborInputs((prev) => ({ ...prev, [lineId]: normalizedLabor }));
+      await fetchWorkOrders();
+      await fetchCostingData();
+    } catch (error) {
+      console.error('Failed to update line labor:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update line labor');
+    }
+  };
+
   const getLineStatus = (lineId: number) => {
+    if (activeDowntimeLines.has(lineId)) return 'stopped';
     const wo = getActiveWorkOrder(lineId);
     if (wo) return 'running';
     const completed = workOrders.find(wo => wo.line === lineId && wo.status === 'Completed');
     if (completed) return 'stopped';
     return 'idle';
+  };
+
+  const getLinePlanRateAlert = (lineId: number) => {
+    const wo = getActiveWorkOrder(lineId);
+    if (!wo) {
+      return {
+        hasAlert: false,
+        missedCases: false,
+        missedBags: false,
+      };
+    }
+
+    const plannedBagsPerMinute = getRequiredBagsPerMinute(wo);
+    const plannedCasesPerMinute = plannedBagsPerMinute !== null
+      ? plannedBagsPerMinute / getBagsPerCase(wo)
+      : null;
+    const currentCasesPerMinute = getCurrentCasesPerMinute(wo);
+    const currentBagsPerMinute = getCurrentBagsPerMinute(wo);
+
+    const missedCases = plannedCasesPerMinute !== null && currentCasesPerMinute !== null && currentCasesPerMinute < plannedCasesPerMinute;
+    const missedBags = plannedBagsPerMinute !== null && currentBagsPerMinute !== null && currentBagsPerMinute < plannedBagsPerMinute;
+
+    return {
+      hasAlert: missedCases || missedBags,
+      missedCases,
+      missedBags,
+    };
   };
 
   const calculateElapsedTime = (wo: any) => {
@@ -386,10 +479,52 @@ export default function ProductionDashboard() {
     );
   };
 
+  const getLineKpiMetrics = (lineId: number) => {
+    const kpiTarget = Number(costingData?.totals?.kpiTargetCostPerCase || LABOR_KPI_TARGET_PER_CASE);
+    const line = Array.isArray(costingData?.byLine)
+      ? costingData.byLine.find((entry: any) => Number(entry.lineNumber) === lineId)
+      : null;
+
+    if (!line) {
+      return {
+        hasData: false,
+        costPerCase: 0,
+        kpiTarget,
+        overKpi: false,
+        variance: 0,
+      };
+    }
+
+    const costPerCase = Number(line.costPerCase || 0);
+    const variance = costPerCase - kpiTarget;
+
+    return {
+      hasData: true,
+      costPerCase,
+      kpiTarget,
+      overKpi: variance > 0,
+      variance,
+    };
+  };
+
   // Filter lines based on URL parameter
   const displayLines = specificLine 
     ? LINES.filter(line => line.id === specificLine)
     : LINES;
+
+  const linesAboveKpi = displayLines
+    .map((line) => {
+      const metrics = getLineKpiMetrics(line.id);
+      return metrics.overKpi ? { line, metrics } : null;
+    })
+    .filter(Boolean) as Array<{ line: { id: number; name: string }; metrics: { costPerCase: number; kpiTarget: number; variance: number } }>;
+
+  const linesBelowPlannedRate = displayLines
+    .map((line) => {
+      const rateAlert = getLinePlanRateAlert(line.id);
+      return rateAlert.hasAlert ? { line, rateAlert } : null;
+    })
+    .filter(Boolean) as Array<{ line: { id: number; name: string }; rateAlert: { missedCases: boolean; missedBags: boolean } }>;
 
   console.log('🔍 Display lines:', displayLines.map(l => ({ id: l.id, name: l.name })));
   console.log('🔍 Checking for active work orders on these lines...');
@@ -477,6 +612,58 @@ export default function ProductionDashboard() {
         </div>
       )}
 
+      {linesAboveKpi.length > 0 && !kpiAlertsMinimized && (
+        <div className="line-kpi-alert" role="alert" aria-live="assertive">
+          <div className="line-kpi-alert__header">
+            <span>⚠ KPI Alerts ({linesAboveKpi.length})</span>
+            <button type="button" className="line-kpi-alert__minimize" onClick={() => setKpiAlertsMinimized(true)}>
+              Minimize
+            </button>
+          </div>
+          {linesAboveKpi.map(({ line, metrics }) => (
+            <div key={line.id} className="line-kpi-alert__item">
+              ⚠ {line.name} is above labor KPI target.
+            </div>
+          ))}
+        </div>
+      )}
+
+      {linesAboveKpi.length > 0 && kpiAlertsMinimized && (
+        <button
+          type="button"
+          className="line-kpi-alert-minimized"
+          onClick={() => setKpiAlertsMinimized(false)}
+        >
+          ⚠ KPI Alerts ({linesAboveKpi.length})
+        </button>
+      )}
+
+      {linesBelowPlannedRate.length > 0 && !rateAlertsMinimized && (
+        <div className="line-rate-alert" role="alert" aria-live="assertive">
+          <div className="line-rate-alert__header">
+            <span className="line-rate-alert__title">⚠ Planned Rate Misses ({linesBelowPlannedRate.length})</span>
+            <button type="button" className="line-rate-alert__minimize" onClick={() => setRateAlertsMinimized(true)}>
+              Minimize
+            </button>
+          </div>
+          {linesBelowPlannedRate.map(({ line, rateAlert }) => (
+            <div key={line.id} className="line-rate-alert__item">
+              {line.name} below planned {rateAlert.missedCases && rateAlert.missedBags ? 'cases/min and bags/min' : rateAlert.missedCases ? 'cases/min' : 'bags/min'}.
+            </div>
+          ))}
+        </div>
+      )}
+
+      {linesBelowPlannedRate.length > 0 && rateAlertsMinimized && (
+        <button
+          type="button"
+          className="line-rate-alert-minimized"
+          onClick={() => setRateAlertsMinimized(false)}
+        >
+          ⚠ Planned Rate Misses ({linesBelowPlannedRate.length})
+        </button>
+      )}
+
       <div className="lines-grid">
         {displayLines.map(line => {
           const wo = getActiveWorkOrder(line.id);
@@ -486,9 +673,11 @@ export default function ProductionDashboard() {
             ? Math.round(((wo.completedCases || 0) / plannedCases) * 100)
             : 0;
           const hasAlert = hasDriverAlertForLine(line.id);
+          const kpiMetrics = getLineKpiMetrics(line.id);
+          const planRateAlert = getLinePlanRateAlert(line.id);
 
           return (
-            <div key={line.id} className={`line-card ${status} ${hasAlert ? 'driver-alert' : ''}`}>
+            <div key={line.id} className={`line-card ${status} ${hasAlert ? 'driver-alert' : ''} ${kpiMetrics.overKpi ? 'kpi-alert' : ''} ${planRateAlert.hasAlert ? 'rate-alert' : ''}`}>
               {hasAlert && <DriverWaitingTicker lineFilter={line.id} inline={true} />}
               <div className="line-header">
                 <h3>{line.name}</h3>
@@ -543,7 +732,7 @@ export default function ProductionDashboard() {
                       </div>
                       <div className="metric">
                         <span className="metric-label">Current Rate:</span>
-                        <span className="metric-value current-rate">{calculateCurrentRate(wo)} bags/min</span>
+                        <span className={`metric-value ${planRateAlert.missedBags ? 'rate-miss' : 'current-rate'}`}>{calculateCurrentRate(wo)} bags/min</span>
                       </div>
                     </div>
                     <div className="metric-row">
@@ -553,9 +742,17 @@ export default function ProductionDashboard() {
                       </div>
                       <div className="metric">
                         <span className="metric-label">Current Rate (Cases):</span>
-                        <span className="metric-value current-rate">{calculateCurrentRateCases(wo)} cases/min</span>
+                        <span className={`metric-value ${planRateAlert.missedCases ? 'rate-miss' : 'current-rate'}`}>{calculateCurrentRateCases(wo)} cases/min</span>
                       </div>
                     </div>
+                    {planRateAlert.hasAlert && (
+                      <div className="metric-row">
+                        <div className="metric">
+                          <span className="metric-label">Rate Alert:</span>
+                          <span className="metric-value rate-miss">Below planned {planRateAlert.missedCases && planRateAlert.missedBags ? 'cases/min + bags/min' : planRateAlert.missedCases ? 'cases/min' : 'bags/min'}</span>
+                        </div>
+                      </div>
+                    )}
                     <div className="metric-row">
                       <div className="metric">
                         <span className="metric-label">Labor Required:</span>
@@ -567,6 +764,23 @@ export default function ProductionDashboard() {
                       </div>
                     </div>
                     <div className="metric-row">
+                      <div className="metric labor-adjust">
+                        <span className="metric-label">Update Headcount:</span>
+                        <div className="labor-adjust__controls">
+                          <input
+                            type="number"
+                            min={0}
+                            value={laborInputs[line.id] ?? Number(wo.labor || 0)}
+                            onChange={(event) => {
+                              const value = Number(event.target.value);
+                              setLaborInputs((prev) => ({ ...prev, [line.id]: Number.isFinite(value) ? value : 0 }));
+                            }}
+                          />
+                          <button type="button" onClick={() => void updateLineLabor(line.id)}>Apply</button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="metric-row">
                       <div className="metric">
                         <span className="metric-label">ETA (Cases):</span>
                         <span className="metric-value required-rate">{calculateEtaCases(wo)}</span>
@@ -574,6 +788,20 @@ export default function ProductionDashboard() {
                       <div className="metric">
                         <span className="metric-label">ETA (Bags):</span>
                         <span className="metric-value required-rate">{calculateEtaBags(wo)}</span>
+                      </div>
+                    </div>
+                    <div className="metric-row">
+                      <div className="metric">
+                        <span className="metric-label">KPI Status:</span>
+                        <span className={`metric-value ${kpiMetrics.hasData ? (kpiMetrics.overKpi ? 'kpi-over' : 'kpi-on-target') : ''}`}>
+                          {kpiMetrics.hasData ? (kpiMetrics.overKpi ? 'ABOVE TARGET' : 'ON TARGET') : 'NO DATA'}
+                        </span>
+                      </div>
+                      <div className="metric">
+                        <span className="metric-label">Alert:</span>
+                        <span className={`metric-value ${kpiMetrics.hasData && kpiMetrics.overKpi ? 'kpi-over' : 'kpi-on-target'}`}>
+                          {kpiMetrics.hasData && kpiMetrics.overKpi ? 'ACTION REQUIRED' : 'CLEAR'}
+                        </span>
                       </div>
                     </div>
                   </div>

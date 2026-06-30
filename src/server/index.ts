@@ -4,8 +4,14 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import path from 'path';
+import fs from 'fs';
+import { ChildProcess, spawn } from 'child_process';
 // Use factory to switch between SQLite (local) and Postgres (Railway)
 import { db } from './db-factory';
+import { CameraCounterEvent, CameraEdgeStore, CameraEdgeStoreError } from './camera-edge-store';
+import { ArgusCompatError, ArgusCompatService } from './argus-compat-service';
+import { WindowCaptureError, WindowCaptureService } from './window-capture-service';
+import { DualEntryRunnerError, DualEntryRunnerService } from './dual-entry-runner-service';
 import {
   CreateCheckinRequest,
   UpdateDoorStatusRequest,
@@ -47,63 +53,123 @@ const ELEVENLABS_VOICE_ID = process.env.ELEVENLABS_VOICE_ID?.trim() || 'xctasy8X
 const ELEVENLABS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID?.trim() || 'eleven_multilingual_v2';
 
 const CAMERA_LINE_COUNT = 6;
+const cameraEdgeStore = new CameraEdgeStore(CAMERA_LINE_COUNT);
+const argusCompatService = new ArgusCompatService({
+  lineCount: CAMERA_LINE_COUNT,
+  onClipIncrement: (lineId, increment, sourcePath, timestamp) => {
+    const payload = cameraEdgeStore.simulateIncrement(lineId, increment, timestamp);
+    io.emit('camera-count:updated', {
+      ...payload,
+      sourcePath,
+      source: 'argus-local-record',
+    });
+  },
+});
+const windowCaptureService = new WindowCaptureService({
+  lineCount: CAMERA_LINE_COUNT,
+  onMotionIncrement: (lineId, increment, timestamp, motionPixels) => {
+    const payload = cameraEdgeStore.simulateIncrement(lineId, increment, timestamp);
+    io.emit('camera-count:updated', {
+      ...payload,
+      source: 'window-capture',
+      motionPixels,
+    });
+  },
+});
+const dualEntryRunnerService = new DualEntryRunnerService();
+const localRunnerConfigPath = path.join(process.cwd(), 'runner-config.json');
+let localRunnerProcess: ChildProcess | null = null;
+let localRunnerStartedAt: string | null = null;
+let localRunnerLastExitCode: number | null = null;
+let localRunnerLastOutput: string[] = [];
 
-interface CameraLineConfig {
-  lineId: number;
-  cameraId: string | null;
-  cameraIp: string | null;
-  enabled: boolean;
-  updatedAt: string;
-}
-
-interface CameraLineRuntime {
-  totalBags: number;
-  lastEventAt: string | null;
-  status: 'online' | 'offline' | 'unassigned';
-}
-
-interface CameraCounterEvent {
-  cameraId: string;
-  totalBags: number;
-  timestamp?: string;
-}
-
-const buildInitialCameraConfigs = (): CameraLineConfig[] => {
-  return Array.from({ length: CAMERA_LINE_COUNT }, (_, index) => ({
-    lineId: index + 1,
-    cameraId: null,
-    cameraIp: null,
-    enabled: false,
-    updatedAt: getLocalISOString(),
-  }));
+const pushRunnerOutput = (line: string) => {
+  localRunnerLastOutput.push(line);
+  if (localRunnerLastOutput.length > 120) {
+    localRunnerLastOutput = localRunnerLastOutput.slice(-120);
+  }
 };
 
-const cameraLineConfigs: CameraLineConfig[] = buildInitialCameraConfigs();
+const isLocalRunnerRunning = () => Boolean(localRunnerProcess && !localRunnerProcess.killed && localRunnerProcess.exitCode === null);
 
-const cameraLineRuntime: Record<number, CameraLineRuntime> = Object.fromEntries(
-  Array.from({ length: CAMERA_LINE_COUNT }, (_, index) => [
-    index + 1,
+const buildReceivingAdapterCommand = (entryPhase: 'focus-only' | 'header-only' | 'full' | 'simulate') => {
+  const mode = entryPhase === 'simulate' ? 'simulate' : 'live';
+  const phaseArg = entryPhase === 'simulate' ? '' : ` -EntryPhase ${entryPhase}`;
+  return `powershell -ExecutionPolicy Bypass -File ./scripts/famous-receiving-adapter.ps1 -Payload {{payload}} -Result {{result}} -JobId {{jobId}} -Mode ${mode}${phaseArg} -FamousWindowTitle Receive -TabMapPath ./scripts/famous-receiving-tabmap.json`;
+};
+
+const loadLocalRunnerConfig = () => {
+  if (!fs.existsSync(localRunnerConfigPath)) {
+    throw new DualEntryRunnerError('runner-config.json not found. Register runner first.', 404);
+  }
+
+  const raw = fs.readFileSync(localRunnerConfigPath, 'utf8');
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+  if (!parsed.baseUrl || !parsed.runnerId || !parsed.runnerKey) {
+    throw new DualEntryRunnerError('runner-config.json is missing baseUrl, runnerId, or runnerKey', 400);
+  }
+
+  return parsed;
+};
+
+const saveLocalRunnerConfig = (config: Record<string, unknown>) => {
+  fs.writeFileSync(localRunnerConfigPath, JSON.stringify(config, null, 2), 'utf8');
+};
+
+const startLocalRunner = () => {
+  if (isLocalRunnerRunning()) {
+    return;
+  }
+  localRunnerLastOutput = [];
+
+  const tsxCliPath = path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
+  if (!fs.existsSync(tsxCliPath)) {
+    throw new DualEntryRunnerError('tsx CLI not found. Run npm install first.', 500);
+  }
+
+  const child = spawn(
+    process.execPath,
+    [tsxCliPath, 'src/server/dual-entry-runner-agent.ts', 'start', '--config', localRunnerConfigPath],
     {
-      totalBags: 0,
-      lastEventAt: null,
-      status: 'unassigned',
-    },
-  ])
-) as Record<number, CameraLineRuntime>;
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    }
+  );
 
-const normalizeCameraId = (value: unknown): string => String(value || '').trim().toUpperCase();
+  child.stdout?.on('data', (data) => {
+    const text = String(data || '').trim();
+    if (text) {
+      pushRunnerOutput(text);
+    }
+  });
 
-const findLineByCameraId = (cameraId: string): CameraLineConfig | undefined => {
-  return cameraLineConfigs.find((config) => normalizeCameraId(config.cameraId) === cameraId);
+  child.stderr?.on('data', (data) => {
+    const text = String(data || '').trim();
+    if (text) {
+      pushRunnerOutput(`[stderr] ${text}`);
+    }
+  });
+
+  child.on('exit', (code) => {
+    localRunnerLastExitCode = code ?? null;
+    localRunnerProcess = null;
+    localRunnerStartedAt = null;
+    pushRunnerOutput(`Runner exited with code ${String(code)}`);
+  });
+
+  localRunnerProcess = child;
+  localRunnerStartedAt = getLocalISOString();
 };
 
-const getCameraLineSnapshot = () => {
-  return cameraLineConfigs
-    .map((config) => ({
-      ...config,
-      runtime: cameraLineRuntime[config.lineId],
-    }))
-    .sort((a, b) => a.lineId - b.lineId);
+const stopLocalRunner = () => {
+  if (!localRunnerProcess) {
+    return;
+  }
+
+  localRunnerProcess.kill('SIGTERM');
 };
 
 interface KioskAssistantTurn {
@@ -125,11 +191,504 @@ interface SessionUser {
   role: string;
 }
 
+interface DualEntryAiMeta {
+  enabled: boolean;
+  provider: 'openai' | 'rules';
+  model: string;
+  mode: 'ai' | 'fallback';
+  confidence: number;
+  issues: string[];
+}
+
+interface DualEntryAiResult {
+  payload: Record<string, unknown>;
+  meta: DualEntryAiMeta;
+}
+
+interface DualEntryMappedField {
+  sourceField: string;
+  sourceValue: string;
+  targetField: string;
+  targetValue: string;
+  confidence: number;
+}
+
+interface DualEntryAiAnalysis {
+  enabled: boolean;
+  provider: 'openai' | 'fallback-rules';
+  model: string;
+  confidence: number;
+  warnings: string[];
+  mappedFields: DualEntryMappedField[];
+  normalizedPayload: Record<string, unknown>;
+}
+
 const toSafeText = (value: unknown, maxLen: number = 600): string => {
   return String(value || '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, maxLen);
+};
+
+const toObject = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+};
+
+const toTrimmedString = (value: unknown): string => String(value || '').trim();
+
+const toNumericString = (value: unknown): string => {
+  const raw = toTrimmedString(value);
+  if (!raw) return '';
+  const normalized = raw.replace(/,/g, '');
+  const asNumber = Number(normalized);
+  return Number.isFinite(asNumber) ? String(asNumber) : raw;
+};
+
+const sanitizeReceivingLine = (input: unknown): Record<string, unknown> => {
+  const line = toObject(input);
+  return {
+    blockId: toTrimmedString(line.blockId),
+    commodity: toTrimmedString(line.commodity).toUpperCase(),
+    style: toTrimmedString(line.style),
+    size: toTrimmedString(line.size),
+    grade: toTrimmedString(line.grade),
+    label: toTrimmedString(line.label),
+    region: toTrimmedString(line.region).toUpperCase(),
+    method: toTrimmedString(line.method),
+    color: toTrimmedString(line.color),
+    invQnt: toNumericString(line.invQnt),
+    invUom: toTrimmedString(line.invUom).toLowerCase(),
+    variety: toTrimmedString(line.variety),
+    palletCopies: toNumericString(line.palletCopies),
+    lotId: toTrimmedString(line.lotId),
+    productDescription: toTrimmedString(line.productDescription),
+    tags: Array.isArray(line.tags) ? line.tags : undefined,
+  };
+};
+
+const sanitizeReceivingPayload = (input: unknown): Record<string, unknown> => {
+  const payload = toObject(input);
+  const linesRaw = Array.isArray(payload.lines) ? payload.lines : [];
+  const lines = linesRaw.map((line) => sanitizeReceivingLine(line));
+
+  return {
+    receiptNo: toTrimmedString(payload.receiptNo),
+    receiveDate: toTrimmedString(payload.receiveDate),
+    poNumber: toTrimmedString(payload.poNumber),
+    orderNumber: toTrimmedString(payload.orderNumber),
+    whseLoc: toTrimmedString(payload.whseLoc),
+    ref: toTrimmedString(payload.ref),
+    lotId: toTrimmedString(payload.lotId),
+    carrierId: toTrimmedString(payload.carrierId),
+    description: toTrimmedString(payload.description),
+    access: toTrimmedString(payload.access),
+    inventoryQnt: toNumericString(payload.inventoryQnt),
+    receiveType: toTrimmedString(payload.receiveType),
+    lines,
+  };
+};
+
+const clampConfidence = (value: unknown): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0.85;
+  return Math.max(0, Math.min(1, parsed));
+};
+
+const tryParseJsonObject = (value: unknown): Record<string, unknown> | null => {
+  const text = String(value || '').trim();
+  if (!text) return null;
+
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        const parsed = JSON.parse(text.slice(firstBrace, lastBrace + 1));
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+};
+
+const runDualEntryAi = async (
+  payloadInput: unknown,
+  targetSystemInput: unknown
+): Promise<DualEntryAiResult> => {
+  const targetSystem = toTrimmedString(targetSystemInput) || 'Famous-Receiving';
+  const sanitized = sanitizeReceivingPayload(payloadInput);
+
+  const fallbackMeta: DualEntryAiMeta = {
+    enabled: false,
+    provider: OPENAI_API_KEY ? 'openai' : 'rules',
+    model: OPENAI_API_KEY ? OPENAI_MODEL : 'rules-receiving-v1',
+    mode: OPENAI_API_KEY ? 'ai' : 'fallback',
+    confidence: 0.85,
+    issues: [],
+  };
+
+  if (!OPENAI_API_KEY || targetSystem !== 'Famous-Receiving') {
+    return {
+      payload: {
+        ...sanitized,
+        _ai: fallbackMeta,
+      },
+      meta: fallbackMeta,
+    };
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.1,
+        max_tokens: 700,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You are Dual Entry AI for Famous Receiving.',
+              'Return ONLY valid JSON object.',
+              'Normalize and validate receiving payload for reliable automated entry.',
+              'Schema: { normalizedPayload: object, confidence: number, issues: string[] }',
+            ].join(' '),
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({ targetSystem, payload: sanitized }),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      console.warn('Dual entry AI request failed, using fallback:', response.status, body.slice(0, 400));
+      return {
+        payload: {
+          ...sanitized,
+          _ai: {
+            ...fallbackMeta,
+            mode: 'fallback',
+            issues: ['OpenAI request failed, fallback normalization used.'],
+          },
+        },
+        meta: {
+          ...fallbackMeta,
+          mode: 'fallback',
+          issues: ['OpenAI request failed, fallback normalization used.'],
+        },
+      };
+    }
+
+    const completion = (await response.json()) as ChatCompletionPayload;
+    const content = completion?.choices?.[0]?.message?.content;
+    const parsed = tryParseJsonObject(content);
+    const normalized = sanitizeReceivingPayload(parsed?.normalizedPayload || sanitized);
+    const issues = Array.isArray(parsed?.issues)
+      ? parsed?.issues.map((issue) => toTrimmedString(issue)).filter(Boolean)
+      : [];
+
+    const meta: DualEntryAiMeta = {
+      enabled: true,
+      provider: 'openai',
+      model: OPENAI_MODEL,
+      mode: 'ai',
+      confidence: clampConfidence(parsed?.confidence),
+      issues,
+    };
+
+    return {
+      payload: {
+        ...normalized,
+        _ai: meta,
+      },
+      meta,
+    };
+  } catch (error: any) {
+    console.warn('Dual entry AI exception, using fallback:', error);
+    const issues = [toTrimmedString(error?.message || error) || 'AI enrichment failed'];
+    const meta: DualEntryAiMeta = {
+      ...fallbackMeta,
+      mode: 'fallback',
+      issues,
+    };
+    return {
+      payload: {
+        ...sanitized,
+        _ai: meta,
+      },
+      meta,
+    };
+  }
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, unknown>;
+};
+
+const asString = (value: unknown): string => String(value || '').trim();
+
+const asNumber = (value: unknown, fallback: number): number => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return parsed;
+};
+
+const normalizeReceivingPayload = (rawPayload: unknown): Record<string, unknown> => {
+  const payload = asRecord(rawPayload);
+  const rawLines = Array.isArray(payload.lines) ? payload.lines : [];
+
+  const lines = rawLines
+    .map((line) => asRecord(line))
+    .filter((line) => Object.keys(line).length > 0)
+    .map((line) => ({
+      blockId: asString(line.blockId),
+      commodity: asString(line.commodity),
+      style: asString(line.style),
+      size: asString(line.size),
+      grade: asString(line.grade),
+      label: asString(line.label),
+      region: asString(line.region),
+      method: asString(line.method),
+      color: asString(line.color),
+      invQnt: asString(line.invQnt),
+      invUom: asString(line.invUom),
+      variety: asString(line.variety),
+      palletCopies: asString(line.palletCopies),
+      lotId: asString(line.lotId),
+      productDescription: asString(line.productDescription),
+      tags: Array.isArray(line.tags) ? line.tags : undefined,
+    }));
+
+  return {
+    receiptNo: asString(payload.receiptNo),
+    receiveDate: asString(payload.receiveDate),
+    poNumber: asString(payload.poNumber),
+    orderNumber: asString(payload.orderNumber),
+    whseLoc: asString(payload.whseLoc),
+    ref: asString(payload.ref),
+    lotId: asString(payload.lotId),
+    carrierId: asString(payload.carrierId),
+    description: asString(payload.description),
+    access: asString(payload.access),
+    inventoryQnt: asString(payload.inventoryQnt),
+    receiveType: asString(payload.receiveType),
+    lines,
+  };
+};
+
+const fallbackReceivingAiAnalysis = (rawPayload: unknown, warning?: string): DualEntryAiAnalysis => {
+  const normalized = normalizeReceivingPayload(rawPayload);
+  const mappedFields: DualEntryMappedField[] = [
+    {
+      sourceField: 'receiveDate',
+      sourceValue: asString(normalized.receiveDate),
+      targetField: 'receiveDate',
+      targetValue: asString(normalized.receiveDate),
+      confidence: 0.94,
+    },
+    {
+      sourceField: 'whseLoc',
+      sourceValue: asString(normalized.whseLoc),
+      targetField: 'whseLoc',
+      targetValue: asString(normalized.whseLoc),
+      confidence: 0.94,
+    },
+    {
+      sourceField: 'ref',
+      sourceValue: asString(normalized.ref),
+      targetField: 'ref',
+      targetValue: asString(normalized.ref),
+      confidence: 0.93,
+    },
+    {
+      sourceField: 'inventoryQnt',
+      sourceValue: asString(normalized.inventoryQnt),
+      targetField: 'inventoryQnt',
+      targetValue: asString(normalized.inventoryQnt),
+      confidence: 0.92,
+    },
+  ];
+
+  const warnings: string[] = [];
+  if (!asString(normalized.receiveDate)) warnings.push('receiveDate is empty');
+  if (!asString(normalized.whseLoc)) warnings.push('whseLoc is empty');
+  if (!asString(normalized.receiveType)) warnings.push('receiveType is empty');
+  if (Array.isArray(normalized.lines) && normalized.lines.length === 0) warnings.push('lines[] is empty');
+  if (warning) warnings.unshift(warning);
+
+  return {
+    enabled: Boolean(OPENAI_API_KEY),
+    provider: 'fallback-rules',
+    model: 'fallback-receiving-rules',
+    confidence: 0.9,
+    warnings,
+    mappedFields,
+    normalizedPayload: normalized,
+  };
+};
+
+const runOpenAiReceivingAnalysis = async (rawPayload: unknown): Promise<DualEntryAiAnalysis> => {
+  if (!OPENAI_API_KEY) {
+    return fallbackReceivingAiAnalysis(rawPayload, 'OPENAI_API_KEY is not configured, fallback rules used.');
+  }
+
+  const normalizedSeed = normalizeReceivingPayload(rawPayload);
+
+  const instructions = [
+    'You normalize OpsIQ receiving payloads for Famous Receiving data entry.',
+    'Return strict JSON only.',
+    'Keep field names exactly as provided in schema.',
+    'Do not invent missing values. Leave them empty strings if absent.',
+  ].join(' ');
+
+  const schemaHint = {
+    normalizedPayload: {
+      receiptNo: '',
+      receiveDate: '',
+      poNumber: '',
+      orderNumber: '',
+      whseLoc: '',
+      ref: '',
+      lotId: '',
+      carrierId: '',
+      description: '',
+      access: '',
+      inventoryQnt: '',
+      receiveType: '',
+      lines: [
+        {
+          blockId: '',
+          commodity: '',
+          style: '',
+          size: '',
+          grade: '',
+          label: '',
+          region: '',
+          method: '',
+          color: '',
+          invQnt: '',
+          invUom: '',
+          variety: '',
+          palletCopies: '',
+          lotId: '',
+          productDescription: '',
+        },
+      ],
+    },
+    confidence: 0.0,
+    warnings: [''],
+    mappedFields: [
+      {
+        sourceField: '',
+        sourceValue: '',
+        targetField: '',
+        targetValue: '',
+        confidence: 0.0,
+      },
+    ],
+  };
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: instructions },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              schema: schemaHint,
+              payload: normalizedSeed,
+            }),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      return fallbackReceivingAiAnalysis(rawPayload, `OpenAI request failed (${response.status}): ${body.slice(0, 160)}`);
+    }
+
+    const completion = (await response.json()) as ChatCompletionPayload;
+    const content = completion?.choices?.[0]?.message?.content;
+    if (!content) {
+      return fallbackReceivingAiAnalysis(rawPayload, 'OpenAI returned no content.');
+    }
+
+    const parsed = JSON.parse(content) as Record<string, unknown>;
+    const normalizedPayload = normalizeReceivingPayload(parsed.normalizedPayload || normalizedSeed);
+
+    const mappedFields = Array.isArray(parsed.mappedFields)
+      ? parsed.mappedFields
+          .map((item) => asRecord(item))
+          .map((item) => ({
+            sourceField: asString(item.sourceField),
+            sourceValue: asString(item.sourceValue),
+            targetField: asString(item.targetField),
+            targetValue: asString(item.targetValue),
+            confidence: Math.max(0, Math.min(1, asNumber(item.confidence, 0.9))),
+          }))
+          .filter((item) => item.sourceField && item.targetField)
+      : [];
+
+    const warnings = Array.isArray(parsed.warnings)
+      ? parsed.warnings.map((entry) => asString(entry)).filter(Boolean)
+      : [];
+
+    return {
+      enabled: true,
+      provider: 'openai',
+      model: OPENAI_MODEL,
+      confidence: Math.max(0, Math.min(1, asNumber(parsed.confidence, 0.93))),
+      warnings,
+      mappedFields,
+      normalizedPayload,
+    };
+  } catch (error: any) {
+    return fallbackReceivingAiAnalysis(rawPayload, `OpenAI analysis exception: ${String(error?.message || error)}`);
+  }
+};
+
+const analyzeDualEntryPayload = async (payload: unknown, targetSystem: unknown): Promise<DualEntryAiAnalysis> => {
+  const target = asString(targetSystem).toLowerCase();
+  if (!target || target.includes('famous-receiving') || target.includes('famous')) {
+    return runOpenAiReceivingAnalysis(payload);
+  }
+
+  return fallbackReceivingAiAnalysis(payload, `No AI template configured for target system: ${asString(targetSystem) || 'unknown'}`);
 };
 
 const getAuthorizedUser = async (authorizationHeader?: string): Promise<SessionUser | null> => {
@@ -477,98 +1036,47 @@ app.get('/api/kpi/production-scheduler', async (req, res) => {
 
 // Read camera-to-line mapping and live totals.
 app.get('/api/counters/camera-lines', async (_req, res) => {
-  res.json(getCameraLineSnapshot());
+  res.json(cameraEdgeStore.getSnapshot());
+});
+
+// Bulk upsert for multi-line rollout.
+app.put('/api/counters/camera-lines/bulk', async (req, res) => {
+  try {
+    const snapshot = cameraEdgeStore.bulkUpsertLines(req.body?.lines);
+    io.emit('camera-lines:updated', snapshot);
+    return res.json({ success: true, lines: snapshot });
+  } catch (error: any) {
+    const statusCode = error instanceof CameraEdgeStoreError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
 });
 
 // Upsert one line mapping. Ensures one camera can only belong to one line.
 app.put('/api/counters/camera-lines/:lineId', async (req, res) => {
   try {
     const lineId = Number(req.params.lineId);
-    if (!Number.isInteger(lineId) || lineId < 1 || lineId > CAMERA_LINE_COUNT) {
-      return res.status(400).json({ error: `lineId must be between 1 and ${CAMERA_LINE_COUNT}` });
-    }
-
-    const cameraId = normalizeCameraId(req.body.cameraId);
-    const cameraIp = String(req.body.cameraIp || '').trim() || null;
-    const enabled = req.body.enabled !== false;
-
-    if (!cameraId) {
-      return res.status(400).json({ error: 'cameraId is required' });
-    }
-
-    const duplicate = cameraLineConfigs.find(
-      (config) => config.lineId !== lineId && normalizeCameraId(config.cameraId) === cameraId
-    );
-
-    if (duplicate) {
-      return res.status(409).json({
-        error: `cameraId ${cameraId} is already assigned to line ${duplicate.lineId}`,
-      });
-    }
-
-    const target = cameraLineConfigs.find((config) => config.lineId === lineId);
-    if (!target) {
-      return res.status(404).json({ error: 'line not found' });
-    }
-
-    target.cameraId = cameraId;
-    target.cameraIp = cameraIp;
-    target.enabled = enabled;
-    target.updatedAt = getLocalISOString();
-
-    cameraLineRuntime[lineId].status = enabled ? 'offline' : 'unassigned';
-
-    const snapshot = getCameraLineSnapshot();
+    const update = cameraEdgeStore.upsertLine(lineId, req.body || {});
+    const snapshot = cameraEdgeStore.getSnapshot();
     io.emit('camera-lines:updated', snapshot);
 
-    return res.json({ success: true, line: target, runtime: cameraLineRuntime[lineId] });
+    return res.json({ success: true, line: update.line, runtime: update.runtime });
   } catch (error: any) {
-    return res.status(400).json({ error: error.message });
+    const statusCode = error instanceof CameraEdgeStoreError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
   }
 });
 
 // Receive cumulative bag total from camera processor and map by cameraId.
 app.post('/api/counters/camera-events', async (req, res) => {
   try {
-    const event = req.body as CameraCounterEvent;
-    const cameraId = normalizeCameraId(event.cameraId);
-    const totalBags = Number(event.totalBags);
-    const timestamp = String(event.timestamp || getLocalISOString());
-
-    if (!cameraId) {
-      return res.status(400).json({ error: 'cameraId is required' });
-    }
-    if (!Number.isFinite(totalBags) || totalBags < 0) {
-      return res.status(400).json({ error: 'totalBags must be a non-negative number' });
-    }
-
-    const line = findLineByCameraId(cameraId);
-    if (!line || !line.enabled) {
-      return res.status(404).json({ error: `cameraId ${cameraId} is not mapped to an enabled line` });
-    }
-
-    const runtime = cameraLineRuntime[line.lineId];
-    const previousTotal = runtime.totalBags;
-    runtime.totalBags = totalBags;
-    runtime.lastEventAt = timestamp;
-    runtime.status = 'online';
-
-    const deltaBags = Math.max(0, totalBags - previousTotal);
-
-    const payload = {
-      lineId: line.lineId,
-      cameraId,
-      totalBags,
-      deltaBags,
-      timestamp,
-      status: runtime.status,
-    };
+    const payload = cameraEdgeStore.processCounterEvent(req.body as CameraCounterEvent);
 
     io.emit('camera-count:updated', payload);
 
     return res.json({ success: true, ...payload });
   } catch (error: any) {
-    return res.status(400).json({ error: error.message });
+    const statusCode = error instanceof CameraEdgeStoreError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
   }
 });
 
@@ -577,41 +1085,386 @@ app.post('/api/counters/camera-events/dev-simulate', async (req, res) => {
   try {
     const lineId = Number(req.body.lineId);
     const increment = Number(req.body.increment ?? 1);
-
-    if (!Number.isInteger(lineId) || lineId < 1 || lineId > CAMERA_LINE_COUNT) {
-      return res.status(400).json({ error: `lineId must be between 1 and ${CAMERA_LINE_COUNT}` });
-    }
-    if (!Number.isFinite(increment) || increment < 0) {
-      return res.status(400).json({ error: 'increment must be a non-negative number' });
-    }
-
-    const config = cameraLineConfigs.find((line) => line.lineId === lineId);
-    if (!config || !config.cameraId) {
-      return res.status(400).json({ error: `line ${lineId} does not have a cameraId assigned` });
-    }
-
-    const runtime = cameraLineRuntime[lineId];
-    const totalBags = runtime.totalBags + increment;
-    const timestamp = getLocalISOString();
-    runtime.totalBags = totalBags;
-    runtime.lastEventAt = timestamp;
-    runtime.status = 'online';
-
-    const payload = {
-      lineId,
-      cameraId: config.cameraId,
-      totalBags,
-      deltaBags: increment,
-      timestamp,
-      status: runtime.status,
-      simulated: true,
-    };
+    const payload = cameraEdgeStore.simulateIncrement(lineId, increment, getLocalISOString());
 
     io.emit('camera-count:updated', payload);
 
     return res.json({ success: true, ...payload });
   } catch (error: any) {
-    return res.status(400).json({ error: error.message });
+    const statusCode = error instanceof CameraEdgeStoreError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+// ==================== ARGUS COMPAT MODE ====================
+
+app.get('/api/counters/argus-compat/status', async (_req, res) => {
+  return res.json(argusCompatService.getStatus());
+});
+
+app.put('/api/counters/argus-compat/line/:lineId', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const line = argusCompatService.configureLine(lineId, req.body || {});
+    return res.json({ success: true, line });
+  } catch (error: any) {
+    const statusCode = error instanceof ArgusCompatError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/counters/argus-compat/runs/:lineId/start', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const run = argusCompatService.startRun(lineId);
+    return res.json({ success: true, run });
+  } catch (error: any) {
+    const statusCode = error instanceof ArgusCompatError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/counters/argus-compat/runs/:lineId/stop', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const run = argusCompatService.stopRun(lineId);
+    return res.json({ success: true, run });
+  } catch (error: any) {
+    const statusCode = error instanceof ArgusCompatError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/counters/argus-compat/runs/stop-all', async (_req, res) => {
+  const runs = argusCompatService.stopAllRuns();
+  return res.json({ success: true, runs });
+});
+
+// ==================== WINDOW CAPTURE MODE ====================
+
+app.get('/api/counters/window-capture/status', async (_req, res) => {
+  return res.json(windowCaptureService.getStatus());
+});
+
+app.put('/api/counters/window-capture/line/:lineId', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const line = windowCaptureService.configureLine(lineId, req.body || {});
+    return res.json({ success: true, line });
+  } catch (error: any) {
+    const statusCode = error instanceof WindowCaptureError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/counters/window-capture/runs/:lineId/start', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const run = windowCaptureService.startRun(lineId);
+    return res.json({ success: true, run });
+  } catch (error: any) {
+    const statusCode = error instanceof WindowCaptureError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/counters/window-capture/runs/:lineId/stop', async (req, res) => {
+  try {
+    const lineId = Number(req.params.lineId);
+    const run = windowCaptureService.stopRun(lineId);
+    return res.json({ success: true, run });
+  } catch (error: any) {
+    const statusCode = error instanceof WindowCaptureError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/counters/window-capture/runs/stop-all', async (_req, res) => {
+  const runs = windowCaptureService.stopAllRuns();
+  return res.json({ success: true, runs });
+});
+
+// ==================== AI DUAL ENTRY RUNNERS ====================
+
+app.get('/api/dual-entry/runners/dashboard', async (_req, res) => {
+  return res.json(dualEntryRunnerService.getDashboard());
+});
+
+app.get('/api/dual-entry/runners', async (_req, res) => {
+  return res.json(dualEntryRunnerService.getRunners());
+});
+
+app.get('/api/dual-entry/ai/status', async (_req, res) => {
+  return res.json({
+    success: true,
+    enabled: Boolean(OPENAI_API_KEY),
+    provider: OPENAI_API_KEY ? 'openai' : 'fallback-rules',
+    model: OPENAI_API_KEY ? OPENAI_MODEL : 'fallback-receiving-rules',
+  });
+});
+
+app.post('/api/dual-entry/ai/analyze', async (req, res) => {
+  try {
+    const analysis = await analyzeDualEntryPayload(req.body?.payload, req.body?.targetSystem || 'Famous-Receiving');
+    return res.json({
+      success: true,
+      analysis,
+    });
+  } catch (error: any) {
+    return res.status(400).json({ error: String(error?.message || error) });
+  }
+});
+
+app.post('/api/dual-entry/runners/pairing-token', async (req, res) => {
+  try {
+    const token = dualEntryRunnerService.createPairingToken(req.body?.tenant, req.body?.expiresInMinutes);
+    return res.json({ success: true, token });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/dual-entry/runners/register', async (req, res) => {
+  try {
+    const registration = dualEntryRunnerService.registerRunner({
+      token: req.body?.token,
+      name: req.body?.name,
+      machineName: req.body?.machineName,
+      version: req.body?.version,
+    });
+    return res.json({ success: true, ...registration });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/dual-entry/runners/:runnerId/heartbeat', async (req, res) => {
+  try {
+    const apiKey = req.header('x-runner-key');
+    const heartbeat = dualEntryRunnerService.heartbeat(req.params.runnerId, apiKey);
+    return res.json(heartbeat);
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 401;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/dual-entry/jobs', async (req, res) => {
+  try {
+    const useAI = req.body?.useAI !== false;
+    let payload = req.body?.payload;
+    let analysis: DualEntryAiAnalysis | null = null;
+
+    if (useAI) {
+      analysis = await analyzeDualEntryPayload(payload, req.body?.targetSystem);
+      payload = {
+        ...analysis.normalizedPayload,
+        _ai: {
+          provider: analysis.provider,
+          model: analysis.model,
+          confidence: analysis.confidence,
+          warnings: analysis.warnings,
+          mappedFields: analysis.mappedFields,
+          analyzedAt: getLocalISOString(),
+        },
+      };
+    }
+
+    const job = dualEntryRunnerService.enqueueJob({
+      tenant: req.body?.tenant,
+      payload,
+      sourceSystem: req.body?.sourceSystem,
+      targetSystem: req.body?.targetSystem,
+    });
+    return res.json({ success: true, job, ai: analysis });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.get('/api/dual-entry/jobs', async (req, res) => {
+  return res.json(dualEntryRunnerService.getJobs(req.query.status));
+});
+
+app.post('/api/dual-entry/runners/:runnerId/claim-next', async (req, res) => {
+  try {
+    const apiKey = req.header('x-runner-key');
+    const job = dualEntryRunnerService.claimNextJob(req.params.runnerId, apiKey);
+    return res.json({ success: true, job });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 401;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/dual-entry/jobs/:jobId/result', async (req, res) => {
+  try {
+    const apiKey = req.header('x-runner-key');
+    const runnerId = req.body?.runnerId;
+    const job = dualEntryRunnerService.submitJobResult(runnerId, apiKey, req.params.jobId, {
+      success: req.body?.success,
+      message: req.body?.message,
+      submittedFields: req.body?.submittedFields,
+    });
+    return res.json({ success: true, job });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 401;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.get('/api/dual-entry/runner/local/status', async (_req, res) => {
+  return res.json({
+    success: true,
+    running: isLocalRunnerRunning(),
+    pid: localRunnerProcess?.pid || null,
+    startedAt: localRunnerStartedAt,
+    lastExitCode: localRunnerLastExitCode,
+    configPath: localRunnerConfigPath,
+    configExists: fs.existsSync(localRunnerConfigPath),
+    lastOutput: localRunnerLastOutput.slice(-20),
+  });
+});
+
+app.post('/api/dual-entry/runner/local/start', async (_req, res) => {
+  try {
+    loadLocalRunnerConfig();
+    startLocalRunner();
+    return res.json({
+      success: true,
+      running: isLocalRunnerRunning(),
+      pid: localRunnerProcess?.pid || null,
+      startedAt: localRunnerStartedAt,
+    });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/dual-entry/runner/local/stop', async (_req, res) => {
+  stopLocalRunner();
+  return res.json({ success: true, running: isLocalRunnerRunning() });
+});
+
+app.post('/api/dual-entry/runner/local/adapter-preset', async (req, res) => {
+  try {
+    const preset = String(req.body?.preset || '').trim().toLowerCase();
+    const allowed = ['simulate', 'focus-only', 'header-only', 'full'];
+    if (!allowed.includes(preset)) {
+      throw new DualEntryRunnerError('preset must be one of: simulate, focus-only, header-only, full', 400);
+    }
+
+    const config = loadLocalRunnerConfig();
+    const command = buildReceivingAdapterCommand(preset as 'focus-only' | 'header-only' | 'full' | 'simulate');
+
+    config.adapterMode = 'command';
+    config.adapterCommand = command;
+    config.adapterWorkingDir = '.';
+    config.adapterTimeoutMs = preset === 'simulate' || preset === 'focus-only' ? 60000 : 90000;
+
+    saveLocalRunnerConfig(config);
+
+    return res.json({
+      success: true,
+      preset,
+      adapterMode: config.adapterMode,
+      adapterCommand: config.adapterCommand,
+      adapterTimeoutMs: config.adapterTimeoutMs,
+    });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
+  }
+});
+
+app.post('/api/dual-entry/testing/queue-batch', async (req, res) => {
+  try {
+    const tenant = String(req.body?.tenant || 'customer-famous-01').trim();
+    const prefix = String(req.body?.prefix || 'LIVEHDR').trim();
+    const countRaw = Number(req.body?.count || 10);
+    const count = Math.max(1, Math.min(200, Math.round(countRaw)));
+    const useAI = req.body?.useAI !== false;
+
+    if (!tenant || !prefix) {
+      throw new DualEntryRunnerError('tenant and prefix are required', 400);
+    }
+
+    const jobs = [];
+    const basePayload = {
+      receiveDate: '04/14/26',
+      whseLoc: 'Produce Depot NJ',
+      receiveType: 'Grower',
+      inventoryQnt: '2160',
+      ref: `${prefix}-000`,
+      lotId: '25D6673870',
+      carrierId: 'UAC',
+      description: 'LIVE HEADER TEST',
+      lines: [
+        {
+          commodity: 'TABLEGRP',
+          style: '18#POUCHCI1000',
+          size: 'CAT 1',
+          grade: 'CAT 1',
+          label: 'UAC',
+          region: 'CL',
+          method: 'ORIG CTN',
+          invQnt: '1188',
+          invUom: 'ctn',
+          variety: 'ALLISON',
+          palletCopies: '1',
+          lotId: '25D6673870',
+          productDescription: 'TABLE GRAPES 18#POUCHCLEAR 1000',
+        },
+      ],
+    };
+
+    const analysis = useAI ? await analyzeDualEntryPayload(basePayload, 'Famous-Receiving') : null;
+
+    for (let i = 1; i <= count; i++) {
+      const ref = `${prefix}-${String(i).padStart(3, '0')}`;
+      const normalizedBase = analysis ? JSON.parse(JSON.stringify(analysis.normalizedPayload)) as Record<string, unknown> : JSON.parse(JSON.stringify(basePayload)) as Record<string, unknown>;
+      normalizedBase.ref = ref;
+      normalizedBase.description = `LIVE HEADER TEST ${i}`;
+
+      if (analysis) {
+        normalizedBase._ai = {
+          provider: analysis.provider,
+          model: analysis.model,
+          confidence: analysis.confidence,
+          warnings: analysis.warnings,
+          mappedFields: analysis.mappedFields,
+          analyzedAt: getLocalISOString(),
+          batchTemplate: true,
+        };
+      }
+
+      const job = dualEntryRunnerService.enqueueJob({
+        tenant,
+        sourceSystem: 'OpsIQ',
+        targetSystem: 'Famous-Receiving',
+        payload: normalizedBase,
+      });
+      jobs.push(job);
+    }
+
+    return res.json({
+      success: true,
+      queued: jobs.length,
+      firstJobId: jobs[0]?.id || null,
+      ai: {
+        enabled: useAI,
+        provider: analysis?.provider || 'disabled',
+        model: analysis?.model || 'disabled',
+        confidence: analysis?.confidence,
+      },
+    });
+  } catch (error: any) {
+    const statusCode = error instanceof DualEntryRunnerError ? error.statusCode : 400;
+    return res.status(statusCode).json({ error: error.message });
   }
 });
 
@@ -1156,6 +2009,33 @@ app.post('/api/labor/kiosk-employees/:id/deactivate', async (req, res) => {
 
     const employee = await db.deactivateKioskEmployee(employeeId);
     res.json(employee);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/labor/kiosk-employees/:id', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (user.role !== 'manager' && user.role !== 'executive') {
+      return res.status(403).json({ error: 'Only managers or executives can delete employees' });
+    }
+
+    const employeeId = Number(req.params.id);
+    if (!Number.isFinite(employeeId) || employeeId <= 0) {
+      return res.status(400).json({ error: 'Valid employee id is required' });
+    }
+
+    const deleted = await db.deleteKioskEmployee(employeeId);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
@@ -2056,6 +2936,8 @@ setInterval(() => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, closing server...');
+  argusCompatService.stop();
+  windowCaptureService.stop();
   httpServer.close(() => {
     db.close();
     process.exit(0);

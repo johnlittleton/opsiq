@@ -30,10 +30,21 @@ interface AnalyticsData {
   appointmentStats: { total: number; withAppointment: number; walkIn: number };
 }
 
+interface ProductionCostingData {
+  totals?: { kpiTargetCostPerCase?: number };
+  byLine?: Array<{
+    lineNumber: number;
+    costPerCase?: number;
+    overKpi?: boolean;
+    kpiVariance?: number;
+  }>;
+}
+
 const ExecutiveAnalytics: React.FC = () => {
   const navigate = useNavigate();
   const { executiveName, userRole, logout } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [productionCosting, setProductionCosting] = useState<ProductionCostingData | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Helper function to get local date string without timezone issues
@@ -57,12 +68,21 @@ const ExecutiveAnalytics: React.FC = () => {
   const loadAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `${API_BASE}/api/executive/analytics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`
-      );
-      if (!response.ok) throw new Error('Failed to load analytics');
-      const data = await response.json();
+      const [analyticsResponse, costingResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/executive/analytics?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`),
+        fetch(`${API_BASE}/api/production/costing?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`),
+      ]);
+
+      if (!analyticsResponse.ok) throw new Error('Failed to load analytics');
+      const data = await analyticsResponse.json();
       setAnalytics(data);
+
+      if (costingResponse.ok) {
+        const costingData = await costingResponse.json();
+        setProductionCosting(costingData);
+      } else {
+        setProductionCosting({ totals: { kpiTargetCostPerCase: 1.25 }, byLine: [] });
+      }
     } catch (error) {
       console.error('Failed to load executive analytics:', error);
       setAnalytics({
@@ -73,6 +93,7 @@ const ExecutiveAnalytics: React.FC = () => {
         palletsFlow: [],
         appointmentStats: { total: 0, withAppointment: 0, walkIn: 0 }
       });
+      setProductionCosting({ totals: { kpiTargetCostPerCase: 1.25 }, byLine: [] });
     } finally {
       setLoading(false);
     }
@@ -169,6 +190,31 @@ const ExecutiveAnalytics: React.FC = () => {
     Warehouse: Math.round(l.warehouseCost * 100) / 100,
     Production: Math.round(l.productionCost * 100) / 100,
     Total: Math.round(l.totalCost * 100) / 100
+  }));
+
+  const kpiTargetCostPerCase = Number(productionCosting?.totals?.kpiTargetCostPerCase || 1.25);
+  const linesMissedKpi = (productionCosting?.byLine || [])
+    .map((line) => {
+      const costPerCase = Number(line.costPerCase || 0);
+      const variance = Number.isFinite(Number(line.kpiVariance))
+        ? Number(line.kpiVariance)
+        : (costPerCase - kpiTargetCostPerCase);
+      const overKpi = line.overKpi !== undefined ? !!line.overKpi : variance > 0;
+
+      return {
+        lineNumber: Number(line.lineNumber),
+        costPerCase,
+        variance,
+        overKpi,
+      };
+    })
+    .filter((line) => line.overKpi)
+    .sort((a, b) => b.variance - a.variance);
+
+  const kpiMissesGraphData = linesMissedKpi.map((line) => ({
+    line: `Line ${line.lineNumber}`,
+    target: Number(kpiTargetCostPerCase.toFixed(3)),
+    actual: Number(line.costPerCase.toFixed(3)),
   }));
 
   return (
@@ -377,6 +423,62 @@ const ExecutiveAnalytics: React.FC = () => {
                 />
               </PieChart>
             </ResponsiveContainer>
+          </GlassPanel>
+
+          {/* Production KPI Misses */}
+          <GlassPanel className="chart-panel kpi-misses">
+            <h3 className="chart-title">⚠️ Production KPI Misses by Line</h3>
+            <div className="kpi-miss-summary">
+              <div className="summary-stat">
+                <div className="stat-label">KPI Target ($/Case)</div>
+                <div className="stat-value">${kpiTargetCostPerCase.toFixed(2)}</div>
+              </div>
+              <div className="summary-stat">
+                <div className="stat-label">Lines Missing KPI</div>
+                <div className="stat-value orange">{linesMissedKpi.length}</div>
+              </div>
+            </div>
+
+            {linesMissedKpi.length === 0 ? (
+              <div className="kpi-miss-empty">No lines missed production KPI in this date range.</div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={kpiMissesGraphData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis dataKey="line" stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                    <YAxis stroke="#94a3b8" style={{ fontSize: '11px' }} />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'rgba(15, 23, 42, 0.95)',
+                        border: '1px solid rgba(255,255,255,0.2)',
+                        borderRadius: '6px',
+                        fontSize: '11px'
+                      }}
+                      formatter={(value: any) => `$${Number(value).toFixed(3)}`}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
+                    <Line type="monotone" dataKey="target" stroke="#10b981" strokeWidth={2} name="KPI Target" />
+                    <Line type="monotone" dataKey="actual" stroke="#ef4444" strokeWidth={2} name="Actual Cost/Case" />
+                  </LineChart>
+                </ResponsiveContainer>
+
+                <div className="kpi-miss-table">
+                  <div className="kpi-miss-row kpi-miss-header">
+                    <span>Line</span>
+                    <span>Cost/Case</span>
+                    <span>Miss Amount</span>
+                  </div>
+                  {linesMissedKpi.map((line) => (
+                    <div className="kpi-miss-row" key={`kpi-miss-line-${line.lineNumber}`}>
+                      <span>Line {line.lineNumber}</span>
+                      <span>${line.costPerCase.toFixed(3)}</span>
+                      <span className="kpi-miss-variance">+${line.variance.toFixed(3)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </GlassPanel>
 
         </div>

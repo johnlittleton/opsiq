@@ -34,6 +34,10 @@ export class DatabaseService implements IDatabaseService {
   private static readonly MAX_REASONABLE_PALLETS = 200;
   private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
   private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
+  private static readonly PROD_COST_KPI_PER_CASE = 1.25;
+  private static readonly PACK_MANAGER_ANNUAL_SALARY = 135000;
+  private static readonly ASSISTANT_PACK_MANAGER_ANNUAL_SALARY = 75000;
+  private static readonly ANNUAL_WORK_HOURS = 2080;
 
   private readonly DEFAULT_PROD_HOURLY_WAGE = 24.5;
 
@@ -596,7 +600,7 @@ export class DatabaseService implements IDatabaseService {
         { name: 'Michelle', pin: '57263', role: 'manager' },
         { name: 'Izzy', pin: '69384', role: 'executive' },
         { name: 'John', pin: '78420', role: 'executive' },
-        { name: 'Ryan', pin: '34090', role: 'manager' },
+        { name: 'Ryan', pin: '34090', role: 'executive' },
         { name: 'Victor Roman', pin: '86214', role: 'manager' },
         { name: 'Erasmo Sanchez', pin: '97531', role: 'manager' },
         { name: 'NJ Ship Receive', pin: '82147', role: 'manager' },
@@ -2510,12 +2514,21 @@ export class DatabaseService implements IDatabaseService {
     }
 
     const existing = await this.pool.query(
-      'SELECT id FROM kiosk_employees WHERE department = $1 AND employee_id = $2 LIMIT 1',
+      'SELECT * FROM kiosk_employees WHERE department = $1 AND employee_id = $2 LIMIT 1',
       [department, employeeId],
     );
 
     if (existing.rows.length > 0) {
-      throw new Error('Employee already exists in that department');
+      const result = await this.pool.query(`
+        UPDATE kiosk_employees
+        SET employee_name = $1,
+            badge_code = $2,
+            is_active = true,
+            updated_at = NOW()
+        WHERE id = $3
+        RETURNING *
+      `, [employeeName, badgeCode, existing.rows[0].id]);
+      return this.toCamelCase(result.rows[0]);
     }
 
     const result = await this.pool.query(`
@@ -3069,6 +3082,9 @@ export class DatabaseService implements IDatabaseService {
   async getProductionCostingAnalytics(startDate?: string, endDate?: string): Promise<any> {
     const today = getLocalISOString().split('T')[0];
     const SHARED_SUPPORT_HEADCOUNT = 6; // 2 taggers + 2 strappers + 1 floor lead + 1 lumper
+    const managerHourlyOverhead = (
+      DatabaseService.PACK_MANAGER_ANNUAL_SALARY + DatabaseService.ASSISTANT_PACK_MANAGER_ANNUAL_SALARY
+    ) / DatabaseService.ANNUAL_WORK_HOURS;
     const start = startDate || today;
     const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
 
@@ -3109,6 +3125,7 @@ export class DatabaseService implements IDatabaseService {
     });
     const activeLineCount = activeLines.size > 0 ? activeLines.size : 1;
     const supportWorkersPerLine = SHARED_SUPPORT_HEADCOUNT / activeLineCount;
+  const managerHourlyOverheadPerLine = managerHourlyOverhead / activeLineCount;
 
     // Aggregate by commodity/product
     const productBreakdown: Record<string, {
@@ -3157,6 +3174,8 @@ export class DatabaseService implements IDatabaseService {
       totalTimeHours: number;
       casesPerHour: number;
       bagsPerHour: number;
+      overKpi?: boolean;
+      kpiVariance?: number;
     }> = {};
 
     workOrders.forEach((wo: any) => {
@@ -3164,7 +3183,9 @@ export class DatabaseService implements IDatabaseService {
       // labor = number of workers, elapsedMs = time spent
       const timeHours = (wo.elapsedMs || 0) / (1000 * 60 * 60);
       const directLaborCost = (wo.labor || 0) * timeHours * productionHourlyWage;
-      const supportLaborCost = supportWorkersPerLine * timeHours * productionHourlyWage;
+      const supportLaborCost =
+        supportWorkersPerLine * timeHours * productionHourlyWage +
+        managerHourlyOverheadPerLine * timeHours;
       const laborCost = directLaborCost + supportLaborCost;
 
       // Product aggregation
@@ -3269,6 +3290,8 @@ export class DatabaseService implements IDatabaseService {
       l.costPerCase = l.totalCases > 0 ? l.totalLaborCost / l.totalCases : 0;
       l.casesPerHour = l.totalTimeHours > 0 ? l.totalCases / l.totalTimeHours : 0;
       l.bagsPerHour = l.totalTimeHours > 0 ? l.totalBags / l.totalTimeHours : 0;
+      l.kpiVariance = l.costPerCase - DatabaseService.PROD_COST_KPI_PER_CASE;
+      l.overKpi = l.kpiVariance > 0;
     });
 
     // Sort arrays
@@ -3299,6 +3322,8 @@ export class DatabaseService implements IDatabaseService {
         totalOrders: workOrders.length,
         activeLineCount,
         supportHeadcount: SHARED_SUPPORT_HEADCOUNT,
+        managerHourlyOverhead: Math.round(managerHourlyOverhead * 100) / 100,
+        kpiTargetCostPerCase: DatabaseService.PROD_COST_KPI_PER_CASE,
       },
       byProduct: products,
       byBagSize: bagSizes,
@@ -3307,6 +3332,11 @@ export class DatabaseService implements IDatabaseService {
       bestPerformer: bestProduct,
       worstPerformer: worstProduct,
     };
+  }
+
+  async deleteKioskEmployee(id: number): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM kiosk_employees WHERE id = $1', [id]);
+    return (result.rowCount || 0) > 0;
   }
 
   async getProductionSchedulerKPI(startDate?: string, endDate?: string, line?: number): Promise<any> {

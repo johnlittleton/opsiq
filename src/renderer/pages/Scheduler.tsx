@@ -5,7 +5,9 @@ import { apiClient } from '../services/api';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 import './Scheduler.css';
 
-const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
+const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Argentina', 'Dry Inventory'];
+const COMPANIES = ['Vanguard', 'SUNKIST', 'ESU'];
+const CUSTOMERS = ['Kings River', 'Sunkist', 'ESU', 'Fresh Taste', 'Four Star', 'SAFCO', 'Vanguard', 'SlingShot', 'Produce Depot', 'Buffalo Repack', 'Burnack'];
 
 interface Appointment {
   id: number;
@@ -669,6 +671,16 @@ const Scheduler: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                       required
                     />
+                    <select
+                      value={COMPANIES.includes(formData.company) ? formData.company : ''}
+                      onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                      className="scheduler__form-select"
+                    >
+                      <option value="">Quick pick company...</option>
+                      {COMPANIES.map((company) => (
+                        <option key={company} value={company}>{company}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="scheduler__form-field">
                     <label>{formData.type === 'Inbound' ? 'P/U Number' : 'S/O Number'}</label>
@@ -690,6 +702,16 @@ const Scheduler: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
                       placeholder="Customer name"
                     />
+                    <select
+                      value={CUSTOMERS.includes(formData.customer) ? formData.customer : ''}
+                      onChange={(e) => setFormData({ ...formData, customer: e.target.value })}
+                      className="scheduler__form-select scheduler__customer-select"
+                    >
+                      <option value="">Quick pick customer...</option>
+                      {CUSTOMERS.map((customer) => (
+                        <option key={customer} value={customer}>{customer}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="scheduler__form-field">
                     <label>Carrier</label>

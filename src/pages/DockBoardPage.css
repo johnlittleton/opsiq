@@ -17,6 +17,94 @@
   height: calc(100vh - 80px);
 }
 
+.dock-board-alert {
+  position: fixed;
+  top: 88px;
+  right: 16px;
+  width: min(560px, calc(100vw - 32px));
+  background: linear-gradient(135deg, rgba(69, 10, 10, 0.95), rgba(127, 29, 29, 0.95));
+  border: 2px solid rgba(248, 113, 113, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45), 0 0 24px rgba(248, 113, 113, 0.45);
+  padding: 10px 12px;
+  z-index: 9801;
+}
+
+.dock-board-alert__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: #fee2e2;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.dock-board-alert__minimize {
+  background: transparent;
+  border: 2px solid rgba(252, 165, 165, 0.85);
+  color: #fecaca;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dock-board-alert__minimize:hover {
+  background: rgba(127, 29, 29, 0.9);
+}
+
+.dock-board-alert__item {
+  color: #fee2e2;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 4px;
+}
+
+.dock-board-alert__item:last-child {
+  margin-bottom: 0;
+}
+
+.dock-board-alert__group {
+  margin-bottom: 8px;
+}
+
+.dock-board-alert__group:last-child {
+  margin-bottom: 0;
+}
+
+.dock-board-alert__group-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #fecaca;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+
+.dock-board-alert-minimized {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 9801;
+  background: linear-gradient(135deg, rgba(69, 10, 10, 0.95), rgba(127, 29, 29, 0.95));
+  color: #fee2e2;
+  border: 2px solid rgba(248, 113, 113, 0.9);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.dock-board-alert-minimized:hover {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.95), rgba(153, 27, 27, 0.95));
+}
+
 .dock-board-page__grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);

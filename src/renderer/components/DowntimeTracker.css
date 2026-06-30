@@ -2,6 +2,27 @@
   position: relative;
 }
 
+.downtime-tracker--floating {
+  position: fixed;
+  z-index: 9805;
+  width: min(390px, calc(100vw - 16px));
+  background: rgba(24, 29, 38, 0.95);
+  border: 1px solid #3a4152;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 10px;
+}
+
+.downtime-tracker__drag-handle {
+  cursor: move;
+  user-select: none;
+  color: #a8b3c7;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
 .btn-downtime {
   padding: 6px 12px !important;
   background: none !important;
@@ -24,17 +45,16 @@
 }
 
 .active-downtimes {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
+  position: static;
   background: #2a3142;
   border: 1px solid #3a4152;
   border-radius: 8px;
-  padding: 12px;
-  min-width: 320px;
-  max-width: 400px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
+  padding: 10px;
+  margin-top: 10px;
+  min-width: 0;
+  max-width: 100%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  z-index: auto;
 }
 
 .active-downtimes h3 {

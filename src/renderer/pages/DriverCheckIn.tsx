@@ -6,7 +6,8 @@ import { InboundOutbound, DoorStatus } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
 import './DriverCheckIn.css';
 
-const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Dry Inventory'];
+const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Argentina', 'Dry Inventory'];
+const COMPANIES = ['Vanguard', 'SUNKIST', 'ESU'];
 
 const DriverCheckIn: React.FC = () => {
   const navigate = useNavigate();
@@ -142,7 +143,7 @@ const DriverCheckIn: React.FC = () => {
       <div className="driver-checkin__container">
         <div className="driver-checkin__header">
           <h1 className="driver-checkin__title">Driver Check-In</h1>
-          <button 
+          <button
             className="driver-checkin__back"
             onClick={() => navigate('/dockboard')}
           >
@@ -277,6 +278,18 @@ const DriverCheckIn: React.FC = () => {
                   placeholder="Company name"
                   disabled={submitting}
                 />
+                <select
+                  name="company"
+                  value={COMPANIES.includes(formData.company) ? formData.company : ''}
+                  onChange={handleChange}
+                  className="driver-checkin__select"
+                  disabled={submitting}
+                >
+                  <option value="">Quick pick company...</option>
+                  {COMPANIES.map((company) => (
+                    <option key={company} value={company}>{company}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="driver-checkin__field">
