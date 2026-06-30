@@ -71,7 +71,7 @@ export default function ProductionDashboard() {
       fetchCheckins();
       fetchActiveDowntimes();
       checkDriverAlerts();
-    }, 1000); // Refresh every second to show live updates
+    }, 5000); // Refresh every 5 seconds to reduce backend load
     return () => clearInterval(interval);
   }, [selectedDate]); // Re-run if date changes
 
@@ -107,7 +107,7 @@ export default function ProductionDashboard() {
 
   const fetchCheckins = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/checkins`);
+      const response = await fetch(`${API_BASE}/api/checkins?startDate=${selectedDate}&endDate=${selectedDate}`);
       if (response.ok) {
         const data = await response.json();
         setCheckins(data);
@@ -237,7 +237,7 @@ export default function ProductionDashboard() {
     try {
       const today = getTodayDateString();
       const [checkinsResponse, workOrdersResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/checkins`),
+        fetch(`${API_BASE}/api/checkins?startDate=${today}&endDate=${today}`),
         fetch(`${API_BASE}/api/production/work-orders?date=${today}`)
       ]);
 

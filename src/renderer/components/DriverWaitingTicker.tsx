@@ -37,7 +37,7 @@ export default function DriverWaitingTicker({ lineFilter, inline = false }: Driv
       const today = getTodayDateString();
       // Fetch both check-ins and active work orders
       const [checkinsResponse, workOrdersResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/checkins`),
+        fetch(`${API_BASE}/api/checkins?startDate=${today}&endDate=${today}`),
         fetch(`${API_BASE}/api/production/work-orders?date=${today}`)
       ]);
 
