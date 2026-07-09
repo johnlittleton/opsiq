@@ -107,7 +107,7 @@ export default function ProductionScheduler() {
   const { executiveName, userRole, sessionToken } = useAuth();
   const isMobileRuntime =
     typeof window !== 'undefined' &&
-    (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
+    window.matchMedia('(max-width: 900px)').matches;
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {

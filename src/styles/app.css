@@ -21,6 +21,16 @@ body {
   background: var(--bg0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
 }
 
 /* App Background - Control Room Vignette */
@@ -196,6 +206,32 @@ a:hover {
   border-radius: 6px;
   border: 1px solid var(--border);
   color: var(--text-muted);
+}
+
+/* iPhone/small-screen protections: avoid overlap and clipping */
+@media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    height: auto;
+    overflow: auto;
+  }
+
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .update-banner {
+    left: 10px;
+    right: 10px;
+    min-width: 0;
+    max-width: none;
+    transform: none;
+  }
 }
 
 .update-banner-close:hover {
