@@ -158,12 +158,13 @@ function createWindow() {
     mainWindow.show();
   });
 
-  // Load URL based on environment
+  // Load URL based on runtime mode
   const screenArg = getScreenArgument();
   let url: string;
 
-  if (process.env.NODE_ENV === 'development') {
-    url = 'http://localhost:5173';
+  // In local dev, app.isPackaged is false even when NODE_ENV is missing.
+  if (!app.isPackaged) {
+    url = process.env.VITE_DEV_SERVER_URL || process.env.ELECTRON_RENDERER_URL || 'http://localhost:5173';
     if (screenArg) {
       url += `/#/${screenArg}`;
     }
