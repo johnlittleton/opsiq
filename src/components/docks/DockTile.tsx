@@ -13,6 +13,8 @@ interface DockTileProps {
   checkin?: DockCheckin | null;
   onClick?: () => void;
   onEdit?: () => void;
+  onOpenForm?: () => void;
+  hasFormOnFile?: boolean;
 }
 
 export const DockTile: React.FC<DockTileProps> = ({
@@ -24,6 +26,8 @@ export const DockTile: React.FC<DockTileProps> = ({
   checkin,
   onClick,
   onEdit,
+  onOpenForm,
+  hasFormOnFile = false,
 }) => {
   const statusLabels: Record<DockStatus, string> = {
     open: 'OPEN',
@@ -43,6 +47,13 @@ export const DockTile: React.FC<DockTileProps> = ({
     }
   };
 
+  const handleFormClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenForm) {
+      onOpenForm();
+    }
+  };
+
   return (
     <div
       className={`dock-tile ${compact ? 'compact' : ''} ${pulsing ? 'pulsing' : ''}`}
@@ -50,6 +61,15 @@ export const DockTile: React.FC<DockTileProps> = ({
       onClick={onClick}
     >
       <div className="dock-tile__label">D{doorNumber}</div>
+      {checkin && onOpenForm && (
+        <button
+          className={`dock-tile__verify-btn ${hasFormOnFile ? 'has-form' : ''}`}
+          onClick={handleFormClick}
+          title={hasFormOnFile ? 'Verification on file - open form' : 'Open verification form'}
+        >
+          ✓
+        </button>
+      )}
       {checkin && onEdit && (
         <button className="dock-tile__edit-btn" onClick={handleEditClick} title="Edit check-in">
           ✏️

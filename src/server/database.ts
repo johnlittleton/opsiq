@@ -31,6 +31,38 @@ function getLocalISOString(date: Date = new Date()): string {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
 }
 
+function normalizeAnalyticsDateRange(startDate?: string, endDate?: string): { start: string; end: string } {
+  const now = new Date();
+
+  const toBoundaryISOString = (dateStr: string, isEnd: boolean): string => {
+    const trimmed = String(dateStr || '').trim();
+    if (!trimmed) return '';
+
+    if (trimmed.includes('T')) {
+      return trimmed;
+    }
+
+    const parts = trimmed.split('-').map((part) => Number(part));
+    if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+      return trimmed;
+    }
+
+    const [year, month, day] = parts;
+    const boundary = isEnd
+      ? new Date(year, month - 1, day, 23, 59, 59, 999)
+      : new Date(year, month - 1, day, 0, 0, 0, 0);
+    return boundary.toISOString();
+  };
+
+  const fallbackStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+  const fallbackEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+
+  return {
+    start: toBoundaryISOString(startDate || '', false) || fallbackStart,
+    end: toBoundaryISOString(endDate || '', true) || fallbackEnd,
+  };
+}
+
 export class DatabaseService implements IDatabaseService {
   private db: Database.Database;
   private static readonly MAX_REASONABLE_PALLETS = 200;
@@ -372,6 +404,49 @@ export class DatabaseService implements IDatabaseService {
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS production_order_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        orderId TEXT NOT NULL UNIQUE,
+        line INTEGER,
+        isOrderComplete INTEGER NOT NULL DEFAULT 0,
+        quantitiesCorrect INTEGER NOT NULL DEFAULT 0,
+        tagsVerified INTEGER NOT NULL DEFAULT 0,
+        leadName TEXT,
+        qcName TEXT,
+        managerName TEXT,
+        notes TEXT,
+        submittedBy TEXT,
+        submittedAt TEXT,
+        isPassed INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (orderId) REFERENCES work_orders(id)
+      );
+
+      CREATE TABLE IF NOT EXISTS outbound_checkin_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        checkinId INTEGER NOT NULL UNIQUE,
+        doorId INTEGER,
+        isOrderComplete INTEGER NOT NULL DEFAULT 0,
+        quantitiesCorrect INTEGER NOT NULL DEFAULT 0,
+        tagsVerified INTEGER NOT NULL DEFAULT 0,
+        leadName TEXT,
+        qcName TEXT,
+        managerName TEXT,
+        notes TEXT,
+        submittedBy TEXT,
+        submittedAt TEXT,
+        isPassed INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        FOREIGN KEY (checkinId) REFERENCES dock_checkins(id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_prod_verification_order ON production_order_verifications(orderId);
+      CREATE INDEX IF NOT EXISTS idx_prod_verification_submitted ON production_order_verifications(submittedAt);
+      CREATE INDEX IF NOT EXISTS idx_outbound_verification_checkin ON outbound_checkin_verifications(checkinId);
+      CREATE INDEX IF NOT EXISTS idx_outbound_verification_submitted ON outbound_checkin_verifications(submittedAt);
 
       CREATE TABLE IF NOT EXISTS pallet_tracker_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2453,6 +2528,25 @@ export class DatabaseService implements IDatabaseService {
       WHERE date = ?
     `).all(targetDate) as any[];
 
+    const activeDepartmentStarts = departmentSessions
+      .filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime))
+      .map((s) => new Date(s.startTime).getTime())
+      .filter((ms) => Number.isFinite(ms));
+    const activeWarehouseEmployeeStarts = warehouseEmployeeShifts
+      .filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime))
+      .map((s) => new Date(s.startTime).getTime())
+      .filter((ms) => Number.isFinite(ms));
+    const activeKioskStarts = kioskEmployeeShifts
+      .filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime))
+      .map((s) => new Date(s.startTime).getTime())
+      .filter((ms) => Number.isFinite(ms));
+    const allActiveStarts = [...activeDepartmentStarts, ...activeWarehouseEmployeeStarts, ...activeKioskStarts];
+    const trackerStartMs = allActiveStarts.length > 0 ? Math.min(...allActiveStarts) : null;
+    const trackerStartTime = trackerStartMs !== null ? new Date(trackerStartMs).toISOString() : null;
+    const trackerElapsedMinutes = trackerStartMs !== null
+      ? Math.max(0, Math.floor((now.getTime() - trackerStartMs) / (1000 * 60)))
+      : 0;
+
     const departmentSummaries = departments.map((department) => {
       const deptSessions = departmentSessions.filter((s) => s.department === department);
       const activeSessions = deptSessions.filter((s) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
@@ -2553,6 +2647,8 @@ export class DatabaseService implements IDatabaseService {
         currentHourlyLaborCost: Math.round(totals.currentHourlyLaborCost * 100) / 100,
         runningLaborCost: Math.round(totals.runningLaborCost * 100) / 100,
         totalLaborCost: Math.round(totals.totalLaborCost * 100) / 100,
+        trackerStartTime,
+        trackerElapsedMinutes,
       },
     };
   }
@@ -2701,6 +2797,122 @@ export class DatabaseService implements IDatabaseService {
     `).all(checkinId) as any[];
   }
 
+  async getCheckinById(checkinId: number): Promise<any | null> {
+    return this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(checkinId) || null;
+  }
+
+  async saveProductionOrderVerification(payload: any): Promise<any> {
+    const now = getLocalISOString();
+    const submittedAt = payload.submittedAt || now;
+    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+
+    this.db.prepare(`
+      INSERT INTO production_order_verifications (
+        orderId, line, isOrderComplete, quantitiesCorrect, tagsVerified,
+        leadName, qcName, managerName, notes, submittedBy, submittedAt,
+        isPassed, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(orderId) DO UPDATE SET
+        line = excluded.line,
+        isOrderComplete = excluded.isOrderComplete,
+        quantitiesCorrect = excluded.quantitiesCorrect,
+        tagsVerified = excluded.tagsVerified,
+        leadName = excluded.leadName,
+        qcName = excluded.qcName,
+        managerName = excluded.managerName,
+        notes = excluded.notes,
+        submittedBy = excluded.submittedBy,
+        submittedAt = excluded.submittedAt,
+        isPassed = excluded.isPassed,
+        updatedAt = excluded.updatedAt
+    `).run(
+      payload.orderId,
+      payload.line ?? null,
+      payload.isOrderComplete ? 1 : 0,
+      payload.quantitiesCorrect ? 1 : 0,
+      payload.tagsVerified ? 1 : 0,
+      payload.leadName || null,
+      payload.qcName || null,
+      payload.managerName || null,
+      payload.notes || null,
+      payload.submittedBy || 'System',
+      submittedAt,
+      isPassed ? 1 : 0,
+      now,
+      now
+    );
+
+    return this.getProductionOrderVerification(payload.orderId);
+  }
+
+  async getProductionOrderVerification(orderId: string): Promise<any | null> {
+    const row = this.db.prepare('SELECT * FROM production_order_verifications WHERE orderId = ?').get(orderId) as any;
+    if (!row) return null;
+    return {
+      ...row,
+      isOrderComplete: Boolean(row.isOrderComplete),
+      quantitiesCorrect: Boolean(row.quantitiesCorrect),
+      tagsVerified: Boolean(row.tagsVerified),
+      isPassed: Boolean(row.isPassed),
+    };
+  }
+
+  async saveOutboundCheckinVerification(payload: any): Promise<any> {
+    const now = getLocalISOString();
+    const submittedAt = payload.submittedAt || now;
+    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+
+    this.db.prepare(`
+      INSERT INTO outbound_checkin_verifications (
+        checkinId, doorId, isOrderComplete, quantitiesCorrect, tagsVerified,
+        leadName, qcName, managerName, notes, submittedBy, submittedAt,
+        isPassed, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(checkinId) DO UPDATE SET
+        doorId = excluded.doorId,
+        isOrderComplete = excluded.isOrderComplete,
+        quantitiesCorrect = excluded.quantitiesCorrect,
+        tagsVerified = excluded.tagsVerified,
+        leadName = excluded.leadName,
+        qcName = excluded.qcName,
+        managerName = excluded.managerName,
+        notes = excluded.notes,
+        submittedBy = excluded.submittedBy,
+        submittedAt = excluded.submittedAt,
+        isPassed = excluded.isPassed,
+        updatedAt = excluded.updatedAt
+    `).run(
+      payload.checkinId,
+      payload.doorId ?? null,
+      payload.isOrderComplete ? 1 : 0,
+      payload.quantitiesCorrect ? 1 : 0,
+      payload.tagsVerified ? 1 : 0,
+      payload.leadName || null,
+      payload.qcName || null,
+      payload.managerName || null,
+      payload.notes || null,
+      payload.submittedBy || 'System',
+      submittedAt,
+      isPassed ? 1 : 0,
+      now,
+      now
+    );
+
+    return this.getOutboundCheckinVerification(payload.checkinId);
+  }
+
+  async getOutboundCheckinVerification(checkinId: number): Promise<any | null> {
+    const row = this.db.prepare('SELECT * FROM outbound_checkin_verifications WHERE checkinId = ?').get(checkinId) as any;
+    if (!row) return null;
+    return {
+      ...row,
+      isOrderComplete: Boolean(row.isOrderComplete),
+      quantitiesCorrect: Boolean(row.quantitiesCorrect),
+      tagsVerified: Boolean(row.tagsVerified),
+      isPassed: Boolean(row.isPassed),
+    };
+  }
+
   updateCheckinCompletion(checkinId: number, actualPallets: number): void {
     const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets');
     const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(checkinId) as any;
@@ -2771,15 +2983,16 @@ export class DatabaseService implements IDatabaseService {
       ? (totalPalletsLoaded + totalPalletsOffloaded) / completedCheckins.length
       : 0;
 
-    // Top operators - ALL TIME (not filtered by date range), all closed records counted
-    const allCompletedCheckins = this.db.prepare(`
+    // Top operators - derived from the same selected range (or all-time window when allTime=true)
+    const operatorCheckins = this.db.prepare(`
       SELECT forkliftDriver, actualPallets, pallets, totalMinutes
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND forkliftDriver IS NOT NULL
-    `).all() as any[];
+        AND closedAt >= ? AND closedAt <= ?
+    `).all(start, end) as any[];
     
-    console.log('📊 Found ALL-TIME completed checkins for operators:', allCompletedCheckins.length);
+    console.log('📊 Found completed checkins for operators:', operatorCheckins.length);
     
     // Normalize driver names to combine variants
     const normalizeDriverName = (name: string): string | null => {
@@ -2805,7 +3018,7 @@ export class DatabaseService implements IDatabaseService {
     // Track timedLoads separately so avgTimeMinutes only averages records that have time data
     const operatorStats: Record<string, { loads: number; pallets: number; totalMinutes: number; timedLoads: number }> = {};
     
-    allCompletedCheckins.forEach(c => {
+    operatorCheckins.forEach(c => {
       const normalizedName = normalizeDriverName(c.forkliftDriver);
       if (!normalizedName) return; // Skip non-approved drivers
       
@@ -2858,7 +3071,8 @@ export class DatabaseService implements IDatabaseService {
       WHERE completedCases > 0
         AND status = 'Completed'
         AND lead IS NOT NULL
-    `).all() as any[];
+        AND updatedAt >= ? AND updatedAt <= ?
+    `).all(start, end) as any[];
 
     const lineLeadStats: Record<string, { totalCases: number; totalBags: number; completedWorkOrders: number }> = {};
 
@@ -2898,6 +3112,22 @@ export class DatabaseService implements IDatabaseService {
       .filter(c => isValidDockDuration(c.totalMinutes))
       .reduce((sum, c) => sum + c.totalMinutes, 0) / 60;
 
+    const dockDoorStatuses = (this.db.prepare(`
+      SELECT status, COUNT(*) as count
+      FROM dock_doors
+      GROUP BY status
+    `).all() as Array<{ status: string; count: number }>).reduce((acc: Record<string, number>, row) => {
+      acc[String(row.status || 'Open')] = Number(row.count) || 0;
+      return acc;
+    }, {});
+    const totalDoors = Object.values(dockDoorStatuses).reduce((sum, count) => sum + count, 0);
+    const offlineDoors = dockDoorStatuses.Offline || 0;
+    const activeDoors = Math.max(0, totalDoors - offlineDoors);
+    const occupiedDoors = Object.entries(dockDoorStatuses)
+      .filter(([status]) => status !== 'Open' && status !== 'Offline')
+      .reduce((sum, [, count]) => sum + count, 0);
+    const dockUtilization = activeDoors > 0 ? Math.round((occupiedDoors / activeDoors) * 1000) / 10 : 0;
+
     // Get latest labor snapshot
     const latestLabor = this.db.prepare(
       'SELECT * FROM labor_snapshots ORDER BY timestamp DESC LIMIT 1'
@@ -2908,17 +3138,15 @@ export class DatabaseService implements IDatabaseService {
     const ytdStart = `${currentYear}-01-01T00:00:00`;
     const ytdEnd = `${today}T23:59:59`;
 
-    // Current shift cost (or latest completed shift in range when no active shift).
-    const latestCompletedShift = this.db.prepare(`
-      SELECT totalLaborCost
+    // Sum the full selected-period labor total, then add the live active shift when it belongs to the range.
+    const completedShiftTotal = this.db.prepare(`
+      SELECT COALESCE(SUM(totalLaborCost), 0) as total
       FROM shift_sessions
       WHERE status = 'completed'
         AND endTime IS NOT NULL
         AND endTime >= ? AND endTime <= ?
-      ORDER BY endTime DESC
-      LIMIT 1
     `).get(start, end) as any;
-    let totalShiftLaborCost = latestCompletedShift?.totalLaborCost || 0;
+    let totalShiftLaborCost = completedShiftTotal?.total || 0;
 
     // Get current shift session to calculate live running labor cost.
     const currentShift = this.getCurrentShiftSession();
@@ -2926,7 +3154,7 @@ export class DatabaseService implements IDatabaseService {
       const runningCost = currentShift.runningLaborCost || 0;
       const shiftStart = currentShift.startTime;
       if (shiftStart >= start && shiftStart <= end) {
-        totalShiftLaborCost = runningCost;
+        totalShiftLaborCost += runningCost;
       }
     }
 
@@ -3021,7 +3249,7 @@ export class DatabaseService implements IDatabaseService {
       topOperators,
       topLineLeads,
       totalDockTimeHours: Math.round(totalDockHours * 10) / 10,
-      dockUtilization: 0, // Calculate based on active doors
+      dockUtilization,
       completedToday: completedCheckins.length,
       activeNow: activeNow.count,
       shippingReceivingLaborCostPerHour: currentShift && currentShift.status === 'active'
@@ -3915,9 +4143,7 @@ export class DatabaseService implements IDatabaseService {
 
   // Executive Analytics - Chart Data
   getExecutiveAnalytics(startDate?: string, endDate?: string): any {
-    const today = getLocalISOString().split('T')[0];
-    const start = startDate ? `${startDate}T00:00:00` : `${today}T00:00:00`;
-    const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
+    const { start, end } = normalizeAnalyticsDateRange(startDate, endDate);
 
     // 1. Line Output - Cases per production line
     const lineOutputRows = this.db.prepare(`
@@ -3964,20 +4190,36 @@ export class DatabaseService implements IDatabaseService {
     `).all(start, end) as any[];
 
     // 3. Forklift Driver Performance
-    const completedCheckins = this.db.prepare(`
+    let completedCheckins = this.db.prepare(`
       SELECT forkliftDriver, actualPallets, pallets, totalMinutes
       FROM dock_checkins
       WHERE closedAt IS NOT NULL
         AND closedAt >= ? AND closedAt <= ?
-        AND forkliftDriver IS NOT NULL
-        AND forkliftDriver != 'TBD'
-        AND forkliftDriver != 'Unknown'
     `).all(start, end) as any[];
+
+    if (completedCheckins.length === 0) {
+      completedCheckins = this.db.prepare(`
+        SELECT
+          COALESCE(c.forkliftDriver, '') as forkliftDriver,
+          c.actualPallets as actualPallets,
+          c.pallets as pallets,
+          COALESCE(c.totalMinutes, 0) as totalMinutes
+        FROM dock_events e
+        LEFT JOIN dock_checkins c ON c.id = e.checkinId
+        WHERE e.checkinId IS NOT NULL
+          AND e.newStatus = 'Open'
+          AND e.oldStatus IN ('Loading', 'Offload', 'Checked In')
+          AND e.eventTime >= ? AND e.eventTime <= ?
+        GROUP BY e.checkinId
+      `).all(start, end) as any[];
+    }
 
     const driverStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
     completedCheckins.forEach(c => {
-      const driver = c.forkliftDriver;
-      if (!driver || driver.trim() === '') return;
+      const rawDriver = String(c.forkliftDriver || '').trim();
+      const driver = !rawDriver || /^tbd$/i.test(rawDriver) || /^unknown$/i.test(rawDriver)
+        ? 'Unassigned'
+        : rawDriver;
       if (!driverStats[driver]) {
         driverStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
@@ -4160,7 +4402,7 @@ export class DatabaseService implements IDatabaseService {
         CAST(palletsIn AS INTEGER) AS palletsIn,
         CAST(palletsOut AS INTEGER) AS palletsOut,
         MAX(CAST(balance AS INTEGER), 0) AS balance,
-        MAX(CAST(balance AS INTEGER), 0) * 40 AS monthlyCharge
+        MAX(CAST(balance AS INTEGER), 0) * 50 AS monthlyCharge
       FROM running_balance
       ORDER BY month
     `).all() as any[]).map((r: any) => {
@@ -4190,7 +4432,7 @@ export class DatabaseService implements IDatabaseService {
     return {
       months: rows,
       currentBalance,
-      currentMonthCharge: currentBalance * 40,
+      currentMonthCharge: currentBalance * 50,
       totalBilledComplete,
       totalBilledAll,
       totalPalletsIn,

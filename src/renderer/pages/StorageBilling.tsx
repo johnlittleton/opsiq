@@ -79,7 +79,7 @@ const StorageBilling: React.FC = () => {
           <button className="storage-billing__back" onClick={() => navigate(-1)}>← Back</button>
           <div className="storage-billing__title-block">
             <h1 className="storage-billing__title">📦 Storage Billing</h1>
-            <p className="storage-billing__subtitle">Pallet storage charges since November 2025 · $40 / pallet / month</p>
+            <p className="storage-billing__subtitle">Pallet storage charges since November 2025 · $50 / pallet / month</p>
           </div>
           <button className="storage-billing__refresh" onClick={loadData}>↻ Refresh</button>
         </div>
@@ -168,7 +168,7 @@ const StorageBilling: React.FC = () => {
             </div>
 
             <p className="storage-billing__note">
-              * Monthly charge = end-of-month pallet balance × $40. The current month reflects today's balance and is an estimate until month-end.
+              * Monthly charge = end-of-month pallet balance × $50. The current month reflects today's balance and is an estimate until month-end.
             </p>
           </>
         )}

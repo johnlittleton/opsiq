@@ -72,6 +72,18 @@ class ApiClient {
     this.socket?.on('production:updated', callback);
   }
 
+  onFormCompleted(callback: (event: {
+    formType: 'production' | 'outbound';
+    referenceId: string | number;
+    line?: number;
+    message?: string;
+    submittedBy?: string;
+    submittedAt?: string;
+  }) => void) {
+    this.socket?.off('form:completed');
+    this.socket?.on('form:completed', callback);
+  }
+
   requestSync() {
     console.log('📤 Requesting sync...');
     this.socket?.emit('sync:request');
@@ -813,6 +825,72 @@ class ApiClient {
       const error = await response.json();
       throw new Error(error.error || 'Failed to delete appointment');
     }
+  }
+
+  async getProductionVerification(orderId: string): Promise<any | null> {
+    const response = await fetch(`${API_BASE}/api/verification/production/${orderId}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to load production verification');
+    }
+    return response.json();
+  }
+
+  async getProductionVerificationStatuses(orderIds: string[]): Promise<Record<string, boolean>> {
+    if (!orderIds.length) return {};
+    const params = new URLSearchParams({ orderIds: orderIds.join(',') });
+    const response = await fetch(`${API_BASE}/api/verification/production/status?${params.toString()}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to load production verification statuses');
+    }
+    return response.json();
+  }
+
+  async saveProductionVerification(orderId: string, payload: any): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/verification/production/${orderId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to save production verification');
+    }
+    return response.json();
+  }
+
+  async getOutboundVerification(checkinId: number): Promise<any | null> {
+    const response = await fetch(`${API_BASE}/api/verification/outbound/${checkinId}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to load outbound verification');
+    }
+    return response.json();
+  }
+
+  async getOutboundVerificationStatuses(checkinIds: number[]): Promise<Record<number, boolean>> {
+    if (!checkinIds.length) return {};
+    const params = new URLSearchParams({ checkinIds: checkinIds.join(',') });
+    const response = await fetch(`${API_BASE}/api/verification/outbound/status?${params.toString()}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to load outbound verification statuses');
+    }
+    return response.json();
+  }
+
+  async saveOutboundVerification(checkinId: number, payload: any): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/verification/outbound/${checkinId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to save outbound verification');
+    }
+    return response.json();
   }
 
   onAppointmentCreated(callback: (appointment: any) => void) {

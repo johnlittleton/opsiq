@@ -343,3 +343,19 @@
     justify-content: space-between;
   }
 }
+
+.driver-avatar-page__construction {
+  position: fixed;
+  top: 42px;
+  left: 16px;
+  z-index: 1001;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.8);
+  background: rgba(120, 53, 15, 0.72);
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}

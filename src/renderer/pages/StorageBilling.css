@@ -1,5 +1,8 @@
 .storage-billing {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   background: #0f172a;
   color: #e2e8f0;
   font-family: 'Inter', sans-serif;

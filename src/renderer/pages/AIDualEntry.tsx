@@ -266,6 +266,7 @@ const AIDualEntry: React.FC = () => {
 
   return (
     <div className="ai-dual-entry-page">
+      <div className="ai-dual-entry__construction">Under Construction</div>
       <header className="ai-dual-entry-header">
         <div>
           <h1>AI Dual Entry</h1>

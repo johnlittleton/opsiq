@@ -872,6 +872,22 @@ app.post('/api/doors/:doorId/clear', async (req, res) => {
       updatedBy: req.body.updatedBy || 'System',
       actualPallets: req.body.actualPallets, // CRITICAL: Pass actualPallets from request body
     };
+
+    const allDoors = await db.getAllDoorsWithCheckins();
+    const targetDoor = Array.isArray(allDoors)
+      ? allDoors.find((door: any) => Number(door.doorId) === data.doorId)
+      : null;
+    const checkin = targetDoor?.checkin;
+
+    if (checkin && String(checkin.inboundOutbound || '').toLowerCase() === 'outbound') {
+      const verification = await db.getOutboundCheckinVerification(Number(checkin.id));
+      if (!verification || !verification.isPassed) {
+        return res.status(409).json({
+          error: `Outbound verification form is required before clearing Door ${data.doorId}.`,
+        });
+      }
+    }
+
     const result = await db.clearDoor(data);
     
     // Broadcast update to all clients
@@ -2112,6 +2128,180 @@ app.post('/api/kiosk/assistant/speak', async (req, res) => {
 
 // ==================== PERFORMANCE TRACKING API ====================
 
+app.get('/api/verification/production/status', async (req, res) => {
+  try {
+    const rawIds = String(req.query.orderIds || '').trim();
+    if (!rawIds) {
+      return res.json({});
+    }
+
+    const orderIds = rawIds
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+
+    const rows = await Promise.all(orderIds.map(async (orderId) => {
+      const verification = await db.getProductionOrderVerification(orderId);
+      return [orderId, Boolean(verification?.isPassed)] as const;
+    }));
+
+    const result: Record<string, boolean> = {};
+    rows.forEach(([orderId, hasForm]) => {
+      result[orderId] = hasForm;
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load production verification statuses' });
+  }
+});
+
+app.get('/api/verification/production/:orderId', async (req, res) => {
+  try {
+    const verification = await db.getProductionOrderVerification(String(req.params.orderId));
+    res.json(verification || null);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load production verification' });
+  }
+});
+
+app.post('/api/verification/production/:orderId', async (req, res) => {
+  try {
+    const orderId = String(req.params.orderId || '').trim();
+    const workOrder = await db.getWorkOrderById(orderId);
+    if (!workOrder) {
+      return res.status(404).json({ error: 'Work order not found' });
+    }
+
+    const payload = {
+      orderId,
+      line: Number(req.body?.line || workOrder.line || 0),
+      isOrderComplete: Boolean(req.body?.isOrderComplete),
+      quantitiesCorrect: Boolean(req.body?.quantitiesCorrect),
+      tagsVerified: Boolean(req.body?.tagsVerified),
+      leadName: String(req.body?.leadName || '').trim(),
+      qcName: String(req.body?.qcName || '').trim(),
+      managerName: String(req.body?.managerName || '').trim(),
+      notes: String(req.body?.notes || '').trim(),
+      submittedBy: String(req.body?.submittedBy || req.body?.updatedBy || 'System').trim(),
+      submittedAt: getLocalISOString(),
+    };
+
+    const isPassed = payload.isOrderComplete
+      && payload.quantitiesCorrect
+      && payload.tagsVerified
+      && payload.leadName
+      && payload.qcName
+      && payload.managerName;
+
+    if (!isPassed) {
+      return res.status(400).json({ error: 'All checklist items and Lead/QC/Manager sign-offs are required.' });
+    }
+
+    const saved = await db.saveProductionOrderVerification(payload);
+
+    io.emit('form:completed', {
+      formType: 'production',
+      referenceId: orderId,
+      line: payload.line,
+      message: `Production form submitted for order ${orderId}`,
+      submittedBy: payload.submittedBy,
+      submittedAt: payload.submittedAt,
+    });
+
+    res.json(saved);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to save production verification' });
+  }
+});
+
+app.get('/api/verification/outbound/status', async (req, res) => {
+  try {
+    const rawIds = String(req.query.checkinIds || '').trim();
+    if (!rawIds) {
+      return res.json({});
+    }
+
+    const checkinIds = rawIds
+      .split(',')
+      .map((id) => parseInt(id.trim(), 10))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    const rows = await Promise.all(checkinIds.map(async (checkinId) => {
+      const verification = await db.getOutboundCheckinVerification(checkinId);
+      return [checkinId, Boolean(verification?.isPassed)] as const;
+    }));
+
+    const result: Record<number, boolean> = {};
+    rows.forEach(([checkinId, hasForm]) => {
+      result[checkinId] = hasForm;
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load outbound verification statuses' });
+  }
+});
+
+app.get('/api/verification/outbound/:checkinId', async (req, res) => {
+  try {
+    const checkinId = parseInt(req.params.checkinId);
+    const verification = await db.getOutboundCheckinVerification(checkinId);
+    res.json(verification || null);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load outbound verification' });
+  }
+});
+
+app.post('/api/verification/outbound/:checkinId', async (req, res) => {
+  try {
+    const checkinId = parseInt(req.params.checkinId);
+    const checkin = await db.getCheckinById(checkinId);
+    if (!checkin) {
+      return res.status(404).json({ error: 'Check-in not found' });
+    }
+
+    const payload = {
+      checkinId,
+      doorId: Number(req.body?.doorId || checkin.doorId || 0),
+      isOrderComplete: Boolean(req.body?.isOrderComplete),
+      quantitiesCorrect: Boolean(req.body?.quantitiesCorrect),
+      tagsVerified: Boolean(req.body?.tagsVerified),
+      leadName: String(req.body?.leadName || '').trim(),
+      qcName: String(req.body?.qcName || '').trim(),
+      managerName: String(req.body?.managerName || '').trim(),
+      notes: String(req.body?.notes || '').trim(),
+      submittedBy: String(req.body?.submittedBy || req.body?.updatedBy || 'System').trim(),
+      submittedAt: getLocalISOString(),
+    };
+
+    const isPassed = payload.isOrderComplete
+      && payload.quantitiesCorrect
+      && payload.tagsVerified
+      && payload.leadName
+      && payload.qcName
+      && payload.managerName;
+
+    if (!isPassed) {
+      return res.status(400).json({ error: 'All checklist items and Lead/QC/Manager sign-offs are required.' });
+    }
+
+    const saved = await db.saveOutboundCheckinVerification(payload);
+
+    io.emit('form:completed', {
+      formType: 'outbound',
+      referenceId: checkinId,
+      message: `Outbound form submitted for check-in #${checkinId}`,
+      submittedBy: payload.submittedBy,
+      submittedAt: payload.submittedAt,
+    });
+
+    res.json(saved);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to save outbound verification' });
+  }
+});
+
 // Mark load start for a checkin
 app.post('/api/checkins/:checkinId/start-load', async (req, res) => {
   try {
@@ -2128,7 +2318,29 @@ app.post('/api/checkins/:checkinId/complete', async (req, res) => {
   try {
     const checkinId = parseInt(req.params.checkinId);
     const { actualPallets } = req.body;
+
+    const checkin = await db.getCheckinById(checkinId);
+    if (!checkin) {
+      return res.status(404).json({ error: 'Check-in not found' });
+    }
+
+    if (String(checkin.inboundOutbound || '').toLowerCase() === 'outbound') {
+      const verification = await db.getOutboundCheckinVerification(checkinId);
+      if (!verification || !verification.isPassed) {
+        return res.status(409).json({ error: 'Outbound verification form is required before completing this check-in.' });
+      }
+    }
+
     await db.updateCheckinCompletion(checkinId, actualPallets);
+
+    io.emit('form:completed', {
+      formType: 'outbound',
+      referenceId: checkinId,
+      message: `Outbound verification completed for check-in #${checkinId}`,
+      submittedBy: req.body?.updatedBy || req.body?.submittedBy || 'System',
+      submittedAt: getLocalISOString(),
+    });
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -2269,9 +2481,29 @@ app.put('/api/production/work-orders/:id', async (req, res) => {
         : {}),
     };
 
+    const isCompleting = String(normalizedBody.status || '').toLowerCase() === 'completed';
+    if (isCompleting) {
+      const verification = await db.getProductionOrderVerification(String(req.params.id));
+      if (!verification || !verification.isPassed) {
+        return res.status(409).json({ error: 'Production verification form is required before completing this work order.' });
+      }
+    }
+
     const workOrder = await db.updateWorkOrder(req.params.id, normalizedBody);
     if (workOrder) {
       io.emit('workorder:updated', workOrder);
+
+      if (String(workOrder.status || '').toLowerCase() === 'completed') {
+        io.emit('form:completed', {
+          formType: 'production',
+          referenceId: workOrder.id,
+          line: Number(workOrder.line || 0),
+          message: `Production verification completed for order ${workOrder.id}`,
+          submittedBy: req.body?.updatedBy || req.body?.submittedBy || 'System',
+          submittedAt: getLocalISOString(),
+        });
+      }
+
       res.json(workOrder);
     } else {
       res.status(404).json({ error: 'Work order not found' });

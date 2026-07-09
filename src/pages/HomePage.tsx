@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../renderer/context/AuthContext';
+import { hasRestrictedFeatureAccess } from '../renderer/utils/restrictedAccess';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { executiveName, userRole, logout } = useAuth();
+  const hasRestrictedAccess = hasRestrictedFeatureAccess(executiveName);
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
   
@@ -22,12 +24,13 @@ export const HomePage: React.FC = () => {
       description: 'Check in drivers and assign dock doors',
       onClick: () => navigate('/checkin'),
     },
-    {
+    ...(hasRestrictedAccess ? [{
       icon: '🤖',
       title: 'Driver Avatar',
       description: 'Open the dedicated avatar stage view',
+      badge: 'Under Construction',
       onClick: () => navigate('/driver-avatar'),
-    },
+    }] : []),
     {
       icon: '👥',
       title: 'Active Drivers',
@@ -91,10 +94,11 @@ export const HomePage: React.FC = () => {
   ];
 
   const managementCards = [
-    ...((userRole === 'executive' || userRole === 'manager') ? [{
+    ...((userRole === 'executive' || userRole === 'manager') && hasRestrictedAccess ? [{
       icon: '🤖',
       title: 'AI Dual Entry',
       description: 'Mirror Famous WMS entries with runner status and exception review',
+      badge: 'Under Construction',
       onClick: () => navigate('/ai-dual-entry'),
     }] : []),
     ...(userRole === 'executive' ? [{
@@ -102,7 +106,12 @@ export const HomePage: React.FC = () => {
       title: 'Executive Dashboard',
       description: 'Site performance metrics and top operators',
       onClick: () => navigate('/executive'),
-    }] : []),
+    }, ...(hasRestrictedAccess ? [{
+      icon: '🖥️',
+      title: 'Combined Live Dashboard',
+      description: 'All departments on one live internal screen',
+      onClick: () => navigate('/combined-live-operations'),
+    }] : [])] : []),
     ...((userRole === 'executive' || userRole === 'manager') ? [{
       icon: '💼',
       title: 'Manager Dashboard',
@@ -208,7 +217,10 @@ export const HomePage: React.FC = () => {
             >
               <div className="home-page__card-icon">{card.icon}</div>
               <div className="home-page__card-content">
-                <h3 className="home-page__card-title">{card.title}</h3>
+                <div className="home-page__card-title-row">
+                  <h3 className="home-page__card-title">{card.title}</h3>
+                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
+                </div>
                 <p className="home-page__card-desc">{card.description}</p>
               </div>
             </div>
@@ -227,7 +239,10 @@ export const HomePage: React.FC = () => {
             >
               <div className="home-page__card-icon">{card.icon}</div>
               <div className="home-page__card-content">
-                <h3 className="home-page__card-title">{card.title}</h3>
+                <div className="home-page__card-title-row">
+                  <h3 className="home-page__card-title">{card.title}</h3>
+                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
+                </div>
                 <p className="home-page__card-desc">{card.description}</p>
               </div>
             </div>
@@ -246,7 +261,10 @@ export const HomePage: React.FC = () => {
             >
               <div className="home-page__card-icon">{card.icon}</div>
               <div className="home-page__card-content">
-                <h3 className="home-page__card-title">{card.title}</h3>
+                <div className="home-page__card-title-row">
+                  <h3 className="home-page__card-title">{card.title}</h3>
+                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
+                </div>
                 <p className="home-page__card-desc">{card.description}</p>
               </div>
             </div>
@@ -265,7 +283,10 @@ export const HomePage: React.FC = () => {
             >
               <div className="home-page__card-icon">{card.icon}</div>
               <div className="home-page__card-content">
-                <h3 className="home-page__card-title">{card.title}</h3>
+                <div className="home-page__card-title-row">
+                  <h3 className="home-page__card-title">{card.title}</h3>
+                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
+                </div>
                 <p className="home-page__card-desc">{card.description}</p>
               </div>
             </div>

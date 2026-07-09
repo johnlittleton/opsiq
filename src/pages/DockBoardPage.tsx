@@ -10,6 +10,16 @@ import { apiClient } from '../renderer/services/api';
 import { DockCheckin } from '../shared/types';
 import './DockBoardPage.css';
 
+interface DockVerificationForm {
+  isOrderComplete: boolean;
+  quantitiesCorrect: boolean;
+  tagsVerified: boolean;
+  leadName: string;
+  qcName: string;
+  managerName: string;
+  notes: string;
+}
+
 export const DockBoardPage: React.FC = () => {
   const navigate = useNavigate();
   const doors = useAppStore(state => state.doors);
@@ -22,6 +32,18 @@ export const DockBoardPage: React.FC = () => {
   const [messengerOpen, setMessengerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [dockAlertsMinimized, setDockAlertsMinimized] = useState(false);
+  const [formCheckin, setFormCheckin] = useState<DockCheckin | null>(null);
+  const [submittingForm, setSubmittingForm] = useState(false);
+  const [formStatuses, setFormStatuses] = useState<Record<number, boolean>>({});
+  const [dockForm, setDockForm] = useState<DockVerificationForm>({
+    isOrderComplete: false,
+    quantitiesCorrect: false,
+    tagsVerified: false,
+    leadName: '',
+    qcName: '',
+    managerName: '',
+    notes: '',
+  });
 
   const getLocalDateString = (date: Date): string => {
     const year = date.getFullYear();
@@ -54,6 +76,32 @@ export const DockBoardPage: React.FC = () => {
     const interval = setInterval(fetchParkedTrucks, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loadFormStatuses = async () => {
+      try {
+        const checkinIds = Array.from(new Set(
+          allDoors
+            .map((door) => door.checkin)
+            .filter((checkin): checkin is DockCheckin => Boolean(checkin))
+            .map((checkin) => Number(checkin.id))
+            .filter((id) => Number.isFinite(id) && id > 0)
+        ));
+
+        if (!checkinIds.length) {
+          setFormStatuses({});
+          return;
+        }
+
+        const statuses = await apiClient.getOutboundVerificationStatuses(checkinIds);
+        setFormStatuses(statuses || {});
+      } catch (error) {
+        console.error('Failed to load dock form statuses:', error);
+      }
+    };
+
+    void loadFormStatuses();
+  }, [doors]);
 
   // Fetch today's appointments and active check-ins for dock alerting
   useEffect(() => {
@@ -148,6 +196,74 @@ export const DockBoardPage: React.FC = () => {
 
   const handleEditCheckin = (checkin: DockCheckin) => {
     setEditingCheckin(checkin);
+  };
+
+  const handleOpenForm = async (checkin: DockCheckin) => {
+    setFormCheckin(checkin);
+    setDockForm({
+      isOrderComplete: false,
+      quantitiesCorrect: false,
+      tagsVerified: false,
+      leadName: '',
+      qcName: '',
+      managerName: '',
+      notes: '',
+    });
+
+    try {
+      const existing = await apiClient.getOutboundVerification(Number(checkin.id));
+      if (existing) {
+        setDockForm({
+          isOrderComplete: Boolean(existing.isOrderComplete),
+          quantitiesCorrect: Boolean(existing.quantitiesCorrect),
+          tagsVerified: Boolean(existing.tagsVerified),
+          leadName: String(existing.leadName || ''),
+          qcName: String(existing.qcName || ''),
+          managerName: String(existing.managerName || ''),
+          notes: String(existing.notes || ''),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load dock form:', error);
+    }
+  };
+
+  const submitDockForm = async () => {
+    if (!formCheckin || submittingForm) return;
+
+    const leadName = dockForm.leadName.trim();
+    const qcName = dockForm.qcName.trim();
+    const managerName = dockForm.managerName.trim();
+
+    if (!dockForm.isOrderComplete || !dockForm.quantitiesCorrect || !dockForm.tagsVerified || !leadName || !qcName || !managerName) {
+      alert('All checklist items and Lead/QC/Manager sign-offs are required before submitting this form.');
+      return;
+    }
+
+    setSubmittingForm(true);
+    try {
+      await apiClient.saveOutboundVerification(Number(formCheckin.id), {
+        doorId: Number(formCheckin.doorId || 0),
+        isOrderComplete: dockForm.isOrderComplete,
+        quantitiesCorrect: dockForm.quantitiesCorrect,
+        tagsVerified: dockForm.tagsVerified,
+        leadName,
+        qcName,
+        managerName,
+        notes: dockForm.notes.trim(),
+        submittedBy: 'Dock Team',
+      });
+
+      setFormStatuses((current) => ({
+        ...current,
+        [Number(formCheckin.id)]: true,
+      }));
+      setFormCheckin(null);
+    } catch (error: any) {
+      alert(error?.message || 'Failed to submit dock form');
+    } finally {
+      setSubmittingForm(false);
+    }
   };
 
   const handleSaveEdit = async (updates: Partial<DockCheckin>, updatedBy: string) => {
@@ -277,6 +393,8 @@ export const DockBoardPage: React.FC = () => {
               checkin={door.checkin}
               onClick={() => handleDoorClick(door.doorNumber)}
               onEdit={door.checkin ? () => handleEditCheckin(door.checkin) : undefined}
+              onOpenForm={door.checkin ? () => void handleOpenForm(door.checkin) : undefined}
+              hasFormOnFile={Boolean(door.checkin && formStatuses[Number(door.checkin.id)])}
             />
           ))}
           {parkedTrucks.length > 0 && (
@@ -307,6 +425,97 @@ export const DockBoardPage: React.FC = () => {
           onClose={() => setEditingCheckin(null)}
           onSave={handleSaveEdit}
         />
+      )}
+
+      {formCheckin && (
+        <div className="dock-form-modal__overlay" onClick={() => setFormCheckin(null)}>
+          <div className="dock-form-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="dock-form-modal__header">
+              <h2>Dock Verification Form</h2>
+              <button className="dock-form-modal__close" onClick={() => setFormCheckin(null)}>×</button>
+            </div>
+
+            <div className="dock-form-modal__body">
+              <div className="dock-form-modal__reference">
+                Door {formCheckin.doorId || 'N/A'} • {formCheckin.inboundOutbound === 'Inbound' ? 'PO' : 'SO'} #{formCheckin.pickupNumber}
+              </div>
+
+              <label className="dock-form-modal__check-row">
+                <input
+                  type="checkbox"
+                  checked={dockForm.isOrderComplete}
+                  onChange={(e) => setDockForm((current) => ({ ...current, isOrderComplete: e.target.checked }))}
+                />
+                Order is fully complete
+              </label>
+
+              <label className="dock-form-modal__check-row">
+                <input
+                  type="checkbox"
+                  checked={dockForm.quantitiesCorrect}
+                  onChange={(e) => setDockForm((current) => ({ ...current, quantitiesCorrect: e.target.checked }))}
+                />
+                Quantities are correct
+              </label>
+
+              <label className="dock-form-modal__check-row">
+                <input
+                  type="checkbox"
+                  checked={dockForm.tagsVerified}
+                  onChange={(e) => setDockForm((current) => ({ ...current, tagsVerified: e.target.checked }))}
+                />
+                Tags/documents verified
+              </label>
+
+              <div className="dock-form-modal__grid">
+                <div className="dock-form-modal__field">
+                  <label>Lead Sign-Off</label>
+                  <input
+                    type="text"
+                    value={dockForm.leadName}
+                    onChange={(e) => setDockForm((current) => ({ ...current, leadName: e.target.value }))}
+                    placeholder="Lead name"
+                  />
+                </div>
+                <div className="dock-form-modal__field">
+                  <label>QC Sign-Off</label>
+                  <input
+                    type="text"
+                    value={dockForm.qcName}
+                    onChange={(e) => setDockForm((current) => ({ ...current, qcName: e.target.value }))}
+                    placeholder="QC name"
+                  />
+                </div>
+                <div className="dock-form-modal__field">
+                  <label>Manager Sign-Off</label>
+                  <input
+                    type="text"
+                    value={dockForm.managerName}
+                    onChange={(e) => setDockForm((current) => ({ ...current, managerName: e.target.value }))}
+                    placeholder="Manager name"
+                  />
+                </div>
+              </div>
+
+              <div className="dock-form-modal__field">
+                <label>Notes</label>
+                <textarea
+                  rows={3}
+                  value={dockForm.notes}
+                  onChange={(e) => setDockForm((current) => ({ ...current, notes: e.target.value }))}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </div>
+
+            <div className="dock-form-modal__footer">
+              <button className="dock-form-modal__cancel" onClick={() => setFormCheckin(null)}>Cancel</button>
+              <button className="dock-form-modal__submit" onClick={submitDockForm} disabled={submittingForm}>
+                {submittingForm ? 'Submitting...' : 'Submit Form'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       
       <ChatTicker onTickerClick={() => setMessengerOpen(true)} />

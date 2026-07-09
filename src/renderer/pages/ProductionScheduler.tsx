@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
+import { apiClient } from '../services/api';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
 import DriverWaitingTicker from '../components/DriverWaitingTicker';
@@ -89,9 +90,21 @@ interface CurrentShift {
   startTime: string;
 }
 
+interface ProductionVerificationForm {
+  isOrderComplete: boolean;
+  quantitiesCorrect: boolean;
+  tagsVerified: boolean;
+  leadName: string;
+  qcName: string;
+  managerName: string;
+  notes: string;
+}
+
+type ProductionVerificationMode = 'save' | 'complete';
+
 export default function ProductionScheduler() {
   const navigate = useNavigate();
-  const { executiveName, sessionToken } = useAuth();
+  const { executiveName, userRole, sessionToken } = useAuth();
   const isMobileRuntime =
     typeof window !== 'undefined' &&
     (window.location.protocol === 'capacitor:' || window.matchMedia('(max-width: 900px)').matches);
@@ -120,6 +133,21 @@ export default function ProductionScheduler() {
   const [plannedShiftEndTime, setPlannedShiftEndTime] = useState<string | null>(null);
   const [showShiftReminder, setShowShiftReminder] = useState(false);
   const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
+  const [showProductionVerificationModal, setShowProductionVerificationModal] = useState(false);
+  const [productionVerificationOrder, setProductionVerificationOrder] = useState<WorkOrder | null>(null);
+  const [productionVerificationMode, setProductionVerificationMode] = useState<ProductionVerificationMode>('save');
+  const [submittingProductionVerification, setSubmittingProductionVerification] = useState(false);
+  const [productionVerificationStatuses, setProductionVerificationStatuses] = useState<Record<string, boolean>>({});
+  const [productionVerificationForm, setProductionVerificationForm] = useState<ProductionVerificationForm>({
+    isOrderComplete: false,
+    quantitiesCorrect: false,
+    tagsVerified: false,
+    leadName: '',
+    qcName: '',
+    managerName: '',
+    notes: '',
+  });
+  const canUndoCompletedWorkOrders = userRole === 'manager' || userRole === 'executive';
 
   const selectedDateStr = getLocalDateString(selectedDate);
   const getPlannedRunRate = (wo: WorkOrder): number | null => {
@@ -204,6 +232,7 @@ export default function ProductionScheduler() {
           plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
         }));
         setWorkOrders(data);
+        void refreshProductionVerificationStatuses(data);
         // Only initialize casesInputs for NEW work orders, preserve existing user input
         setCasesInputs(prev => {
           const newInputs = { ...prev };
@@ -220,6 +249,20 @@ export default function ProductionScheduler() {
       console.error('Failed to fetch work orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshProductionVerificationStatuses = async (orders: WorkOrder[]) => {
+    try {
+      const orderIds = Array.from(new Set(orders.map((wo) => String(wo.id || '').trim()).filter(Boolean)));
+      if (!orderIds.length) {
+        setProductionVerificationStatuses({});
+        return;
+      }
+      const statuses = await apiClient.getProductionVerificationStatuses(orderIds);
+      setProductionVerificationStatuses(statuses || {});
+    } catch (error) {
+      console.error('Failed to load production verification statuses:', error);
     }
   };
 
@@ -452,7 +495,7 @@ export default function ProductionScheduler() {
     }
   };
 
-  const completeWorkOrder = async (id: string) => {
+  const completeWorkOrderDirect = async (id: string) => {
     const wo = workOrders.find(w => w.id === id);
     if (!wo) return;
 
@@ -504,6 +547,129 @@ export default function ProductionScheduler() {
     } catch (error) {
       console.error('Error completing work order:', error);
       alert('Error completing work order: ' + error);
+    }
+  };
+
+  const openProductionVerificationModal = async (id: string, mode: ProductionVerificationMode = 'save') => {
+    const wo = workOrders.find((item) => item.id === id);
+    if (!wo) return;
+
+    setProductionVerificationOrder(wo);
+    setProductionVerificationMode(mode);
+    setProductionVerificationForm({
+      isOrderComplete: false,
+      quantitiesCorrect: false,
+      tagsVerified: false,
+      leadName: '',
+      qcName: '',
+      managerName: '',
+      notes: '',
+    });
+    setShowProductionVerificationModal(true);
+
+    try {
+      const existing = await apiClient.getProductionVerification(id);
+      if (existing) {
+        setProductionVerificationForm({
+          isOrderComplete: Boolean(existing.isOrderComplete),
+          quantitiesCorrect: Boolean(existing.quantitiesCorrect),
+          tagsVerified: Boolean(existing.tagsVerified),
+          leadName: String(existing.leadName || ''),
+          qcName: String(existing.qcName || ''),
+          managerName: String(existing.managerName || ''),
+          notes: String(existing.notes || ''),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load production verification:', error);
+    }
+  };
+
+  const submitProductionVerification = async (shouldComplete: boolean) => {
+    if (!productionVerificationOrder || submittingProductionVerification) return;
+
+    const leadName = productionVerificationForm.leadName.trim();
+    const qcName = productionVerificationForm.qcName.trim();
+    const managerName = productionVerificationForm.managerName.trim();
+    const isComplete = productionVerificationForm.isOrderComplete
+      && productionVerificationForm.quantitiesCorrect
+      && productionVerificationForm.tagsVerified
+      && leadName
+      && qcName
+      && managerName;
+
+    if (!isComplete) {
+      alert('All checklist items and Lead/QC/Manager sign-offs are required before submitting this form.');
+      return;
+    }
+
+    setSubmittingProductionVerification(true);
+    try {
+      await apiClient.saveProductionVerification(productionVerificationOrder.id, {
+        line: productionVerificationOrder.line,
+        isOrderComplete: productionVerificationForm.isOrderComplete,
+        quantitiesCorrect: productionVerificationForm.quantitiesCorrect,
+        tagsVerified: productionVerificationForm.tagsVerified,
+        leadName,
+        qcName,
+        managerName,
+        notes: productionVerificationForm.notes.trim(),
+        submittedBy: executiveName || 'System',
+      });
+
+      setProductionVerificationStatuses((current) => ({
+        ...current,
+        [productionVerificationOrder.id]: true,
+      }));
+
+      setShowProductionVerificationModal(false);
+      if (shouldComplete) {
+        await completeWorkOrderDirect(productionVerificationOrder.id);
+      }
+    } catch (error: any) {
+      alert(error?.message || 'Failed to submit production verification form');
+    } finally {
+      setSubmittingProductionVerification(false);
+    }
+  };
+
+  const undoCompleteWorkOrder = async (id: string) => {
+    if (!canUndoCompletedWorkOrders) {
+      alert('Only managers and executives can undo completed work orders.');
+      return;
+    }
+
+    const wo = workOrders.find(w => w.id === id);
+    if (!wo || wo.status !== 'Completed') return;
+
+    const confirmUndo = window.confirm(`Undo completion for work order ${id}? It will return to Active.`);
+    if (!confirmUndo) return;
+
+    try {
+      const now = Date.now();
+      const response = await fetch(`${API_BASE}/api/production/work-orders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'Active',
+          isPaused: false,
+          startTimestamp: now,
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        alert('Failed to undo completed work order: ' + error);
+        return;
+      }
+
+      await fetchWorkOrders();
+      if (viewMode === 'calendar') {
+        await fetchMonthWorkOrders();
+      }
+    } catch (error) {
+      console.error('Error undoing completed work order:', error);
+      alert('Error undoing completed work order: ' + error);
     }
   };
 
@@ -664,6 +830,7 @@ export default function ProductionScheduler() {
 
     const progress = wo.targetCases ? Math.round(((wo.completedCases || 0) / wo.targetCases) * 100) : 0;
     const casesInput = casesInputs[wo.id] ?? wo.completedCases ?? 0;
+    const hasVerificationForm = Boolean(productionVerificationStatuses[wo.id]);
 
     // COMPLETED - Show collapsed view with customer, WO number, and "Completed"
     if (wo.status === 'Completed') {
@@ -673,8 +840,16 @@ export default function ProductionScheduler() {
           onClick={() => openModal(line, slot, wo)}
         >
           <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
+          {hasVerificationForm && <div className="verification-badge-card">Form On File</div>}
           <div className="customer">{wo.customer || 'N/A'}</div>
           <div className="completion-badge">✓ Completed</div>
+          {canUndoCompletedWorkOrders && (
+            <div className="wo-actions" onClick={(e) => e.stopPropagation()}>
+              <button className="btn-small undo-btn" onClick={() => void undoCompleteWorkOrder(wo.id)}>
+                Undo
+              </button>
+            </div>
+          )}
         </div>
       );
     }
@@ -687,6 +862,7 @@ export default function ProductionScheduler() {
           onClick={() => openModal(line, slot, wo)}
         >
           <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
+          {hasVerificationForm && <div className="verification-badge-card">Form On File</div>}
           <div className="wo-actions" onClick={(e) => e.stopPropagation()}>
             <button className="start-btn" onClick={() => startWorkOrder(wo.id)}>
               Start
@@ -703,6 +879,7 @@ export default function ProductionScheduler() {
         onClick={() => openModal(line, slot, wo)}
       >
         <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
+        {hasVerificationForm && <div className="verification-badge-card">Form On File</div>}
         <div className="customer"><b>Customer:</b> {wo.customer || 'N/A'}</div>
         <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
         <div className="product"><b>Product:</b> <em>{wo.product || 'N/A'}</em></div>
@@ -758,7 +935,10 @@ export default function ProductionScheduler() {
         </div>
         
         <div className="wo-actions" onClick={(e) => e.stopPropagation()}>
-          <button className="done-btn" onClick={() => completeWorkOrder(wo.id)}>
+          <button className="btn-small form-btn" onClick={() => openProductionVerificationModal(wo.id, 'save')}>
+            Form
+          </button>
+          <button className="done-btn" onClick={() => openProductionVerificationModal(wo.id, 'complete')}>
             Done
           </button>
         </div>
@@ -1243,7 +1423,19 @@ export default function ProductionScheduler() {
                 <tbody>
                   {activeWorkOrders.map(wo => (
                     <tr key={wo.id} className="wo-row active-row" onClick={() => openModal(wo.line, wo.slot, wo)}>
-                      <td><strong>#{wo.id}</strong></td>
+                      <td className="order-id-cell">
+                        <button
+                          className={`verify-icon-btn ${productionVerificationStatuses[wo.id] ? 'has-form' : ''}`}
+                          title={productionVerificationStatuses[wo.id] ? 'Verification on file - open form' : 'Open verification form'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openProductionVerificationModal(wo.id, 'save');
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <strong>#{wo.id}</strong>
+                      </td>
                       <td>
                         <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
                           {normalizeOrderType(wo.orderType)}
@@ -1290,7 +1482,7 @@ export default function ProductionScheduler() {
                       <td className="actions-column" onClick={(e) => e.stopPropagation()}>
                         <div className="wo-action-buttons">
                           <button className="btn-small go-btn" onClick={() => updateCompletedCases(wo.id, casesInputs[wo.id] ?? 0)}>Go</button>
-                          <button className="btn-small done-btn" onClick={() => completeWorkOrder(wo.id)}>Done</button>
+                          <button className="btn-small done-btn" onClick={() => openProductionVerificationModal(wo.id, 'complete')}>Done</button>
                         </div>
                       </td>
                     </tr>
@@ -1331,7 +1523,19 @@ export default function ProductionScheduler() {
                 <tbody>
                   {scheduledWorkOrders.map(wo => (
                     <tr key={wo.id} className="wo-row scheduled-row" onClick={() => openModal(wo.line, wo.slot, wo)}>
-                      <td><strong>#{wo.id}</strong></td>
+                      <td className="order-id-cell">
+                        <button
+                          className={`verify-icon-btn ${productionVerificationStatuses[wo.id] ? 'has-form' : ''}`}
+                          title={productionVerificationStatuses[wo.id] ? 'Verification on file - open form' : 'Open verification form'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openProductionVerificationModal(wo.id, 'save');
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <strong>#{wo.id}</strong>
+                      </td>
                       <td>
                         <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
                           {normalizeOrderType(wo.orderType)}
@@ -1387,12 +1591,25 @@ export default function ProductionScheduler() {
                     <th className="col-country">Country</th>
                     <th>Completed</th>
                     <th className="col-notes">Notes</th>
+                    <th className="actions-column">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {completedWorkOrders.map(wo => (
                     <tr key={wo.id} className="wo-row completed-row" onClick={() => openModal(wo.line, wo.slot, wo)}>
-                      <td><strong>#{wo.id}</strong></td>
+                      <td className="order-id-cell">
+                        <button
+                          className={`verify-icon-btn ${productionVerificationStatuses[wo.id] ? 'has-form' : ''}`}
+                          title={productionVerificationStatuses[wo.id] ? 'Verification on file - open form' : 'Open verification form'}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void openProductionVerificationModal(wo.id, 'save');
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <strong>#{wo.id}</strong>
+                      </td>
                       <td>
                         <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
                           {normalizeOrderType(wo.orderType)}
@@ -1405,6 +1622,15 @@ export default function ProductionScheduler() {
                       <td className="col-country">{wo.countryOfOrigin || 'N/A'}</td>
                       <td><span className="completed-badge-sm">✓ {wo.completedCases || 0} cases</span></td>
                       <td className="notes-cell col-notes" title={wo.notes || ''}>{wo.notes || '-'}</td>
+                      <td className="actions-column" onClick={(e) => e.stopPropagation()}>
+                        {canUndoCompletedWorkOrders ? (
+                          <div className="wo-action-buttons">
+                            <button className="btn-small undo-btn" onClick={() => void undoCompleteWorkOrder(wo.id)}>Undo</button>
+                          </div>
+                        ) : (
+                          '-'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1608,9 +1834,21 @@ export default function ProductionScheduler() {
               <div className="modal-footer-left">
                 {editingWorkOrder.id && (
                   <>
+                    <button
+                      className="form-access-btn"
+                      onClick={() => void openProductionVerificationModal(editingWorkOrder.id!, 'save')}
+                      title="Open verification form for this work order"
+                    >
+                      Open Form
+                    </button>
                     <button className="duplicate-btn" onClick={duplicateWorkOrder} title="Create a copy of this work order">
                       📋 Duplicate
                     </button>
+                    {editingWorkOrder.status === 'Completed' && canUndoCompletedWorkOrders && (
+                      <button className="undo-btn" onClick={() => void undoCompleteWorkOrder(editingWorkOrder.id!)} title="Reopen this completed work order">
+                        ↩ Undo Completed
+                      </button>
+                    )}
                     {['John', 'Ryan', 'Izzy', 'Julia'].includes(executiveName) && (
                       <button className="delete-btn" onClick={deleteWorkOrder} title="Delete this work order (authorized users only)">
                         🗑️ Delete
@@ -1625,6 +1863,104 @@ export default function ProductionScheduler() {
               <div className="modal-footer-right">
                 <button className="cancel-btn" onClick={closeModal}>Cancel</button>
                 <button className="save-btn" onClick={saveWorkOrder}>Save</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showProductionVerificationModal && productionVerificationOrder && (
+        <div className="modal-overlay" onClick={() => setShowProductionVerificationModal(false)}>
+          <div className="modal-content verification-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Production Completion Verification</h3>
+              <button className="close-btn" onClick={() => setShowProductionVerificationModal(false)}>×</button>
+            </div>
+
+            <div className="modal-body">
+              <div className="verification-order-ref">
+                Order #{productionVerificationOrder.id} • {getLineName(productionVerificationOrder.line)}
+              </div>
+
+              <label className="verification-check-row">
+                <input
+                  type="checkbox"
+                  checked={productionVerificationForm.isOrderComplete}
+                  onChange={(e) => setProductionVerificationForm((current) => ({ ...current, isOrderComplete: e.target.checked }))}
+                />
+                Order is fully complete
+              </label>
+
+              <label className="verification-check-row">
+                <input
+                  type="checkbox"
+                  checked={productionVerificationForm.quantitiesCorrect}
+                  onChange={(e) => setProductionVerificationForm((current) => ({ ...current, quantitiesCorrect: e.target.checked }))}
+                />
+                Quantities are correct
+              </label>
+
+              <label className="verification-check-row">
+                <input
+                  type="checkbox"
+                  checked={productionVerificationForm.tagsVerified}
+                  onChange={(e) => setProductionVerificationForm((current) => ({ ...current, tagsVerified: e.target.checked }))}
+                />
+                All tags have been checked and verified
+              </label>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Lead Sign-Off</label>
+                  <input
+                    type="text"
+                    value={productionVerificationForm.leadName}
+                    onChange={(e) => setProductionVerificationForm((current) => ({ ...current, leadName: e.target.value }))}
+                    placeholder="Lead name"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>QC Sign-Off</label>
+                  <input
+                    type="text"
+                    value={productionVerificationForm.qcName}
+                    onChange={(e) => setProductionVerificationForm((current) => ({ ...current, qcName: e.target.value }))}
+                    placeholder="QC name"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Manager Sign-Off</label>
+                  <input
+                    type="text"
+                    value={productionVerificationForm.managerName}
+                    onChange={(e) => setProductionVerificationForm((current) => ({ ...current, managerName: e.target.value }))}
+                    placeholder="Manager name"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Verification Notes</label>
+                <textarea
+                  rows={3}
+                  value={productionVerificationForm.notes}
+                  onChange={(e) => setProductionVerificationForm((current) => ({ ...current, notes: e.target.value }))}
+                  placeholder="Optional notes"
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <div className="modal-footer-right">
+                <button className="cancel-btn" onClick={() => setShowProductionVerificationModal(false)}>Cancel</button>
+                <button className="save-btn" onClick={() => submitProductionVerification(false)} disabled={submittingProductionVerification}>
+                  {submittingProductionVerification ? 'Submitting...' : 'Submit Verification Form'}
+                </button>
+                {productionVerificationMode !== 'save' && (
+                  <button className="done-btn" onClick={() => submitProductionVerification(true)} disabled={submittingProductionVerification}>
+                    {submittingProductionVerification ? 'Submitting...' : 'Submit + Complete'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

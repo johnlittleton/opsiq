@@ -18,6 +18,7 @@ const LINES = [
 ];
 
 const LABOR_KPI_TARGET_PER_CASE = 1.25;
+const DIRECT_LABOR_HOURLY_RATE = 25.38;
 
 export default function ProductionDashboard() {
   const navigate = useNavigate();
@@ -481,11 +482,8 @@ export default function ProductionDashboard() {
 
   const getLineKpiMetrics = (lineId: number) => {
     const kpiTarget = Number(costingData?.totals?.kpiTargetCostPerCase || LABOR_KPI_TARGET_PER_CASE);
-    const line = Array.isArray(costingData?.byLine)
-      ? costingData.byLine.find((entry: any) => Number(entry.lineNumber) === lineId)
-      : null;
-
-    if (!line) {
+    const wo = getActiveWorkOrder(lineId);
+    if (!wo) {
       return {
         hasData: false,
         costPerCase: 0,
@@ -495,7 +493,22 @@ export default function ProductionDashboard() {
       };
     }
 
-    const costPerCase = Number(line.costPerCase || 0);
+    const completedCases = Number(wo.completedCases || 0);
+    const elapsedHours = getElapsedMinutes(wo) / 60;
+    const headcount = Number((laborInputs[lineId] ?? wo.labor) || 0);
+
+    if (completedCases <= 0 || elapsedHours <= 0 || headcount <= 0) {
+      return {
+        hasData: false,
+        costPerCase: 0,
+        kpiTarget,
+        overKpi: false,
+        variance: 0,
+      };
+    }
+
+    const directLaborCost = headcount * elapsedHours * DIRECT_LABOR_HOURLY_RATE;
+    const costPerCase = directLaborCost / completedCases;
     const variance = costPerCase - kpiTarget;
 
     return {
@@ -519,10 +532,25 @@ export default function ProductionDashboard() {
     })
     .filter(Boolean) as Array<{ line: { id: number; name: string }; metrics: { costPerCase: number; kpiTarget: number; variance: number } }>;
 
+  const linesOnTargetKpi = displayLines
+    .map((line) => {
+      const metrics = getLineKpiMetrics(line.id);
+      return metrics.hasData && !metrics.overKpi ? { line, metrics } : null;
+    })
+    .filter(Boolean) as Array<{ line: { id: number; name: string }; metrics: { costPerCase: number; kpiTarget: number; variance: number } }>;
+
   const linesBelowPlannedRate = displayLines
     .map((line) => {
       const rateAlert = getLinePlanRateAlert(line.id);
       return rateAlert.hasAlert ? { line, rateAlert } : null;
+    })
+    .filter(Boolean) as Array<{ line: { id: number; name: string }; rateAlert: { missedCases: boolean; missedBags: boolean } }>;
+
+  const linesHittingPlannedRate = displayLines
+    .map((line) => {
+      const rateAlert = getLinePlanRateAlert(line.id);
+      const wo = getActiveWorkOrder(line.id);
+      return wo && !rateAlert.hasAlert ? { line, rateAlert } : null;
     })
     .filter(Boolean) as Array<{ line: { id: number; name: string }; rateAlert: { missedCases: boolean; missedBags: boolean } }>;
 
@@ -620,9 +648,22 @@ export default function ProductionDashboard() {
               Minimize
             </button>
           </div>
-          {linesAboveKpi.map(({ line, metrics }) => (
+          {linesAboveKpi.map(({ line }) => (
             <div key={line.id} className="line-kpi-alert__item">
               ⚠ {line.name} is above labor KPI target.
+            </div>
+          ))}
+        </div>
+      )}
+
+      {linesOnTargetKpi.length > 0 && (
+        <div className="line-kpi-ok" role="status" aria-live="polite">
+          <div className="line-kpi-ok__header">
+            <span>✅ KPI On Target ({linesOnTargetKpi.length})</span>
+          </div>
+          {linesOnTargetKpi.map(({ line }) => (
+            <div key={line.id} className="line-kpi-ok__item">
+              ✅ {line.name} is hitting or under labor KPI target.
             </div>
           ))}
         </div>
@@ -649,6 +690,19 @@ export default function ProductionDashboard() {
           {linesBelowPlannedRate.map(({ line, rateAlert }) => (
             <div key={line.id} className="line-rate-alert__item">
               {line.name} below planned {rateAlert.missedCases && rateAlert.missedBags ? 'cases/min and bags/min' : rateAlert.missedCases ? 'cases/min' : 'bags/min'}.
+            </div>
+          ))}
+        </div>
+      )}
+
+      {linesHittingPlannedRate.length > 0 && (
+        <div className="line-rate-ok" role="status" aria-live="polite">
+          <div className="line-rate-ok__header">
+            <span className="line-rate-ok__title">✅ Planned Rate On Target ({linesHittingPlannedRate.length})</span>
+          </div>
+          {linesHittingPlannedRate.map(({ line }) => (
+            <div key={line.id} className="line-rate-ok__item">
+              ✅ {line.name} is hitting planned cases/min and bags/min.
             </div>
           ))}
         </div>
@@ -745,14 +799,16 @@ export default function ProductionDashboard() {
                         <span className={`metric-value ${planRateAlert.missedCases ? 'rate-miss' : 'current-rate'}`}>{calculateCurrentRateCases(wo)} cases/min</span>
                       </div>
                     </div>
-                    {planRateAlert.hasAlert && (
-                      <div className="metric-row">
-                        <div className="metric">
-                          <span className="metric-label">Rate Alert:</span>
-                          <span className="metric-value rate-miss">Below planned {planRateAlert.missedCases && planRateAlert.missedBags ? 'cases/min + bags/min' : planRateAlert.missedCases ? 'cases/min' : 'bags/min'}</span>
-                        </div>
+                    <div className="metric-row">
+                      <div className="metric">
+                        <span className="metric-label">Rate Status:</span>
+                        <span className={`metric-value ${planRateAlert.hasAlert ? 'rate-miss' : 'rate-hit'}`}>
+                          {planRateAlert.hasAlert
+                            ? `Below planned ${planRateAlert.missedCases && planRateAlert.missedBags ? 'cases/min + bags/min' : planRateAlert.missedCases ? 'cases/min' : 'bags/min'}`
+                            : 'Hitting planned rate'}
+                        </span>
                       </div>
-                    )}
+                    </div>
                     <div className="metric-row">
                       <div className="metric">
                         <span className="metric-label">Labor Required:</span>
@@ -794,13 +850,13 @@ export default function ProductionDashboard() {
                       <div className="metric">
                         <span className="metric-label">KPI Status:</span>
                         <span className={`metric-value ${kpiMetrics.hasData ? (kpiMetrics.overKpi ? 'kpi-over' : 'kpi-on-target') : ''}`}>
-                          {kpiMetrics.hasData ? (kpiMetrics.overKpi ? 'ABOVE TARGET' : 'ON TARGET') : 'NO DATA'}
+                          {kpiMetrics.hasData ? (kpiMetrics.overKpi ? 'ABOVE TARGET' : 'UNDER TARGET') : 'NO DATA'}
                         </span>
                       </div>
                       <div className="metric">
                         <span className="metric-label">Alert:</span>
                         <span className={`metric-value ${kpiMetrics.hasData && kpiMetrics.overKpi ? 'kpi-over' : 'kpi-on-target'}`}>
-                          {kpiMetrics.hasData && kpiMetrics.overKpi ? 'ACTION REQUIRED' : 'CLEAR'}
+                          {kpiMetrics.hasData && kpiMetrics.overKpi ? 'LINE IS OVER TARGET' : 'KPI IS UNDER TARGET'}
                         </span>
                       </div>
                     </div>

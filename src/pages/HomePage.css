@@ -222,6 +222,29 @@
   margin-bottom: 2px;
 }
 
+.home-page__card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.home-page__card-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 191, 36, 0.75);
+  background: rgba(120, 53, 15, 0.72);
+  color: #fde68a;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .home-page__card-desc {
   font-size: 10px;
   color: var(--text-muted);

@@ -330,3 +330,126 @@
     max-height: 90px;
   }
 }
+
+.dock-form-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9900;
+  padding: 16px;
+}
+
+.dock-form-modal {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #232837;
+  border-radius: 12px;
+  border: 1px solid #2a3142;
+}
+
+.dock-form-modal__header {
+  padding: 18px 22px;
+  border-bottom: 1px solid #2a3142;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dock-form-modal__header h2 {
+  margin: 0;
+  color: #f3f6fa;
+  font-size: 1.2rem;
+}
+
+.dock-form-modal__close {
+  border: none;
+  background: none;
+  color: #9aa4b2;
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.dock-form-modal__body {
+  padding: 22px;
+}
+
+.dock-form-modal__reference {
+  margin-bottom: 14px;
+  color: #7fb6ff;
+  font-weight: 700;
+}
+
+.dock-form-modal__check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #e8edf5;
+  font-weight: 600;
+}
+
+.dock-form-modal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.dock-form-modal__field {
+  display: flex;
+  flex-direction: column;
+}
+
+.dock-form-modal__field label {
+  margin-bottom: 6px;
+  color: #d0d5db;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.dock-form-modal__field input,
+.dock-form-modal__field textarea {
+  background: #181c24;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #f3f6fa;
+  padding: 8px 10px;
+}
+
+.dock-form-modal__footer {
+  padding: 14px 22px;
+  border-top: 1px solid #2a3142;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.dock-form-modal__cancel,
+.dock-form-modal__submit {
+  border: 3px solid;
+  border-radius: 12px;
+  background: none;
+  font-weight: 700;
+  padding: 9px 20px;
+  cursor: pointer;
+}
+
+.dock-form-modal__cancel {
+  color: #95a5a6;
+  border-color: #95a5a6;
+}
+
+.dock-form-modal__submit {
+  color: #2ecc71;
+  border-color: #2ecc71;
+}
+
+.dock-form-modal__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

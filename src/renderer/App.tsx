@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { apiClient } from './services/api';
 import PinEntry from './components/PinEntry';
 import { HomePage } from '../pages/HomePage';
 import { DockBoardPage } from '../pages/DockBoardPage';
@@ -18,6 +19,8 @@ import ShippingReceivingKPI from './pages/ShippingReceivingKPI';
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
 import ExecutiveAnalytics from './pages/ExecutiveAnalytics';
 import ProductionCosting from './pages/ProductionCosting';
+import AllInProductionKPIDashboard from './pages/AllInProductionKPIDashboard';
+import JohnDashboard from './pages/JohnDashboard';
 import Settings from './pages/Settings';
 import LaborTracker from './pages/LaborTracker';
 import LaborHistory from './pages/LaborHistory';
@@ -28,18 +31,25 @@ import ProductionLaborPlanner from './pages/ProductionLaborPlanner';
 import ProductionLaborPlannerHistory from './pages/ProductionLaborPlannerHistory';
 import ProductionScheduler from './pages/ProductionScheduler';
 import ProductionDashboard from './pages/ProductionDashboard';
+import CombinedLiveOperationsDashboard from './pages/CombinedLiveOperationsDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
 import StorageBilling from './pages/StorageBilling';
 import AIDualEntry from './pages/AIDualEntry';
 import DriverAvatarPage from './pages/DriverAvatarPage';
+import { hasRestrictedFeatureAccess } from './utils/restrictedAccess';
 
 type UpdaterStatus = {
   state: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
   version?: string;
   percent?: number;
   message?: string;
+};
+
+type FormToast = {
+  id: string;
+  text: string;
 };
 
 // Public routes that don't require authentication (display dashboards for TVs/monitors)
@@ -55,8 +65,9 @@ const PUBLIC_ROUTES = [
 
 const AppRoutes: React.FC = () => {
   const location = useLocation();
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, executiveName } = useAuth();
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+  const hasRestrictedAccess = hasRestrictedFeatureAccess(executiveName);
 
   const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
     login(name, role, sessionToken);
@@ -85,6 +96,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/executive" element={<ExecutiveDashboard />} />
       <Route path="/executive-analytics" element={<ExecutiveAnalytics />} />
       <Route path="/production-costing" element={<ProductionCosting />} />
+      <Route path="/all-in-production-kpi" element={<AllInProductionKPIDashboard />} />
+      <Route path="/john-dashboard" element={<JohnDashboard />} />
       <Route path="/labor-tracker" element={<LaborTracker />} />
       <Route path="/labor-history" element={<LaborHistory />} />
       <Route path="/labor-kiosk" element={<LaborKiosk />} />
@@ -100,14 +113,25 @@ const AppRoutes: React.FC = () => {
       <Route path="/downtime-history" element={<DowntimeHistory />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/storage-billing" element={<StorageBilling />} />
-      <Route path="/ai-dual-entry" element={<AIDualEntry />} />
-      <Route path="/driver-avatar" element={<DriverAvatarPage />} />
+      <Route
+        path="/ai-dual-entry"
+        element={hasRestrictedAccess ? <AIDualEntry /> : <HomePage />}
+      />
+      <Route
+        path="/driver-avatar"
+        element={hasRestrictedAccess ? <DriverAvatarPage /> : <HomePage />}
+      />
+      <Route
+        path="/combined-live-operations"
+        element={hasRestrictedAccess ? <CombinedLiveOperationsDashboard /> : <HomePage />}
+      />
     </Routes>
   );
 };
 const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
   const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatus | null>(null);
+  const [formToasts, setFormToasts] = React.useState<FormToast[]>([]);
 
   useEffect(() => {
     initializeSync();
@@ -129,6 +153,26 @@ const AppContent: React.FC = () => {
     return () => {
       if (unsubscribe) unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    apiClient.onFormCompleted((event) => {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const submittedBy = event.submittedBy ? ` by ${event.submittedBy}` : '';
+      const fallbackText = event.formType === 'production'
+        ? `Production form completed for order ${event.referenceId}${submittedBy}`
+        : `Outbound form completed for check-in ${event.referenceId}${submittedBy}`;
+
+      const toast: FormToast = {
+        id,
+        text: event.message || fallbackText,
+      };
+
+      setFormToasts((current) => [...current.slice(-4), toast]);
+      window.setTimeout(() => {
+        setFormToasts((current) => current.filter((item) => item.id !== id));
+      }, 7000);
+    });
   }, []);
 
   const shouldShowBanner = updaterStatus && updaterStatus.state !== 'not-available';
@@ -170,6 +214,16 @@ const AppContent: React.FC = () => {
       >
         <AppRoutes />
       </Router>
+
+      {formToasts.length > 0 && (
+        <div className="form-toast-stack" aria-live="polite">
+          {formToasts.map((toast) => (
+            <div key={toast.id} className="form-toast-item">
+              {toast.text}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 };

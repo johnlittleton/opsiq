@@ -445,6 +445,7 @@ const DriverAvatarPage: React.FC = () => {
 
   return (
     <div className="driver-avatar-page">
+      <div className="driver-avatar-page__construction">Under Construction</div>
       <div className="driver-avatar-page__nav">
         <div className="driver-avatar-page__nav-left">
           <button className="driver-avatar-page__control-button" onClick={() => navigate('/')}>Home</button>

@@ -377,6 +377,124 @@
   padding: 12px !important;
 }
 
+.live-line-cost-panel {
+  margin-bottom: 12px;
+  padding: 12px !important;
+}
+
+.live-line-cost-panel h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.live-line-cost-subtitle {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.live-line-cost-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.live-line-cost-card {
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.live-line-cost-card.under-target {
+  border-left: 4px solid #22c55e;
+}
+
+.live-line-cost-card.over-target {
+  border-left: 4px solid #ef4444;
+}
+
+.live-line-cost-card.no-live-data {
+  border-left: 4px solid #64748b;
+}
+
+.live-line-cost-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.live-line-cost-card__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.live-line-cost-card__status {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.live-line-cost-card__status.active {
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.live-line-cost-card__status.insufficient {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.live-line-cost-card__status.idle {
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.live-line-cost-card__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.live-line-cost-card.under-target .live-line-cost-card__value {
+  color: #22c55e;
+}
+
+.live-line-cost-card.over-target .live-line-cost-card__value {
+  color: #ef4444;
+}
+
+.live-line-cost-card.no-live-data .live-line-cost-card__value {
+  color: #94a3b8;
+}
+
+.live-line-cost-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.live-line-cost-card__variance {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
 .performance-summary h2 {
   font-size: 13px;
   font-weight: 600;
@@ -490,7 +608,7 @@
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
 }
 
@@ -703,6 +821,10 @@
   }
   
   .labor-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .live-line-cost-grid {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -993,6 +1115,10 @@
     grid-template-columns: 1fr;
     gap: 8px;
     text-align: left !important;
+  }
+
+  .live-line-cost-grid {
+    grid-template-columns: 1fr;
   }
 
   .col-rank,

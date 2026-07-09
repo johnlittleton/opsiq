@@ -50,6 +50,30 @@ interface DepartmentShiftSession {
   endTime?: string | null;
 }
 
+interface LiveLineCostCard {
+  lineId: number;
+  lineName: string;
+  status: 'active' | 'insufficient' | 'idle';
+  costPerCase: number | null;
+  completedCases: number;
+  headcount: number;
+  elapsedMinutes: number;
+  variance: number | null;
+  overTarget: boolean;
+}
+
+const PRODUCTION_LINES = [
+  { id: 1, name: 'Giro Line 1' },
+  { id: 2, name: 'Giro Line 2' },
+  { id: 3, name: 'Giro Line 3' },
+  { id: 4, name: 'Giro Line 4' },
+  { id: 5, name: 'Hand Pack' },
+  { id: 6, name: 'Regrade' },
+];
+
+const LIVE_DIRECT_LABOR_HOURLY_RATE = 25.38;
+const LIVE_LINE_KPI_TARGET_PER_CASE = 1.25;
+
 const ExecutiveDashboard: React.FC = () => {
   console.log('ExecutiveDashboard component rendering...');
   const navigate = useNavigate();
@@ -60,6 +84,7 @@ const ExecutiveDashboard: React.FC = () => {
   const [departmentLaborSummary, setDepartmentLaborSummary] = useState<DepartmentLaborSummary | null>(null);
   const [departmentSessions, setDepartmentSessions] = useState<DepartmentShiftSession[]>([]);
   const [departmentLaborWarning, setDepartmentLaborWarning] = useState<string | null>(null);
+  const [liveLineCosts, setLiveLineCosts] = useState<LiveLineCostCard[]>([]);
   
   // Helper function to get local date string without timezone issues
   const getLocalDateString = (date: Date) => {
@@ -234,16 +259,96 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
+  const getWorkOrderElapsedMinutes = (wo: any): number => {
+    if (!wo || !wo.startTimestamp) return 0;
+    const elapsedMs = (wo.elapsedMs || 0) + (wo.isPaused ? 0 : Date.now() - wo.startTimestamp);
+    return elapsedMs > 0 ? elapsedMs / 60000 : 0;
+  };
+
+  const fetchLiveLineCosts = async () => {
+    try {
+      const todayLocal = getLocalDateString(new Date());
+      const response = await fetch(`${API_BASE}/api/production/work-orders?date=${todayLocal}`);
+      if (!response.ok) {
+        setLiveLineCosts([]);
+        return;
+      }
+
+      const workOrders = await response.json();
+      const cards: LiveLineCostCard[] = PRODUCTION_LINES.map((line) => {
+        const wo = Array.isArray(workOrders)
+          ? workOrders.find((order: any) => Number(order.line) === line.id && order.status === 'Active')
+          : null;
+
+        if (!wo) {
+          return {
+            lineId: line.id,
+            lineName: line.name,
+            status: 'idle',
+            costPerCase: null,
+            completedCases: 0,
+            headcount: 0,
+            elapsedMinutes: 0,
+            variance: null,
+            overTarget: false,
+          };
+        }
+
+        const completedCases = Number(wo.completedCases || 0);
+        const headcount = Number(wo.labor || 0);
+        const elapsedMinutes = getWorkOrderElapsedMinutes(wo);
+        const elapsedHours = elapsedMinutes / 60;
+
+        if (completedCases <= 0 || headcount <= 0 || elapsedHours <= 0) {
+          return {
+            lineId: line.id,
+            lineName: line.name,
+            status: 'insufficient',
+            costPerCase: null,
+            completedCases,
+            headcount,
+            elapsedMinutes,
+            variance: null,
+            overTarget: false,
+          };
+        }
+
+        const directLaborCost = headcount * elapsedHours * LIVE_DIRECT_LABOR_HOURLY_RATE;
+        const costPerCase = directLaborCost / completedCases;
+        const variance = costPerCase - LIVE_LINE_KPI_TARGET_PER_CASE;
+
+        return {
+          lineId: line.id,
+          lineName: line.name,
+          status: 'active',
+          costPerCase,
+          completedCases,
+          headcount,
+          elapsedMinutes,
+          variance,
+          overTarget: variance > 0,
+        };
+      });
+
+      setLiveLineCosts(cards);
+    } catch (error) {
+      console.error('❌ Failed to fetch live line costs:', error);
+      setLiveLineCosts([]);
+    }
+  };
+
   // Auto-update shift and refresh active labor metrics frequently for near real-time status.
   useEffect(() => {
     fetchCurrentShift();
     fetchDepartmentLaborLive();
     fetchDepartmentSessions();
+    fetchLiveLineCosts();
 
     const interval = setInterval(() => {
       fetchCurrentShift();
       fetchDepartmentLaborLive();
       fetchDepartmentSessions();
+      fetchLiveLineCosts();
 
       // Silently refresh activeNow — always live regardless of mode
       // Uses refs to read current viewMode/dateRange without stale closures
@@ -389,6 +494,9 @@ const ExecutiveDashboard: React.FC = () => {
             >🌐 All Time</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
+            <button className="costing-btn" onClick={() => navigate('/all-in-production-kpi')}>📈 All-In Prod KPI</button>
+            <button className="analytics-btn" onClick={() => navigate('/combined-live-operations')}>🖥 Combined Live</button>
+            <button className="analytics-btn" onClick={() => navigate('/john-dashboard')}>🏢 John's Dashboard</button>
             <button className="storage-btn" onClick={() => navigate('/storage-billing')}>📦 Storage Billing</button>
             <button className="logout-btn" onClick={logout}>🔒 Logout</button>
           </div>
@@ -584,12 +692,49 @@ const ExecutiveDashboard: React.FC = () => {
         )}
 
         {/* Performance Summary */}
+        <GlassPanel className="live-line-cost-panel">
+          <h2>Real Live Cost Per Case by Production Line</h2>
+          <p className="live-line-cost-subtitle">
+            Direct labor formula: (headcount x elapsed hours x ${LIVE_DIRECT_LABOR_HOURLY_RATE.toFixed(2)}) / completed cases
+          </p>
+          <div className="live-line-cost-grid">
+            {liveLineCosts.map((line) => (
+              <div key={line.lineId} className={`live-line-cost-card ${line.status === 'active' ? (line.overTarget ? 'over-target' : 'under-target') : 'no-live-data'}`}>
+                <div className="live-line-cost-card__header">
+                  <span className="live-line-cost-card__title">{line.lineName}</span>
+                  <span className={`live-line-cost-card__status ${line.status}`}>
+                    {line.status === 'active' ? 'Live' : line.status === 'insufficient' ? 'Waiting Data' : 'Idle'}
+                  </span>
+                </div>
+
+                <div className="live-line-cost-card__value">
+                  {line.costPerCase !== null ? `$${line.costPerCase.toFixed(3)}` : '--'}
+                </div>
+
+                <div className="live-line-cost-card__meta">
+                  <span>Cases: {line.completedCases.toLocaleString()}</span>
+                  <span>HC: {line.headcount}</span>
+                  <span>Elapsed: {Math.max(0, Math.floor(line.elapsedMinutes))}m</span>
+                </div>
+
+                <div className="live-line-cost-card__variance">
+                  Target ${LIVE_LINE_KPI_TARGET_PER_CASE.toFixed(2)} • {line.variance !== null ? `${line.variance >= 0 ? '+' : ''}$${line.variance.toFixed(3)}` : 'n/a'}
+                </div>
+              </div>
+            ))}
+          </div>
+        </GlassPanel>
+
         <GlassPanel className="performance-summary">
           <h2>Performance Summary</h2>
           <div className="summary-grid">
             <div className="summary-item">
               <span className="label">Total Dock Time</span>
               <span className="value">{metrics.totalDockTimeHours} hours</span>
+            </div>
+            <div className="summary-item">
+              <span className="label">Dock Utilization</span>
+              <span className="value">{Number(metrics.dockUtilization || 0).toFixed(1)}%</span>
             </div>
             <div className="summary-item">
               <span className="label">Avg Pallets/Truck</span>

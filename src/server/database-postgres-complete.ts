@@ -29,6 +29,38 @@ function getLocalISOString(date: Date = new Date()): string {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
 }
 
+function normalizeAnalyticsDateRange(startDate?: string, endDate?: string): { start: string; end: string } {
+  const now = new Date();
+
+  const toBoundaryISOString = (dateStr: string, isEnd: boolean): string => {
+    const trimmed = String(dateStr || '').trim();
+    if (!trimmed) return '';
+
+    if (trimmed.includes('T')) {
+      return trimmed;
+    }
+
+    const parts = trimmed.split('-').map((part) => Number(part));
+    if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+      return trimmed;
+    }
+
+    const [year, month, day] = parts;
+    const boundary = isEnd
+      ? new Date(year, month - 1, day, 23, 59, 59, 999)
+      : new Date(year, month - 1, day, 0, 0, 0, 0);
+    return boundary.toISOString();
+  };
+
+  const fallbackStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
+  const fallbackEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
+
+  return {
+    start: toBoundaryISOString(startDate || '', false) || fallbackStart,
+    end: toBoundaryISOString(endDate || '', true) || fallbackEnd,
+  };
+}
+
 export class DatabaseService implements IDatabaseService {
   private pool: Pool;
   private static readonly MAX_REASONABLE_PALLETS = 200;
@@ -355,6 +387,44 @@ export class DatabaseService implements IDatabaseService {
           notes TEXT
         );
 
+        CREATE TABLE IF NOT EXISTS production_order_verifications (
+          id SERIAL PRIMARY KEY,
+          order_id TEXT NOT NULL UNIQUE,
+          line INTEGER,
+          is_order_complete BOOLEAN NOT NULL DEFAULT false,
+          quantities_correct BOOLEAN NOT NULL DEFAULT false,
+          tags_verified BOOLEAN NOT NULL DEFAULT false,
+          lead_name TEXT,
+          qc_name TEXT,
+          manager_name TEXT,
+          notes TEXT,
+          submitted_by TEXT,
+          submitted_at TIMESTAMP,
+          is_passed BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          FOREIGN KEY (order_id) REFERENCES work_orders(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS outbound_checkin_verifications (
+          id SERIAL PRIMARY KEY,
+          checkin_id INTEGER NOT NULL UNIQUE,
+          door_id INTEGER,
+          is_order_complete BOOLEAN NOT NULL DEFAULT false,
+          quantities_correct BOOLEAN NOT NULL DEFAULT false,
+          tags_verified BOOLEAN NOT NULL DEFAULT false,
+          lead_name TEXT,
+          qc_name TEXT,
+          manager_name TEXT,
+          notes TEXT,
+          submitted_by TEXT,
+          submitted_at TIMESTAMP,
+          is_passed BOOLEAN NOT NULL DEFAULT false,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          FOREIGN KEY (checkin_id) REFERENCES dock_checkins(id)
+        );
+
         CREATE TABLE IF NOT EXISTS production_dock_statuses (
           id SERIAL PRIMARY KEY,
           dock_number INTEGER NOT NULL UNIQUE,
@@ -464,6 +534,10 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_checkins_closed_inbound_outbound ON dock_checkins(closed_at, inbound_outbound);
         CREATE INDEX IF NOT EXISTS idx_pallet_tracker_order ON pallet_tracker_events(order_type, order_id, scanned_at);
         CREATE INDEX IF NOT EXISTS idx_pallet_tracker_tag ON pallet_tracker_events(order_type, order_id, pallet_tag);
+        CREATE INDEX IF NOT EXISTS idx_prod_verification_order ON production_order_verifications(order_id);
+        CREATE INDEX IF NOT EXISTS idx_prod_verification_submitted ON production_order_verifications(submitted_at);
+        CREATE INDEX IF NOT EXISTS idx_outbound_verification_checkin ON outbound_checkin_verifications(checkin_id);
+        CREATE INDEX IF NOT EXISTS idx_outbound_verification_submitted ON outbound_checkin_verifications(submitted_at);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
@@ -2646,6 +2720,25 @@ export class DatabaseService implements IDatabaseService {
     const warehouseEmployeeShifts = this.toCamelCase(employeeResult.rows);
     const kioskEmployeeShifts = this.toCamelCase(kioskEmployeeResult.rows);
 
+    const activeDepartmentStarts = departmentSessions
+      .filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime))
+      .map((s: any) => new Date(s.startTime).getTime())
+      .filter((ms: number) => Number.isFinite(ms));
+    const activeWarehouseEmployeeStarts = warehouseEmployeeShifts
+      .filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime))
+      .map((s: any) => new Date(s.startTime).getTime())
+      .filter((ms: number) => Number.isFinite(ms));
+    const activeKioskStarts = kioskEmployeeShifts
+      .filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime))
+      .map((s: any) => new Date(s.startTime).getTime())
+      .filter((ms: number) => Number.isFinite(ms));
+    const allActiveStarts = [...activeDepartmentStarts, ...activeWarehouseEmployeeStarts, ...activeKioskStarts];
+    const trackerStartMs = allActiveStarts.length > 0 ? Math.min(...allActiveStarts) : null;
+    const trackerStartTime = trackerStartMs !== null ? new Date(trackerStartMs).toISOString() : null;
+    const trackerElapsedMinutes = trackerStartMs !== null
+      ? Math.max(0, Math.floor((now.getTime() - trackerStartMs) / (1000 * 60)))
+      : 0;
+
     const departmentSummaries = departments.map((department) => {
       const deptSessions = departmentSessions.filter((s: any) => s.department === department);
       const activeSessions = deptSessions.filter((s: any) => s.status === 'active' && isWithinActiveShiftWindow(s.startTime));
@@ -2739,6 +2832,8 @@ export class DatabaseService implements IDatabaseService {
         currentHourlyLaborCost: Math.round(totals.currentHourlyLaborCost * 100) / 100,
         runningLaborCost: Math.round(totals.runningLaborCost * 100) / 100,
         totalLaborCost: Math.round(totals.totalLaborCost * 100) / 100,
+        trackerStartTime,
+        trackerElapsedMinutes,
       },
     };
   }
@@ -2762,6 +2857,109 @@ export class DatabaseService implements IDatabaseService {
       SET actual_pallets = $1, load_end_time = $2, total_minutes = $3, updated_at = $4
       WHERE id = $5
     `, [sanitizedActualPallets, now, totalMinutes, now, checkinId]);
+  }
+
+  async getCheckinById(checkinId: number): Promise<any | null> {
+    const result = await this.pool.query('SELECT * FROM dock_checkins WHERE id = $1', [checkinId]);
+    return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
+  }
+
+  async saveProductionOrderVerification(payload: any): Promise<any> {
+    const submittedAt = payload.submittedAt || getLocalISOString();
+    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+
+    const result = await this.pool.query(`
+      INSERT INTO production_order_verifications (
+        order_id, line, is_order_complete, quantities_correct, tags_verified,
+        lead_name, qc_name, manager_name, notes, submitted_by, submitted_at,
+        is_passed, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ON CONFLICT (order_id) DO UPDATE SET
+        line = EXCLUDED.line,
+        is_order_complete = EXCLUDED.is_order_complete,
+        quantities_correct = EXCLUDED.quantities_correct,
+        tags_verified = EXCLUDED.tags_verified,
+        lead_name = EXCLUDED.lead_name,
+        qc_name = EXCLUDED.qc_name,
+        manager_name = EXCLUDED.manager_name,
+        notes = EXCLUDED.notes,
+        submitted_by = EXCLUDED.submitted_by,
+        submitted_at = EXCLUDED.submitted_at,
+        is_passed = EXCLUDED.is_passed,
+        updated_at = EXCLUDED.updated_at
+      RETURNING *
+    `, [
+      payload.orderId,
+      payload.line ?? null,
+      Boolean(payload.isOrderComplete),
+      Boolean(payload.quantitiesCorrect),
+      Boolean(payload.tagsVerified),
+      payload.leadName || null,
+      payload.qcName || null,
+      payload.managerName || null,
+      payload.notes || null,
+      payload.submittedBy || 'System',
+      submittedAt,
+      isPassed,
+      getLocalISOString(),
+      getLocalISOString(),
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getProductionOrderVerification(orderId: string): Promise<any | null> {
+    const result = await this.pool.query('SELECT * FROM production_order_verifications WHERE order_id = $1', [orderId]);
+    return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
+  }
+
+  async saveOutboundCheckinVerification(payload: any): Promise<any> {
+    const submittedAt = payload.submittedAt || getLocalISOString();
+    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+
+    const result = await this.pool.query(`
+      INSERT INTO outbound_checkin_verifications (
+        checkin_id, door_id, is_order_complete, quantities_correct, tags_verified,
+        lead_name, qc_name, manager_name, notes, submitted_by, submitted_at,
+        is_passed, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ON CONFLICT (checkin_id) DO UPDATE SET
+        door_id = EXCLUDED.door_id,
+        is_order_complete = EXCLUDED.is_order_complete,
+        quantities_correct = EXCLUDED.quantities_correct,
+        tags_verified = EXCLUDED.tags_verified,
+        lead_name = EXCLUDED.lead_name,
+        qc_name = EXCLUDED.qc_name,
+        manager_name = EXCLUDED.manager_name,
+        notes = EXCLUDED.notes,
+        submitted_by = EXCLUDED.submitted_by,
+        submitted_at = EXCLUDED.submitted_at,
+        is_passed = EXCLUDED.is_passed,
+        updated_at = EXCLUDED.updated_at
+      RETURNING *
+    `, [
+      payload.checkinId,
+      payload.doorId ?? null,
+      Boolean(payload.isOrderComplete),
+      Boolean(payload.quantitiesCorrect),
+      Boolean(payload.tagsVerified),
+      payload.leadName || null,
+      payload.qcName || null,
+      payload.managerName || null,
+      payload.notes || null,
+      payload.submittedBy || 'System',
+      submittedAt,
+      isPassed,
+      getLocalISOString(),
+      getLocalISOString(),
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getOutboundCheckinVerification(checkinId: number): Promise<any | null> {
+    const result = await this.pool.query('SELECT * FROM outbound_checkin_verifications WHERE checkin_id = $1', [checkinId]);
+    return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
   }
 
   async markLoadStart(checkinId: number): Promise<void> {
@@ -2886,6 +3084,23 @@ export class DatabaseService implements IDatabaseService {
       .filter((c: any) => isValidDockDuration(c.totalMinutes))
       .reduce((sum: number, c: any) => sum + c.totalMinutes, 0) / 60;
 
+    const dockDoorStatusResult = await this.pool.query(`
+      SELECT status, COUNT(*) as count
+      FROM dock_doors
+      GROUP BY status
+    `);
+    const dockDoorStatuses = dockDoorStatusResult.rows.reduce((acc: Record<string, number>, row: any) => {
+      acc[String(row.status || 'Open')] = parseInt(row.count, 10) || 0;
+      return acc;
+    }, {});
+    const totalDoors = Object.values(dockDoorStatuses).reduce((sum, count) => sum + count, 0);
+    const offlineDoors = dockDoorStatuses.Offline || 0;
+    const activeDoors = Math.max(0, totalDoors - offlineDoors);
+    const occupiedDoors = Object.entries(dockDoorStatuses)
+      .filter(([status]) => status !== 'Open' && status !== 'Offline')
+      .reduce((sum, [, count]) => sum + count, 0);
+    const dockUtilization = activeDoors > 0 ? Math.round((occupiedDoors / activeDoors) * 1000) / 10 : 0;
+
     // Get latest labor snapshot
     const latestLabor = await this.getLatestLaborSnapshot();
 
@@ -2894,19 +3109,15 @@ export class DatabaseService implements IDatabaseService {
     const ytdStart = `${currentYear}-01-01T00:00:00`;
     const ytdEnd = `${today}T23:59:59`;
 
-    // Current shift cost (or latest completed shift in range when no active shift).
-    const latestCompletedShiftResult = await this.pool.query(`
-      SELECT total_labor_cost
+    // Sum the full selected-period labor total, then add the live active shift when it belongs to the range.
+    const completedShiftTotalResult = await this.pool.query(`
+      SELECT COALESCE(SUM(total_labor_cost), 0) as total
       FROM shift_sessions
       WHERE status = 'completed'
         AND end_time IS NOT NULL
         AND end_time >= $1 AND end_time <= $2
-      ORDER BY end_time DESC
-      LIMIT 1
     `, [start, end]);
-    let totalShiftLaborCost = latestCompletedShiftResult.rows.length > 0
-      ? parseFloat(latestCompletedShiftResult.rows[0].total_labor_cost) || 0
-      : 0;
+    let totalShiftLaborCost = parseFloat(completedShiftTotalResult.rows[0].total) || 0;
 
     // Get current shift session to calculate live running labor cost.
     const currentShift = await this.getCurrentShiftSession();
@@ -2914,7 +3125,7 @@ export class DatabaseService implements IDatabaseService {
       const runningCost = currentShift.runningLaborCost || 0;
       const shiftStart = currentShift.startTime;
       if (shiftStart >= start && shiftStart <= end) {
-        totalShiftLaborCost = runningCost;
+        totalShiftLaborCost += runningCost;
       }
     }
 
@@ -3044,7 +3255,7 @@ export class DatabaseService implements IDatabaseService {
       topOperators,
       topLineLeads,
       totalDockTimeHours: Math.round(totalDockHours * 10) / 10,
-      dockUtilization: 0, // Calculate based on active doors
+      dockUtilization,
       completedToday: completedCheckins.length,
       activeNow,
       shippingReceivingLaborCostPerHour: currentShift && currentShift.status === 'active'
@@ -4478,9 +4689,7 @@ export class DatabaseService implements IDatabaseService {
 
   // Executive Analytics - Chart Data
   async getExecutiveAnalytics(startDate?: string, endDate?: string): Promise<any> {
-    const today = getLocalISOString().split('T')[0];
-    const start = startDate ? `${startDate}T00:00:00` : `${today}T00:00:00`;
-    const end = endDate ? `${endDate}T23:59:59` : `${today}T23:59:59`;
+    const { start, end } = normalizeAnalyticsDateRange(startDate, endDate);
 
     // 1. Line Output - Cases per production line
     const lineOutputResult = await this.pool.query(`
@@ -4533,22 +4742,38 @@ export class DatabaseService implements IDatabaseService {
     }));
 
     // 3. Forklift Driver Performance
-    const completedCheckinsResult = await this.pool.query(`
+    let completedCheckinsResult = await this.pool.query(`
       SELECT forklift_driver, actual_pallets, pallets, total_minutes
       FROM dock_checkins
       WHERE closed_at IS NOT NULL
         AND closed_at >= $1 AND closed_at <= $2
-        AND forklift_driver IS NOT NULL
-        AND forklift_driver != 'TBD'
-        AND forklift_driver != 'Unknown'
     `, [start, end]);
+
+    if (completedCheckinsResult.rows.length === 0) {
+      completedCheckinsResult = await this.pool.query(`
+        SELECT
+          COALESCE(c.forklift_driver, '') as forklift_driver,
+          c.actual_pallets,
+          c.pallets,
+          COALESCE(c.total_minutes, 0) as total_minutes
+        FROM dock_events e
+        LEFT JOIN dock_checkins c ON c.id = e.checkin_id
+        WHERE e.checkin_id IS NOT NULL
+          AND e.new_status = 'Open'
+          AND e.old_status IN ('Loading', 'Offload', 'Checked In')
+          AND e.event_time >= $1 AND e.event_time <= $2
+        GROUP BY e.checkin_id, c.forklift_driver, c.actual_pallets, c.pallets, c.total_minutes
+      `, [start, end]);
+    }
     
     const completedCheckins = this.toCamelCase(completedCheckinsResult.rows);
     const driverStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
     
     completedCheckins.forEach((c: any) => {
-      const driver = c.forkliftDriver;
-      if (!driver || driver.trim() === '') return;
+      const rawDriver = String(c.forkliftDriver || '').trim();
+      const driver = !rawDriver || /^tbd$/i.test(rawDriver) || /^unknown$/i.test(rawDriver)
+        ? 'Unassigned'
+        : rawDriver;
       if (!driverStats[driver]) {
         driverStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
       }
@@ -4766,7 +4991,7 @@ export class DatabaseService implements IDatabaseService {
           pallets_in::INTEGER,
           pallets_out::INTEGER,
           GREATEST(balance::INTEGER, 0) AS balance,
-          GREATEST(balance::INTEGER, 0) * 40 AS monthly_charge
+          GREATEST(balance::INTEGER, 0) * 50 AS monthly_charge
         FROM running_balance
         ORDER BY month
       `);
@@ -4791,7 +5016,7 @@ export class DatabaseService implements IDatabaseService {
       return {
         months: rows,
         currentBalance,
-        currentMonthCharge: currentBalance * 40,
+        currentMonthCharge: currentBalance * 50,
         totalBilledComplete,
         totalBilledAll,
         totalPalletsIn,

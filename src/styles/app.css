@@ -202,3 +202,24 @@ a:hover {
   color: var(--text-bright);
   border-color: var(--border-bright);
 }
+
+.form-toast-stack {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10000;
+  display: grid;
+  gap: 8px;
+  width: min(380px, calc(100vw - 28px));
+}
+
+.form-toast-item {
+  background: color-mix(in oklab, var(--bg2) 88%, black 12%);
+  border: 1px solid color-mix(in oklab, var(--ok) 55%, transparent);
+  color: var(--text-bright);
+  border-radius: 10px;
+  box-shadow: var(--shadow-heavy);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.35;
+}
