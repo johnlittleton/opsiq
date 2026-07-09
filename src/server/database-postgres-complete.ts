@@ -64,6 +64,7 @@ function normalizeAnalyticsDateRange(startDate?: string, endDate?: string): { st
 export class DatabaseService implements IDatabaseService {
   private pool: Pool;
   private static readonly MAX_REASONABLE_PALLETS = 200;
+  private static readonly MAX_REASONABLE_TRUCK_PALLETS = 60;
   private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
   private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
   private static readonly PROD_COST_KPI_PER_CASE = 1.25;
@@ -97,15 +98,15 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Reject impossible pallet counts that can skew analytics and KPIs.
-  private sanitizePalletCount(value: number | null | undefined, fieldName: string): number | undefined {
+  private sanitizePalletCount(value: number | null | undefined, fieldName: string, maxAllowed = DatabaseService.MAX_REASONABLE_PALLETS): number | undefined {
     if (value === null || value === undefined) return undefined;
     if (!Number.isFinite(value)) {
       throw new Error(`${fieldName} must be a valid number`);
     }
 
     const rounded = Math.round(value);
-    if (rounded < 0 || rounded > DatabaseService.MAX_REASONABLE_PALLETS) {
-      throw new Error(`${fieldName} must be between 0 and ${DatabaseService.MAX_REASONABLE_PALLETS}`);
+    if (rounded < 0 || rounded > maxAllowed) {
+      throw new Error(`${fieldName} must be between 0 and ${maxAllowed}`);
     }
 
     return rounded;
@@ -116,9 +117,13 @@ export class DatabaseService implements IDatabaseService {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
-  private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
+  private getSafePalletCount(
+    actualPallets: number | null | undefined,
+    plannedPallets: number | null | undefined,
+    maxAllowed = DatabaseService.MAX_REASONABLE_PALLETS
+  ): number {
     const candidate = actualPallets ?? plannedPallets ?? 0;
-    return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
+    return candidate >= 0 && candidate <= maxAllowed ? candidate : 0;
   }
 
   private getPaidShiftHours(elapsedMinutes: number): number {
@@ -1010,7 +1015,7 @@ export class DatabaseService implements IDatabaseService {
   async clearDoor(data: ClearDoorRequest): Promise<DockDoorWithCheckin> {
     let sanitizedActualPallets: number | undefined;
     try {
-      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets', DatabaseService.MAX_REASONABLE_TRUCK_PALLETS);
     } catch (error) {
       console.warn('Invalid actualPallets on clearDoor; falling back to safe pallet value.', {
         doorId: data.doorId,
@@ -1041,7 +1046,11 @@ export class DatabaseService implements IDatabaseService {
       if (savedCheckinId) {
         const checkinResult = await client.query('SELECT * FROM dock_checkins WHERE id = $1', [savedCheckinId]);
         const checkin = this.toCamelCase(checkinResult.rows[0]);
-        const effectiveActualPallets = this.getSafePalletCount(sanitizedActualPallets, checkin.pallets);
+        const effectiveActualPallets = this.getSafePalletCount(
+          sanitizedActualPallets,
+          checkin.pallets,
+          DatabaseService.MAX_REASONABLE_TRUCK_PALLETS
+        );
         
         console.log('🚪 Clearing door - Checkin data:', {
           id: checkin.id,
@@ -1335,7 +1344,7 @@ export class DatabaseService implements IDatabaseService {
         if (camelKey === 'pallets') {
           normalizedValue = this.sanitizePalletCount(value as number, 'pallets');
         } else if (camelKey === 'actualPallets') {
-          normalizedValue = this.sanitizePalletCount(value as number, 'actualPallets');
+          normalizedValue = this.sanitizePalletCount(value as number, 'actualPallets', DatabaseService.MAX_REASONABLE_TRUCK_PALLETS);
         }
         
         const snakeKey = fieldMap[camelKey];
@@ -2841,7 +2850,7 @@ export class DatabaseService implements IDatabaseService {
   // ==================== PERFORMANCE TRACKING ====================
 
   async updateCheckinCompletion(checkinId: number, actualPallets: number): Promise<void> {
-    const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets');
+    const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets', DatabaseService.MAX_REASONABLE_TRUCK_PALLETS);
     const checkinResult = await this.pool.query('SELECT * FROM dock_checkins WHERE id = $1', [checkinId]);
     if (checkinResult.rows.length === 0) {
       throw new Error(`Checkin ${checkinId} not found`);
@@ -4743,16 +4752,42 @@ export class DatabaseService implements IDatabaseService {
 
     // 3. Forklift Driver Performance
     let completedCheckinsResult = await this.pool.query(`
-      SELECT forklift_driver, actual_pallets, pallets, total_minutes
-      FROM dock_checkins
-      WHERE closed_at IS NOT NULL
-        AND closed_at >= $1 AND closed_at <= $2
+      SELECT
+        COALESCE(
+          NULLIF(BTRIM(c.forklift_driver), ''),
+          (
+            SELECT NULLIF(BTRIM(a.new_value), '')
+            FROM checkin_audit_log a
+            WHERE a.checkin_id = c.id
+              AND a.field_name = 'forkliftDriver'
+            ORDER BY a.changed_at DESC, a.id DESC
+            LIMIT 1
+          ),
+          ''
+        ) as forklift_driver,
+        c.actual_pallets,
+        c.pallets,
+        c.total_minutes
+      FROM dock_checkins c
+      WHERE c.closed_at IS NOT NULL
+        AND c.closed_at >= $1 AND c.closed_at <= $2
     `, [start, end]);
 
     if (completedCheckinsResult.rows.length === 0) {
       completedCheckinsResult = await this.pool.query(`
         SELECT
-          COALESCE(c.forklift_driver, '') as forklift_driver,
+          COALESCE(
+            NULLIF(BTRIM(c.forklift_driver), ''),
+            (
+              SELECT NULLIF(BTRIM(a.new_value), '')
+              FROM checkin_audit_log a
+              WHERE a.checkin_id = c.id
+                AND a.field_name = 'forkliftDriver'
+              ORDER BY a.changed_at DESC, a.id DESC
+              LIMIT 1
+            ),
+            ''
+          ) as forklift_driver,
           c.actual_pallets,
           c.pallets,
           COALESCE(c.total_minutes, 0) as total_minutes
@@ -4762,7 +4797,7 @@ export class DatabaseService implements IDatabaseService {
           AND e.new_status = 'Open'
           AND e.old_status IN ('Loading', 'Offload', 'Checked In')
           AND e.event_time >= $1 AND e.event_time <= $2
-        GROUP BY e.checkin_id, c.forklift_driver, c.actual_pallets, c.pallets, c.total_minutes
+        GROUP BY e.checkin_id, c.id, c.forklift_driver, c.actual_pallets, c.pallets, c.total_minutes
       `, [start, end]);
     }
     
@@ -4771,15 +4806,20 @@ export class DatabaseService implements IDatabaseService {
     
     completedCheckins.forEach((c: any) => {
       const rawDriver = String(c.forkliftDriver || '').trim();
-      const driver = !rawDriver || /^tbd$/i.test(rawDriver) || /^unknown$/i.test(rawDriver)
-        ? 'Unassigned'
-        : rawDriver;
-      if (!driverStats[driver]) {
-        driverStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
+      if (!rawDriver || /^tbd$/i.test(rawDriver) || /^unknown$/i.test(rawDriver) || /^n\/a$/i.test(rawDriver) || /^na$/i.test(rawDriver)) {
+        return;
       }
-      driverStats[driver].loads++;
-      driverStats[driver].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      driverStats[driver].totalMinutes += c.totalMinutes;
+
+      if (!driverStats[rawDriver]) {
+        driverStats[rawDriver] = { loads: 0, pallets: 0, totalMinutes: 0 };
+      }
+      driverStats[rawDriver].loads++;
+      driverStats[rawDriver].pallets += this.getSafePalletCount(
+        c.actualPallets,
+        c.pallets,
+        DatabaseService.MAX_REASONABLE_TRUCK_PALLETS
+      );
+      driverStats[rawDriver].totalMinutes += c.totalMinutes;
     });
 
     const driverPerformance = Object.entries(driverStats)

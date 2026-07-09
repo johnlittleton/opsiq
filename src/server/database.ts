@@ -66,6 +66,7 @@ function normalizeAnalyticsDateRange(startDate?: string, endDate?: string): { st
 export class DatabaseService implements IDatabaseService {
   private db: Database.Database;
   private static readonly MAX_REASONABLE_PALLETS = 200;
+  private static readonly MAX_REASONABLE_TRUCK_PALLETS = 60;
   private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
   private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
   private static readonly PROD_COST_KPI_PER_CASE = 1.25;
@@ -103,15 +104,15 @@ export class DatabaseService implements IDatabaseService {
   }
 
   // Reject impossible pallet counts that can skew analytics and KPIs.
-  private sanitizePalletCount(value: number | null | undefined, fieldName: string): number | undefined {
+  private sanitizePalletCount(value: number | null | undefined, fieldName: string, maxAllowed = DatabaseService.MAX_REASONABLE_PALLETS): number | undefined {
     if (value === null || value === undefined) return undefined;
     if (!Number.isFinite(value)) {
       throw new Error(`${fieldName} must be a valid number`);
     }
 
     const rounded = Math.round(value);
-    if (rounded < 0 || rounded > DatabaseService.MAX_REASONABLE_PALLETS) {
-      throw new Error(`${fieldName} must be between 0 and ${DatabaseService.MAX_REASONABLE_PALLETS}`);
+    if (rounded < 0 || rounded > maxAllowed) {
+      throw new Error(`${fieldName} must be between 0 and ${maxAllowed}`);
     }
 
     return rounded;
@@ -122,9 +123,13 @@ export class DatabaseService implements IDatabaseService {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
-  private getSafePalletCount(actualPallets: number | null | undefined, plannedPallets: number | null | undefined): number {
+  private getSafePalletCount(
+    actualPallets: number | null | undefined,
+    plannedPallets: number | null | undefined,
+    maxAllowed = DatabaseService.MAX_REASONABLE_PALLETS
+  ): number {
     const candidate = actualPallets ?? plannedPallets ?? 0;
-    return candidate >= 0 && candidate <= DatabaseService.MAX_REASONABLE_PALLETS ? candidate : 0;
+    return candidate >= 0 && candidate <= maxAllowed ? candidate : 0;
   }
 
   private getPaidShiftHours(elapsedMinutes: number): number {
@@ -1101,7 +1106,7 @@ export class DatabaseService implements IDatabaseService {
   clearDoor(data: ClearDoorRequest): DockDoorWithCheckin {
     let sanitizedActualPallets: number | undefined;
     try {
-      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets');
+      sanitizedActualPallets = this.sanitizePalletCount(data.actualPallets, 'actualPallets', DatabaseService.MAX_REASONABLE_TRUCK_PALLETS);
     } catch (error) {
       console.warn('Invalid actualPallets on clearDoor; falling back to safe pallet value.', {
         doorId: data.doorId,
@@ -1122,7 +1127,11 @@ export class DatabaseService implements IDatabaseService {
       // Close checkin if exists and record performance metrics
       if (door.currentCheckinId) {
         const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(door.currentCheckinId) as any;
-        const effectiveActualPallets = this.getSafePalletCount(sanitizedActualPallets, checkin.pallets);
+        const effectiveActualPallets = this.getSafePalletCount(
+          sanitizedActualPallets,
+          checkin.pallets,
+          DatabaseService.MAX_REASONABLE_TRUCK_PALLETS
+        );
         
         console.log('Clearing door - Checkin data:', {
           id: checkin.id,
@@ -2733,7 +2742,7 @@ export class DatabaseService implements IDatabaseService {
       if (camelKey === 'pallets') {
         normalizedValue = this.sanitizePalletCount(value as number, 'pallets');
       } else if (camelKey === 'actualPallets') {
-        normalizedValue = this.sanitizePalletCount(value as number, 'actualPallets');
+        normalizedValue = this.sanitizePalletCount(value as number, 'actualPallets', DatabaseService.MAX_REASONABLE_TRUCK_PALLETS);
       }
       
       const fieldName = fieldMap[camelKey];
@@ -2914,7 +2923,7 @@ export class DatabaseService implements IDatabaseService {
   }
 
   updateCheckinCompletion(checkinId: number, actualPallets: number): void {
-    const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets');
+    const sanitizedActualPallets = this.sanitizePalletCount(actualPallets, 'actualPallets', DatabaseService.MAX_REASONABLE_TRUCK_PALLETS);
     const checkin = this.db.prepare('SELECT * FROM dock_checkins WHERE id = ?').get(checkinId) as any;
     if (!checkin) {
       throw new Error(`Checkin ${checkinId} not found`);
@@ -4191,16 +4200,42 @@ export class DatabaseService implements IDatabaseService {
 
     // 3. Forklift Driver Performance
     let completedCheckins = this.db.prepare(`
-      SELECT forkliftDriver, actualPallets, pallets, totalMinutes
-      FROM dock_checkins
-      WHERE closedAt IS NOT NULL
-        AND closedAt >= ? AND closedAt <= ?
+      SELECT
+        COALESCE(
+          NULLIF(TRIM(c.forkliftDriver), ''),
+          (
+            SELECT NULLIF(TRIM(a.newValue), '')
+            FROM checkin_audit_log a
+            WHERE a.checkinId = c.id
+              AND a.fieldName = 'forkliftDriver'
+            ORDER BY a.changedAt DESC, a.id DESC
+            LIMIT 1
+          ),
+          ''
+        ) as forkliftDriver,
+        c.actualPallets,
+        c.pallets,
+        c.totalMinutes
+      FROM dock_checkins c
+      WHERE c.closedAt IS NOT NULL
+        AND c.closedAt >= ? AND c.closedAt <= ?
     `).all(start, end) as any[];
 
     if (completedCheckins.length === 0) {
       completedCheckins = this.db.prepare(`
         SELECT
-          COALESCE(c.forkliftDriver, '') as forkliftDriver,
+          COALESCE(
+            NULLIF(TRIM(c.forkliftDriver), ''),
+            (
+              SELECT NULLIF(TRIM(a.newValue), '')
+              FROM checkin_audit_log a
+              WHERE a.checkinId = c.id
+                AND a.fieldName = 'forkliftDriver'
+              ORDER BY a.changedAt DESC, a.id DESC
+              LIMIT 1
+            ),
+            ''
+          ) as forkliftDriver,
           c.actualPallets as actualPallets,
           c.pallets as pallets,
           COALESCE(c.totalMinutes, 0) as totalMinutes
@@ -4217,15 +4252,20 @@ export class DatabaseService implements IDatabaseService {
     const driverStats: Record<string, { loads: number; pallets: number; totalMinutes: number }> = {};
     completedCheckins.forEach(c => {
       const rawDriver = String(c.forkliftDriver || '').trim();
-      const driver = !rawDriver || /^tbd$/i.test(rawDriver) || /^unknown$/i.test(rawDriver)
-        ? 'Unassigned'
-        : rawDriver;
-      if (!driverStats[driver]) {
-        driverStats[driver] = { loads: 0, pallets: 0, totalMinutes: 0 };
+      if (!rawDriver || /^tbd$/i.test(rawDriver) || /^unknown$/i.test(rawDriver) || /^n\/a$/i.test(rawDriver) || /^na$/i.test(rawDriver)) {
+        return;
       }
-      driverStats[driver].loads++;
-      driverStats[driver].pallets += this.getSafePalletCount(c.actualPallets, c.pallets);
-      driverStats[driver].totalMinutes += c.totalMinutes;
+
+      if (!driverStats[rawDriver]) {
+        driverStats[rawDriver] = { loads: 0, pallets: 0, totalMinutes: 0 };
+      }
+      driverStats[rawDriver].loads++;
+      driverStats[rawDriver].pallets += this.getSafePalletCount(
+        c.actualPallets,
+        c.pallets,
+        DatabaseService.MAX_REASONABLE_TRUCK_PALLETS
+      );
+      driverStats[rawDriver].totalMinutes += c.totalMinutes;
     });
 
     const driverPerformance = Object.entries(driverStats)
