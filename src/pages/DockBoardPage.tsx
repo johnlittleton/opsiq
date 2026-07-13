@@ -14,6 +14,8 @@ interface DockVerificationForm {
   isOrderComplete: boolean;
   quantitiesCorrect: boolean;
   tagsVerified: boolean;
+  famousTransactionsVerified: boolean;
+  documentationReviewedSignedUploadedAndEmailed: boolean;
   leadName: string;
   qcName: string;
   managerName: string;
@@ -39,6 +41,8 @@ export const DockBoardPage: React.FC = () => {
     isOrderComplete: false,
     quantitiesCorrect: false,
     tagsVerified: false,
+    famousTransactionsVerified: false,
+    documentationReviewedSignedUploadedAndEmailed: false,
     leadName: '',
     qcName: '',
     managerName: '',
@@ -204,6 +208,8 @@ export const DockBoardPage: React.FC = () => {
       isOrderComplete: false,
       quantitiesCorrect: false,
       tagsVerified: false,
+      famousTransactionsVerified: false,
+      documentationReviewedSignedUploadedAndEmailed: false,
       leadName: '',
       qcName: '',
       managerName: '',
@@ -217,6 +223,8 @@ export const DockBoardPage: React.FC = () => {
           isOrderComplete: Boolean(existing.isOrderComplete),
           quantitiesCorrect: Boolean(existing.quantitiesCorrect),
           tagsVerified: Boolean(existing.tagsVerified),
+          famousTransactionsVerified: Boolean(existing.famousTransactionsVerified),
+          documentationReviewedSignedUploadedAndEmailed: Boolean(existing.documentationReviewedSignedUploadedAndEmailed),
           leadName: String(existing.leadName || ''),
           qcName: String(existing.qcName || ''),
           managerName: String(existing.managerName || ''),
@@ -235,8 +243,15 @@ export const DockBoardPage: React.FC = () => {
     const qcName = dockForm.qcName.trim();
     const managerName = dockForm.managerName.trim();
 
-    if (!dockForm.isOrderComplete || !dockForm.quantitiesCorrect || !dockForm.tagsVerified || !leadName || !qcName || !managerName) {
-      alert('All checklist items and Lead/QC/Manager sign-offs are required before submitting this form.');
+    if (!dockForm.isOrderComplete
+      || !dockForm.quantitiesCorrect
+      || !dockForm.tagsVerified
+      || !dockForm.famousTransactionsVerified
+      || !dockForm.documentationReviewedSignedUploadedAndEmailed
+      || !leadName
+      || !qcName
+      || !managerName) {
+      alert('All checklist items, Famous/accounting attestations, and Lead/QC/Manager sign-offs are required before submitting this form.');
       return;
     }
 
@@ -247,6 +262,8 @@ export const DockBoardPage: React.FC = () => {
         isOrderComplete: dockForm.isOrderComplete,
         quantitiesCorrect: dockForm.quantitiesCorrect,
         tagsVerified: dockForm.tagsVerified,
+        famousTransactionsVerified: dockForm.famousTransactionsVerified,
+        documentationReviewedSignedUploadedAndEmailed: dockForm.documentationReviewedSignedUploadedAndEmailed,
         leadName,
         qcName,
         managerName,
@@ -465,6 +482,24 @@ export const DockBoardPage: React.FC = () => {
                   onChange={(e) => setDockForm((current) => ({ ...current, tagsVerified: e.target.checked }))}
                 />
                 Tags/documents verified
+              </label>
+
+              <label className="dock-form-modal__check-row">
+                <input
+                  type="checkbox"
+                  checked={dockForm.famousTransactionsVerified}
+                  onChange={(e) => setDockForm((current) => ({ ...current, famousTransactionsVerified: e.target.checked }))}
+                />
+                All Famous transactions for this order are verified for completion and accuracy
+              </label>
+
+              <label className="dock-form-modal__check-row">
+                <input
+                  type="checkbox"
+                  checked={dockForm.documentationReviewedSignedUploadedAndEmailed}
+                  onChange={(e) => setDockForm((current) => ({ ...current, documentationReviewedSignedUploadedAndEmailed: e.target.checked }))}
+                />
+                All documentation has been reviewed, signed off for accuracy, uploaded to Famous, and emailed to the customer
               </label>
 
               <div className="dock-form-modal__grid">

@@ -22,6 +22,8 @@ interface OutboundVerificationForm {
   isOrderComplete: boolean;
   quantitiesCorrect: boolean;
   tagsVerified: boolean;
+  famousTransactionsVerified: boolean;
+  documentationReviewedSignedUploadedAndEmailed: boolean;
   leadName: string;
   qcName: string;
   managerName: string;
@@ -46,6 +48,8 @@ const DoorTile: React.FC<{
     isOrderComplete: false,
     quantitiesCorrect: false,
     tagsVerified: false,
+    famousTransactionsVerified: false,
+    documentationReviewedSignedUploadedAndEmailed: false,
     leadName: '',
     qcName: '',
     managerName: '',
@@ -121,6 +125,8 @@ const DoorTile: React.FC<{
       isOrderComplete: false,
       quantitiesCorrect: false,
       tagsVerified: false,
+      famousTransactionsVerified: false,
+      documentationReviewedSignedUploadedAndEmailed: false,
       leadName: '',
       qcName: '',
       managerName: '',
@@ -135,6 +141,8 @@ const DoorTile: React.FC<{
           isOrderComplete: Boolean(existing.isOrderComplete),
           quantitiesCorrect: Boolean(existing.quantitiesCorrect),
           tagsVerified: Boolean(existing.tagsVerified),
+          famousTransactionsVerified: Boolean(existing.famousTransactionsVerified),
+          documentationReviewedSignedUploadedAndEmailed: Boolean(existing.documentationReviewedSignedUploadedAndEmailed),
           leadName: String(existing.leadName || ''),
           qcName: String(existing.qcName || ''),
           managerName: String(existing.managerName || ''),
@@ -168,8 +176,7 @@ const DoorTile: React.FC<{
       }
     }
 
-    const isOutbound = String(door.currentCheckin?.inboundOutbound || '').toLowerCase() === 'outbound';
-    if (!isOutbound || !door.currentCheckin) {
+    if (!door.currentCheckin) {
       await clearDoorRequest(actualPallets);
       return;
     }
@@ -186,12 +193,14 @@ const DoorTile: React.FC<{
     const isComplete = outboundVerificationForm.isOrderComplete
       && outboundVerificationForm.quantitiesCorrect
       && outboundVerificationForm.tagsVerified
+      && outboundVerificationForm.famousTransactionsVerified
+      && outboundVerificationForm.documentationReviewedSignedUploadedAndEmailed
       && leadName
       && qcName
       && managerName;
 
     if (!isComplete) {
-      alert('All checklist items and Lead/QC/Manager sign-offs are required before submitting this form.');
+      alert('All checklist items, Famous/accounting attestations, and Lead/QC/Manager sign-offs are required before submitting this form.');
       return;
     }
 
@@ -202,6 +211,8 @@ const DoorTile: React.FC<{
         isOrderComplete: outboundVerificationForm.isOrderComplete,
         quantitiesCorrect: outboundVerificationForm.quantitiesCorrect,
         tagsVerified: outboundVerificationForm.tagsVerified,
+        famousTransactionsVerified: outboundVerificationForm.famousTransactionsVerified,
+        documentationReviewedSignedUploadedAndEmailed: outboundVerificationForm.documentationReviewedSignedUploadedAndEmailed,
         leadName,
         qcName,
         managerName,
@@ -418,6 +429,24 @@ const DoorTile: React.FC<{
                   onChange={(e) => setOutboundVerificationForm((current) => ({ ...current, tagsVerified: e.target.checked }))}
                 />
                 All tags/documents have been checked and verified
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#f3f6fa', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={outboundVerificationForm.famousTransactionsVerified}
+                  onChange={(e) => setOutboundVerificationForm((current) => ({ ...current, famousTransactionsVerified: e.target.checked }))}
+                />
+                All Famous transactions for this order are verified for completion and accuracy
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', color: '#f3f6fa', fontWeight: 600 }}>
+                <input
+                  type="checkbox"
+                  checked={outboundVerificationForm.documentationReviewedSignedUploadedAndEmailed}
+                  onChange={(e) => setOutboundVerificationForm((current) => ({ ...current, documentationReviewedSignedUploadedAndEmailed: e.target.checked }))}
+                />
+                All documentation has been reviewed, signed off for accuracy, uploaded to Famous, and emailed to the customer
               </label>
 
               <div className="form-row">

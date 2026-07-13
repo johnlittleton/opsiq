@@ -94,6 +94,8 @@ interface ProductionVerificationForm {
   isOrderComplete: boolean;
   quantitiesCorrect: boolean;
   tagsVerified: boolean;
+  famousTransactionsVerified: boolean;
+  documentationReviewedSignedUploadedAndEmailed: boolean;
   leadName: string;
   qcName: string;
   managerName: string;
@@ -142,6 +144,8 @@ export default function ProductionScheduler() {
     isOrderComplete: false,
     quantitiesCorrect: false,
     tagsVerified: false,
+    famousTransactionsVerified: false,
+    documentationReviewedSignedUploadedAndEmailed: false,
     leadName: '',
     qcName: '',
     managerName: '',
@@ -560,6 +564,8 @@ export default function ProductionScheduler() {
       isOrderComplete: false,
       quantitiesCorrect: false,
       tagsVerified: false,
+      famousTransactionsVerified: false,
+      documentationReviewedSignedUploadedAndEmailed: false,
       leadName: '',
       qcName: '',
       managerName: '',
@@ -574,6 +580,8 @@ export default function ProductionScheduler() {
           isOrderComplete: Boolean(existing.isOrderComplete),
           quantitiesCorrect: Boolean(existing.quantitiesCorrect),
           tagsVerified: Boolean(existing.tagsVerified),
+          famousTransactionsVerified: Boolean(existing.famousTransactionsVerified),
+          documentationReviewedSignedUploadedAndEmailed: Boolean(existing.documentationReviewedSignedUploadedAndEmailed),
           leadName: String(existing.leadName || ''),
           qcName: String(existing.qcName || ''),
           managerName: String(existing.managerName || ''),
@@ -594,12 +602,14 @@ export default function ProductionScheduler() {
     const isComplete = productionVerificationForm.isOrderComplete
       && productionVerificationForm.quantitiesCorrect
       && productionVerificationForm.tagsVerified
+      && productionVerificationForm.famousTransactionsVerified
+      && productionVerificationForm.documentationReviewedSignedUploadedAndEmailed
       && leadName
       && qcName
       && managerName;
 
     if (!isComplete) {
-      alert('All checklist items and Lead/QC/Manager sign-offs are required before submitting this form.');
+      alert('All checklist items, Famous/accounting attestations, and Lead/QC/Manager sign-offs are required before submitting this form.');
       return;
     }
 
@@ -610,6 +620,8 @@ export default function ProductionScheduler() {
         isOrderComplete: productionVerificationForm.isOrderComplete,
         quantitiesCorrect: productionVerificationForm.quantitiesCorrect,
         tagsVerified: productionVerificationForm.tagsVerified,
+        famousTransactionsVerified: productionVerificationForm.famousTransactionsVerified,
+        documentationReviewedSignedUploadedAndEmailed: productionVerificationForm.documentationReviewedSignedUploadedAndEmailed,
         leadName,
         qcName,
         managerName,
@@ -1907,6 +1919,24 @@ export default function ProductionScheduler() {
                   onChange={(e) => setProductionVerificationForm((current) => ({ ...current, tagsVerified: e.target.checked }))}
                 />
                 All tags have been checked and verified
+              </label>
+
+              <label className="verification-check-row">
+                <input
+                  type="checkbox"
+                  checked={productionVerificationForm.famousTransactionsVerified}
+                  onChange={(e) => setProductionVerificationForm((current) => ({ ...current, famousTransactionsVerified: e.target.checked }))}
+                />
+                All Famous transactions for this order are verified for completion and accuracy
+              </label>
+
+              <label className="verification-check-row">
+                <input
+                  type="checkbox"
+                  checked={productionVerificationForm.documentationReviewedSignedUploadedAndEmailed}
+                  onChange={(e) => setProductionVerificationForm((current) => ({ ...current, documentationReviewedSignedUploadedAndEmailed: e.target.checked }))}
+                />
+                All documentation has been reviewed, signed off for accuracy, uploaded to Famous, and emailed to the customer
               </label>
 
               <div className="form-row">

@@ -893,6 +893,73 @@ class ApiClient {
     return response.json();
   }
 
+  async uploadDockCheckerImage(file: File): Promise<{ filename: string; url: string; size: number; mimeType: string; uploadedAt: string; }> {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const response = await fetch(`${API_BASE}/api/dock-checker/upload-image`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to upload image');
+    }
+
+    return response.json();
+  }
+
+  async saveOutboundDockCheckerForm(payload: any): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/dock-checker/outbound`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to save outbound dock checker form');
+    }
+
+    return response.json();
+  }
+
+  async saveInboundDockCheckerForm(payload: any): Promise<any> {
+    const response = await fetch(`${API_BASE}/api/dock-checker/inbound`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to save inbound dock checker form');
+    }
+
+    return response.json();
+  }
+
+  async getDockCheckerHistory(filters?: {
+    startDate?: string;
+    endDate?: string;
+    type?: 'all' | 'inbound' | 'outbound';
+    search?: string;
+  }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.startDate) params.append('startDate', filters.startDate);
+    if (filters?.endDate) params.append('endDate', filters.endDate);
+    if (filters?.type) params.append('type', filters.type);
+    if (filters?.search) params.append('search', filters.search);
+
+    const response = await fetch(`${API_BASE}/api/dock-checker/history?${params.toString()}`);
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.error || 'Failed to load dock checker history');
+    }
+    return response.json();
+  }
+
   onAppointmentCreated(callback: (appointment: any) => void) {
     console.log('🎯 onAppointmentCreated called, flag =', this.appointmentListenersRegistered);
     if (this.appointmentListenersRegistered) {

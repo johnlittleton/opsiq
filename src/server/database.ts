@@ -417,6 +417,8 @@ export class DatabaseService implements IDatabaseService {
         isOrderComplete INTEGER NOT NULL DEFAULT 0,
         quantitiesCorrect INTEGER NOT NULL DEFAULT 0,
         tagsVerified INTEGER NOT NULL DEFAULT 0,
+        famousTransactionsVerified INTEGER NOT NULL DEFAULT 0,
+        documentationReviewedSignedUploadedAndEmailed INTEGER NOT NULL DEFAULT 0,
         leadName TEXT,
         qcName TEXT,
         managerName TEXT,
@@ -436,6 +438,8 @@ export class DatabaseService implements IDatabaseService {
         isOrderComplete INTEGER NOT NULL DEFAULT 0,
         quantitiesCorrect INTEGER NOT NULL DEFAULT 0,
         tagsVerified INTEGER NOT NULL DEFAULT 0,
+        famousTransactionsVerified INTEGER NOT NULL DEFAULT 0,
+        documentationReviewedSignedUploadedAndEmailed INTEGER NOT NULL DEFAULT 0,
         leadName TEXT,
         qcName TEXT,
         managerName TEXT,
@@ -448,10 +452,66 @@ export class DatabaseService implements IDatabaseService {
         FOREIGN KEY (checkinId) REFERENCES dock_checkins(id)
       );
 
+      CREATE TABLE IF NOT EXISTS outbound_dock_checker_forms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        referenceNumber TEXT NOT NULL,
+        company TEXT,
+        doorId INTEGER,
+        checkinId INTEGER,
+        palletsOffloaded INTEGER NOT NULL DEFAULT 0,
+        checkerName TEXT NOT NULL,
+        forkliftOperatorName TEXT NOT NULL,
+        salesOrderPoMatchesPickTicket INTEGER NOT NULL DEFAULT 0,
+        qtyOnPickTicketsMatch INTEGER NOT NULL DEFAULT 0,
+        palletTagsMatchPickTicket INTEGER NOT NULL DEFAULT 0,
+        babyTagsAndLabelsRemoved INTEGER NOT NULL DEFAULT 0,
+        loadingSheetPalletQtyMatchesPickTicket INTEGER NOT NULL DEFAULT 0,
+        shipToAddressVerifiedWithClerk INTEGER NOT NULL DEFAULT 0,
+        palletsLoaded INTEGER NOT NULL DEFAULT 0,
+        paperworkVerifiedByClerkOrManager INTEGER NOT NULL DEFAULT 0,
+        tempRecorderRequired INTEGER NOT NULL DEFAULT 0,
+        palletsOnChep INTEGER NOT NULL DEFAULT 0,
+        picturesTakenEachPallet INTEGER NOT NULL DEFAULT 0,
+        imagePathsJson TEXT,
+        notes TEXT,
+        submittedBy TEXT NOT NULL,
+        submittedAt TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS inbound_dock_checker_forms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        referenceNumber TEXT NOT NULL,
+        company TEXT,
+        doorId INTEGER,
+        checkinId INTEGER,
+        palletsOffloaded INTEGER NOT NULL DEFAULT 0,
+        appliedAllFamousLabels INTEGER NOT NULL DEFAULT 0,
+        manifestMatchedPallets INTEGER NOT NULL DEFAULT 0,
+        qcIssues INTEGER NOT NULL DEFAULT 0,
+        qcIssueNotes TEXT,
+        damages INTEGER NOT NULL DEFAULT 0,
+        damageNotes TEXT,
+        tempRecorderRemoved INTEGER NOT NULL DEFAULT 0,
+        trailerTemperatureChecked INTEGER NOT NULL DEFAULT 0,
+        paperworkSubmittedToShippingReceiving INTEGER NOT NULL DEFAULT 0,
+        imagePathsJson TEXT,
+        notes TEXT,
+        submittedBy TEXT NOT NULL,
+        submittedAt TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_prod_verification_order ON production_order_verifications(orderId);
       CREATE INDEX IF NOT EXISTS idx_prod_verification_submitted ON production_order_verifications(submittedAt);
       CREATE INDEX IF NOT EXISTS idx_outbound_verification_checkin ON outbound_checkin_verifications(checkinId);
       CREATE INDEX IF NOT EXISTS idx_outbound_verification_submitted ON outbound_checkin_verifications(submittedAt);
+      CREATE INDEX IF NOT EXISTS idx_outbound_checker_submitted ON outbound_dock_checker_forms(submittedAt);
+      CREATE INDEX IF NOT EXISTS idx_outbound_checker_ref ON outbound_dock_checker_forms(referenceNumber);
+      CREATE INDEX IF NOT EXISTS idx_inbound_checker_submitted ON inbound_dock_checker_forms(submittedAt);
+      CREATE INDEX IF NOT EXISTS idx_inbound_checker_ref ON inbound_dock_checker_forms(referenceNumber);
 
       CREATE TABLE IF NOT EXISTS pallet_tracker_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -504,6 +564,20 @@ export class DatabaseService implements IDatabaseService {
         updatedAt TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS extra_service_entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        serviceDate TEXT NOT NULL,
+        serviceType TEXT NOT NULL,
+        unitType TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        workerCount INTEGER NOT NULL,
+        totalRevenue REAL NOT NULL,
+        notes TEXT,
+        capturedBy TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS executives (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
@@ -552,6 +626,8 @@ export class DatabaseService implements IDatabaseService {
       CREATE INDEX IF NOT EXISTS idx_pallet_tracker_order ON pallet_tracker_events(orderType, orderId, scannedAt);
       CREATE INDEX IF NOT EXISTS idx_pallet_tracker_tag ON pallet_tracker_events(orderType, orderId, palletTag);
       CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointmentDate);
+      CREATE INDEX IF NOT EXISTS idx_extra_service_date ON extra_service_entries(serviceDate);
+      CREATE INDEX IF NOT EXISTS idx_extra_service_type_date ON extra_service_entries(serviceType, serviceDate);
       
       -- Partial unique index: only one active shift per date/shift_number
       CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
@@ -612,6 +688,31 @@ export class DatabaseService implements IDatabaseService {
       if (!laborColumnNames.includes('productionOvertimeHours')) {
         console.log('Adding productionOvertimeHours column to labor_snapshots...');
         this.db.exec('ALTER TABLE labor_snapshots ADD COLUMN productionOvertimeHours REAL DEFAULT 0');
+      }
+
+      // Migration: Add verification attestation columns for production and dock forms
+      const productionVerificationColumns = this.db.pragma('table_info(production_order_verifications)') as any[];
+      const productionVerificationColumnNames = productionVerificationColumns.map(c => c.name);
+
+      if (!productionVerificationColumnNames.includes('famousTransactionsVerified')) {
+        console.log('Adding famousTransactionsVerified column to production_order_verifications...');
+        this.db.exec('ALTER TABLE production_order_verifications ADD COLUMN famousTransactionsVerified INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!productionVerificationColumnNames.includes('documentationReviewedSignedUploadedAndEmailed')) {
+        console.log('Adding documentationReviewedSignedUploadedAndEmailed column to production_order_verifications...');
+        this.db.exec('ALTER TABLE production_order_verifications ADD COLUMN documentationReviewedSignedUploadedAndEmailed INTEGER NOT NULL DEFAULT 0');
+      }
+
+      const outboundVerificationColumns = this.db.pragma('table_info(outbound_checkin_verifications)') as any[];
+      const outboundVerificationColumnNames = outboundVerificationColumns.map(c => c.name);
+
+      if (!outboundVerificationColumnNames.includes('famousTransactionsVerified')) {
+        console.log('Adding famousTransactionsVerified column to outbound_checkin_verifications...');
+        this.db.exec('ALTER TABLE outbound_checkin_verifications ADD COLUMN famousTransactionsVerified INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!outboundVerificationColumnNames.includes('documentationReviewedSignedUploadedAndEmailed')) {
+        console.log('Adding documentationReviewedSignedUploadedAndEmailed column to outbound_checkin_verifications...');
+        this.db.exec('ALTER TABLE outbound_checkin_verifications ADD COLUMN documentationReviewedSignedUploadedAndEmailed INTEGER NOT NULL DEFAULT 0');
       }
 
       // Migration: Add role column to executives for older local databases
@@ -1304,6 +1405,65 @@ export class DatabaseService implements IDatabaseService {
     query += ' ORDER BY createdAt DESC';
 
     return this.db.prepare(query).all(...params) as DockCheckin[];
+  }
+
+  createExtraServiceEntry(data: {
+    serviceDate: string;
+    serviceType: string;
+    unitType: string;
+    quantity: number;
+    workerCount: number;
+    totalRevenue: number;
+    notes?: string;
+    capturedBy?: string;
+  }): any {
+    const now = getLocalISOString();
+
+    const result = this.db.prepare(`
+      INSERT INTO extra_service_entries (
+        serviceDate, serviceType, unitType, quantity, workerCount, totalRevenue, notes, capturedBy, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      data.serviceDate,
+      data.serviceType,
+      data.unitType,
+      data.quantity,
+      data.workerCount,
+      data.totalRevenue,
+      data.notes || null,
+      data.capturedBy || null,
+      now,
+      now
+    );
+
+    return this.db.prepare('SELECT * FROM extra_service_entries WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  getExtraServiceEntries(filters?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }): any[] {
+    let query = 'SELECT * FROM extra_service_entries WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.date) {
+      query += ' AND serviceDate = ?';
+      params.push(filters.date);
+    } else {
+      if (filters?.startDate) {
+        query += ' AND serviceDate >= ?';
+        params.push(filters.startDate);
+      }
+      if (filters?.endDate) {
+        query += ' AND serviceDate <= ?';
+        params.push(filters.endDate);
+      }
+    }
+
+    query += ' ORDER BY createdAt DESC';
+
+    return this.db.prepare(query).all(...params);
   }
 
   // ==================== PRODUCTION ====================
@@ -2813,19 +2973,31 @@ export class DatabaseService implements IDatabaseService {
   async saveProductionOrderVerification(payload: any): Promise<any> {
     const now = getLocalISOString();
     const submittedAt = payload.submittedAt || now;
-    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+    const isPassed = Boolean(
+      payload.isOrderComplete
+      && payload.quantitiesCorrect
+      && payload.tagsVerified
+      && payload.famousTransactionsVerified
+      && payload.documentationReviewedSignedUploadedAndEmailed
+      && payload.leadName
+      && payload.qcName
+      && payload.managerName
+    );
 
     this.db.prepare(`
       INSERT INTO production_order_verifications (
         orderId, line, isOrderComplete, quantitiesCorrect, tagsVerified,
+        famousTransactionsVerified, documentationReviewedSignedUploadedAndEmailed,
         leadName, qcName, managerName, notes, submittedBy, submittedAt,
         isPassed, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(orderId) DO UPDATE SET
         line = excluded.line,
         isOrderComplete = excluded.isOrderComplete,
         quantitiesCorrect = excluded.quantitiesCorrect,
         tagsVerified = excluded.tagsVerified,
+        famousTransactionsVerified = excluded.famousTransactionsVerified,
+        documentationReviewedSignedUploadedAndEmailed = excluded.documentationReviewedSignedUploadedAndEmailed,
         leadName = excluded.leadName,
         qcName = excluded.qcName,
         managerName = excluded.managerName,
@@ -2840,6 +3012,8 @@ export class DatabaseService implements IDatabaseService {
       payload.isOrderComplete ? 1 : 0,
       payload.quantitiesCorrect ? 1 : 0,
       payload.tagsVerified ? 1 : 0,
+      payload.famousTransactionsVerified ? 1 : 0,
+      payload.documentationReviewedSignedUploadedAndEmailed ? 1 : 0,
       payload.leadName || null,
       payload.qcName || null,
       payload.managerName || null,
@@ -2862,6 +3036,8 @@ export class DatabaseService implements IDatabaseService {
       isOrderComplete: Boolean(row.isOrderComplete),
       quantitiesCorrect: Boolean(row.quantitiesCorrect),
       tagsVerified: Boolean(row.tagsVerified),
+      famousTransactionsVerified: Boolean(row.famousTransactionsVerified),
+      documentationReviewedSignedUploadedAndEmailed: Boolean(row.documentationReviewedSignedUploadedAndEmailed),
       isPassed: Boolean(row.isPassed),
     };
   }
@@ -2869,19 +3045,31 @@ export class DatabaseService implements IDatabaseService {
   async saveOutboundCheckinVerification(payload: any): Promise<any> {
     const now = getLocalISOString();
     const submittedAt = payload.submittedAt || now;
-    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+    const isPassed = Boolean(
+      payload.isOrderComplete
+      && payload.quantitiesCorrect
+      && payload.tagsVerified
+      && payload.famousTransactionsVerified
+      && payload.documentationReviewedSignedUploadedAndEmailed
+      && payload.leadName
+      && payload.qcName
+      && payload.managerName
+    );
 
     this.db.prepare(`
       INSERT INTO outbound_checkin_verifications (
         checkinId, doorId, isOrderComplete, quantitiesCorrect, tagsVerified,
+        famousTransactionsVerified, documentationReviewedSignedUploadedAndEmailed,
         leadName, qcName, managerName, notes, submittedBy, submittedAt,
         isPassed, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(checkinId) DO UPDATE SET
         doorId = excluded.doorId,
         isOrderComplete = excluded.isOrderComplete,
         quantitiesCorrect = excluded.quantitiesCorrect,
         tagsVerified = excluded.tagsVerified,
+        famousTransactionsVerified = excluded.famousTransactionsVerified,
+        documentationReviewedSignedUploadedAndEmailed = excluded.documentationReviewedSignedUploadedAndEmailed,
         leadName = excluded.leadName,
         qcName = excluded.qcName,
         managerName = excluded.managerName,
@@ -2896,6 +3084,8 @@ export class DatabaseService implements IDatabaseService {
       payload.isOrderComplete ? 1 : 0,
       payload.quantitiesCorrect ? 1 : 0,
       payload.tagsVerified ? 1 : 0,
+      payload.famousTransactionsVerified ? 1 : 0,
+      payload.documentationReviewedSignedUploadedAndEmailed ? 1 : 0,
       payload.leadName || null,
       payload.qcName || null,
       payload.managerName || null,
@@ -2918,8 +3108,215 @@ export class DatabaseService implements IDatabaseService {
       isOrderComplete: Boolean(row.isOrderComplete),
       quantitiesCorrect: Boolean(row.quantitiesCorrect),
       tagsVerified: Boolean(row.tagsVerified),
+      famousTransactionsVerified: Boolean(row.famousTransactionsVerified),
+      documentationReviewedSignedUploadedAndEmailed: Boolean(row.documentationReviewedSignedUploadedAndEmailed),
       isPassed: Boolean(row.isPassed),
     };
+  }
+
+  async saveOutboundDockCheckerForm(payload: any): Promise<any> {
+    const now = getLocalISOString();
+    const submittedAt = String(payload.submittedAt || now);
+
+    const result = this.db.prepare(`
+      INSERT INTO outbound_dock_checker_forms (
+        referenceNumber, company, doorId, checkinId, palletsOffloaded,
+        checkerName, forkliftOperatorName,
+        salesOrderPoMatchesPickTicket, qtyOnPickTicketsMatch, palletTagsMatchPickTicket,
+        babyTagsAndLabelsRemoved, loadingSheetPalletQtyMatchesPickTicket,
+        shipToAddressVerifiedWithClerk, palletsLoaded, paperworkVerifiedByClerkOrManager,
+        tempRecorderRequired, palletsOnChep, picturesTakenEachPallet,
+        imagePathsJson, notes, submittedBy, submittedAt, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      String(payload.referenceNumber || '').trim(),
+      String(payload.company || '').trim() || null,
+      Number.isFinite(Number(payload.doorId)) ? Number(payload.doorId) : null,
+      Number.isFinite(Number(payload.checkinId)) ? Number(payload.checkinId) : null,
+      Math.max(0, Math.round(Number(payload.palletsOffloaded || 0))),
+      String(payload.checkerName || '').trim(),
+      String(payload.forkliftOperatorName || '').trim(),
+      payload.salesOrderPoMatchesPickTicket ? 1 : 0,
+      payload.qtyOnPickTicketsMatch ? 1 : 0,
+      payload.palletTagsMatchPickTicket ? 1 : 0,
+      payload.babyTagsAndLabelsRemoved ? 1 : 0,
+      payload.loadingSheetPalletQtyMatchesPickTicket ? 1 : 0,
+      payload.shipToAddressVerifiedWithClerk ? 1 : 0,
+      Math.max(0, Math.round(Number(payload.palletsLoaded || 0))),
+      payload.paperworkVerifiedByClerkOrManager ? 1 : 0,
+      payload.tempRecorderRequired ? 1 : 0,
+      payload.palletsOnChep ? 1 : 0,
+      payload.picturesTakenEachPallet ? 1 : 0,
+      JSON.stringify(Array.isArray(payload.imagePaths) ? payload.imagePaths : []),
+      String(payload.notes || '').trim() || null,
+      String(payload.submittedBy || 'System').trim(),
+      submittedAt,
+      now,
+      now
+    );
+
+    const row = this.db.prepare('SELECT * FROM outbound_dock_checker_forms WHERE id = ?').get(result.lastInsertRowid) as any;
+    return {
+      ...row,
+      palletsOffloaded: Number(row.palletsOffloaded || 0),
+      palletsLoaded: Number(row.palletsLoaded || 0),
+      salesOrderPoMatchesPickTicket: Boolean(row.salesOrderPoMatchesPickTicket),
+      qtyOnPickTicketsMatch: Boolean(row.qtyOnPickTicketsMatch),
+      palletTagsMatchPickTicket: Boolean(row.palletTagsMatchPickTicket),
+      babyTagsAndLabelsRemoved: Boolean(row.babyTagsAndLabelsRemoved),
+      loadingSheetPalletQtyMatchesPickTicket: Boolean(row.loadingSheetPalletQtyMatchesPickTicket),
+      shipToAddressVerifiedWithClerk: Boolean(row.shipToAddressVerifiedWithClerk),
+      paperworkVerifiedByClerkOrManager: Boolean(row.paperworkVerifiedByClerkOrManager),
+      tempRecorderRequired: Boolean(row.tempRecorderRequired),
+      palletsOnChep: Boolean(row.palletsOnChep),
+      picturesTakenEachPallet: Boolean(row.picturesTakenEachPallet),
+      imagePaths: (() => {
+        try {
+          return JSON.parse(String(row.imagePathsJson || '[]'));
+        } catch {
+          return [];
+        }
+      })(),
+    };
+  }
+
+  async saveInboundDockCheckerForm(payload: any): Promise<any> {
+    const now = getLocalISOString();
+    const submittedAt = String(payload.submittedAt || now);
+
+    const result = this.db.prepare(`
+      INSERT INTO inbound_dock_checker_forms (
+        referenceNumber, company, doorId, checkinId, palletsOffloaded,
+        appliedAllFamousLabels, manifestMatchedPallets, qcIssues, qcIssueNotes,
+        damages, damageNotes, tempRecorderRemoved, trailerTemperatureChecked,
+        paperworkSubmittedToShippingReceiving, imagePathsJson, notes,
+        submittedBy, submittedAt, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      String(payload.referenceNumber || '').trim(),
+      String(payload.company || '').trim() || null,
+      Number.isFinite(Number(payload.doorId)) ? Number(payload.doorId) : null,
+      Number.isFinite(Number(payload.checkinId)) ? Number(payload.checkinId) : null,
+      Math.max(0, Math.round(Number(payload.palletsOffloaded || 0))),
+      payload.appliedAllFamousLabels ? 1 : 0,
+      payload.manifestMatchedPallets ? 1 : 0,
+      payload.qcIssues ? 1 : 0,
+      String(payload.qcIssueNotes || '').trim() || null,
+      payload.damages ? 1 : 0,
+      String(payload.damageNotes || '').trim() || null,
+      payload.tempRecorderRemoved ? 1 : 0,
+      payload.trailerTemperatureChecked ? 1 : 0,
+      payload.paperworkSubmittedToShippingReceiving ? 1 : 0,
+      JSON.stringify(Array.isArray(payload.imagePaths) ? payload.imagePaths : []),
+      String(payload.notes || '').trim() || null,
+      String(payload.submittedBy || 'System').trim(),
+      submittedAt,
+      now,
+      now
+    );
+
+    const row = this.db.prepare('SELECT * FROM inbound_dock_checker_forms WHERE id = ?').get(result.lastInsertRowid) as any;
+    return {
+      ...row,
+      palletsOffloaded: Number(row.palletsOffloaded || 0),
+      appliedAllFamousLabels: Boolean(row.appliedAllFamousLabels),
+      manifestMatchedPallets: Boolean(row.manifestMatchedPallets),
+      qcIssues: Boolean(row.qcIssues),
+      damages: Boolean(row.damages),
+      tempRecorderRemoved: Boolean(row.tempRecorderRemoved),
+      trailerTemperatureChecked: Boolean(row.trailerTemperatureChecked),
+      paperworkSubmittedToShippingReceiving: Boolean(row.paperworkSubmittedToShippingReceiving),
+      imagePaths: (() => {
+        try {
+          return JSON.parse(String(row.imagePathsJson || '[]'));
+        } catch {
+          return [];
+        }
+      })(),
+    };
+  }
+
+  async getDockCheckerFormsHistory(filters?: {
+    startDate?: string;
+    endDate?: string;
+    type?: 'inbound' | 'outbound' | 'all';
+    search?: string;
+  }): Promise<any[]> {
+    const normalizedType = String(filters?.type || 'all').toLowerCase();
+    const includeInbound = normalizedType === 'all' || normalizedType === 'inbound';
+    const includeOutbound = normalizedType === 'all' || normalizedType === 'outbound';
+    const searchText = String(filters?.search || '').trim().toLowerCase();
+    const likeValue = `%${searchText}%`;
+
+    const result: any[] = [];
+
+    if (includeOutbound) {
+      let query = 'SELECT * FROM outbound_dock_checker_forms WHERE 1=1';
+      const params: any[] = [];
+
+      if (filters?.startDate) {
+        query += ' AND submittedAt >= ?';
+        params.push(filters.startDate);
+      }
+      if (filters?.endDate) {
+        query += ' AND submittedAt <= ?';
+        params.push(filters.endDate);
+      }
+      if (searchText) {
+        query += ' AND (LOWER(COALESCE(referenceNumber, "")) LIKE ? OR LOWER(COALESCE(company, "")) LIKE ? OR LOWER(COALESCE(checkerName, "")) LIKE ? OR LOWER(COALESCE(forkliftOperatorName, "")) LIKE ? OR LOWER(COALESCE(notes, "")) LIKE ? OR LOWER(COALESCE(submittedBy, "")) LIKE ?)';
+        params.push(likeValue, likeValue, likeValue, likeValue, likeValue, likeValue);
+      }
+
+      const rows = this.db.prepare(`${query} ORDER BY submittedAt DESC`).all(...params) as any[];
+      rows.forEach((row) => {
+        result.push({
+          ...row,
+          formType: 'outbound',
+          imagePaths: (() => {
+            try {
+              return JSON.parse(String(row.imagePathsJson || '[]'));
+            } catch {
+              return [];
+            }
+          })(),
+        });
+      });
+    }
+
+    if (includeInbound) {
+      let query = 'SELECT * FROM inbound_dock_checker_forms WHERE 1=1';
+      const params: any[] = [];
+
+      if (filters?.startDate) {
+        query += ' AND submittedAt >= ?';
+        params.push(filters.startDate);
+      }
+      if (filters?.endDate) {
+        query += ' AND submittedAt <= ?';
+        params.push(filters.endDate);
+      }
+      if (searchText) {
+        query += ' AND (LOWER(COALESCE(referenceNumber, "")) LIKE ? OR LOWER(COALESCE(company, "")) LIKE ? OR LOWER(COALESCE(qcIssueNotes, "")) LIKE ? OR LOWER(COALESCE(damageNotes, "")) LIKE ? OR LOWER(COALESCE(notes, "")) LIKE ? OR LOWER(COALESCE(submittedBy, "")) LIKE ?)';
+        params.push(likeValue, likeValue, likeValue, likeValue, likeValue, likeValue);
+      }
+
+      const rows = this.db.prepare(`${query} ORDER BY submittedAt DESC`).all(...params) as any[];
+      rows.forEach((row) => {
+        result.push({
+          ...row,
+          formType: 'inbound',
+          imagePaths: (() => {
+            try {
+              return JSON.parse(String(row.imagePathsJson || '[]'));
+            } catch {
+              return [];
+            }
+          })(),
+        });
+      });
+    }
+
+    return result.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
   }
 
   updateCheckinCompletion(checkinId: number, actualPallets: number): void {

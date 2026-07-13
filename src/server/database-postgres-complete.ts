@@ -399,6 +399,8 @@ export class DatabaseService implements IDatabaseService {
           is_order_complete BOOLEAN NOT NULL DEFAULT false,
           quantities_correct BOOLEAN NOT NULL DEFAULT false,
           tags_verified BOOLEAN NOT NULL DEFAULT false,
+          famous_transactions_verified BOOLEAN NOT NULL DEFAULT false,
+          documentation_reviewed_signed_uploaded_and_emailed BOOLEAN NOT NULL DEFAULT false,
           lead_name TEXT,
           qc_name TEXT,
           manager_name TEXT,
@@ -418,6 +420,8 @@ export class DatabaseService implements IDatabaseService {
           is_order_complete BOOLEAN NOT NULL DEFAULT false,
           quantities_correct BOOLEAN NOT NULL DEFAULT false,
           tags_verified BOOLEAN NOT NULL DEFAULT false,
+          famous_transactions_verified BOOLEAN NOT NULL DEFAULT false,
+          documentation_reviewed_signed_uploaded_and_emailed BOOLEAN NOT NULL DEFAULT false,
           lead_name TEXT,
           qc_name TEXT,
           manager_name TEXT,
@@ -428,6 +432,58 @@ export class DatabaseService implements IDatabaseService {
           created_at TIMESTAMP NOT NULL DEFAULT NOW(),
           updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
           FOREIGN KEY (checkin_id) REFERENCES dock_checkins(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS outbound_dock_checker_forms (
+          id SERIAL PRIMARY KEY,
+          reference_number TEXT NOT NULL,
+          company TEXT,
+          door_id INTEGER,
+          checkin_id INTEGER,
+          pallets_offloaded INTEGER NOT NULL DEFAULT 0,
+          checker_name TEXT NOT NULL,
+          forklift_operator_name TEXT NOT NULL,
+          sales_order_po_matches_pick_ticket BOOLEAN NOT NULL DEFAULT false,
+          qty_on_pick_tickets_match BOOLEAN NOT NULL DEFAULT false,
+          pallet_tags_match_pick_ticket BOOLEAN NOT NULL DEFAULT false,
+          baby_tags_and_labels_removed BOOLEAN NOT NULL DEFAULT false,
+          loading_sheet_pallet_qty_matches_pick_ticket BOOLEAN NOT NULL DEFAULT false,
+          ship_to_address_verified_with_clerk BOOLEAN NOT NULL DEFAULT false,
+          pallets_loaded INTEGER NOT NULL DEFAULT 0,
+          paperwork_verified_by_clerk_or_manager BOOLEAN NOT NULL DEFAULT false,
+          temp_recorder_required BOOLEAN NOT NULL DEFAULT false,
+          pallets_on_chep BOOLEAN NOT NULL DEFAULT false,
+          pictures_taken_each_pallet BOOLEAN NOT NULL DEFAULT false,
+          image_paths_json TEXT,
+          notes TEXT,
+          submitted_by TEXT NOT NULL,
+          submitted_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS inbound_dock_checker_forms (
+          id SERIAL PRIMARY KEY,
+          reference_number TEXT NOT NULL,
+          company TEXT,
+          door_id INTEGER,
+          checkin_id INTEGER,
+          pallets_offloaded INTEGER NOT NULL DEFAULT 0,
+          applied_all_famous_labels BOOLEAN NOT NULL DEFAULT false,
+          manifest_matched_pallets BOOLEAN NOT NULL DEFAULT false,
+          qc_issues BOOLEAN NOT NULL DEFAULT false,
+          qc_issue_notes TEXT,
+          damages BOOLEAN NOT NULL DEFAULT false,
+          damage_notes TEXT,
+          temp_recorder_removed BOOLEAN NOT NULL DEFAULT false,
+          trailer_temperature_checked BOOLEAN NOT NULL DEFAULT false,
+          paperwork_submitted_to_shipping_receiving BOOLEAN NOT NULL DEFAULT false,
+          image_paths_json TEXT,
+          notes TEXT,
+          submitted_by TEXT NOT NULL,
+          submitted_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP NOT NULL
         );
 
         CREATE TABLE IF NOT EXISTS production_dock_statuses (
@@ -477,6 +533,20 @@ export class DatabaseService implements IDatabaseService {
           plan_payload JSONB NOT NULL,
           created_by TEXT,
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS extra_service_entries (
+          id SERIAL PRIMARY KEY,
+          service_date TEXT NOT NULL,
+          service_type TEXT NOT NULL,
+          unit_type TEXT NOT NULL,
+          quantity REAL NOT NULL,
+          worker_count INTEGER NOT NULL,
+          total_revenue REAL NOT NULL,
+          notes TEXT,
+          captured_by TEXT,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
         CREATE TABLE IF NOT EXISTS executives (
@@ -543,7 +613,13 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_prod_verification_submitted ON production_order_verifications(submitted_at);
         CREATE INDEX IF NOT EXISTS idx_outbound_verification_checkin ON outbound_checkin_verifications(checkin_id);
         CREATE INDEX IF NOT EXISTS idx_outbound_verification_submitted ON outbound_checkin_verifications(submitted_at);
+        CREATE INDEX IF NOT EXISTS idx_outbound_checker_submitted ON outbound_dock_checker_forms(submitted_at);
+        CREATE INDEX IF NOT EXISTS idx_outbound_checker_reference ON outbound_dock_checker_forms(reference_number);
+        CREATE INDEX IF NOT EXISTS idx_inbound_checker_submitted ON inbound_dock_checker_forms(submitted_at);
+        CREATE INDEX IF NOT EXISTS idx_inbound_checker_reference ON inbound_dock_checker_forms(reference_number);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
+        CREATE INDEX IF NOT EXISTS idx_extra_service_date ON extra_service_entries(service_date);
+        CREATE INDEX IF NOT EXISTS idx_extra_service_type_date ON extra_service_entries(service_type, service_date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_status ON department_shift_sessions(status);
@@ -626,6 +702,24 @@ export class DatabaseService implements IDatabaseService {
       // Migration: Add role column to executives
       await client.query(`
         ALTER TABLE executives ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'manager';
+      `);
+
+      // Migration: Add verification attestation columns for production and dock forms
+      await client.query(`
+        ALTER TABLE production_order_verifications
+        ADD COLUMN IF NOT EXISTS famous_transactions_verified BOOLEAN NOT NULL DEFAULT false;
+      `);
+      await client.query(`
+        ALTER TABLE production_order_verifications
+        ADD COLUMN IF NOT EXISTS documentation_reviewed_signed_uploaded_and_emailed BOOLEAN NOT NULL DEFAULT false;
+      `);
+      await client.query(`
+        ALTER TABLE outbound_checkin_verifications
+        ADD COLUMN IF NOT EXISTS famous_transactions_verified BOOLEAN NOT NULL DEFAULT false;
+      `);
+      await client.query(`
+        ALTER TABLE outbound_checkin_verifications
+        ADD COLUMN IF NOT EXISTS documentation_reviewed_signed_uploaded_and_emailed BOOLEAN NOT NULL DEFAULT false;
       `);
 
       // Migration: Add session_id column to messages
@@ -1255,6 +1349,67 @@ export class DatabaseService implements IDatabaseService {
 
     query += ' ORDER BY created_at DESC';
 
+    const result = await this.pool.query(query, params);
+    return this.toCamelCase(result.rows);
+  }
+
+  async createExtraServiceEntry(data: {
+    serviceDate: string;
+    serviceType: string;
+    unitType: string;
+    quantity: number;
+    workerCount: number;
+    totalRevenue: number;
+    notes?: string;
+    capturedBy?: string;
+  }): Promise<any> {
+    const now = getLocalISOString();
+    const result = await this.pool.query(`
+      INSERT INTO extra_service_entries (
+        service_date, service_type, unit_type, quantity, worker_count, total_revenue, notes, captured_by, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *
+    `, [
+      data.serviceDate,
+      data.serviceType,
+      data.unitType,
+      data.quantity,
+      data.workerCount,
+      data.totalRevenue,
+      data.notes || null,
+      data.capturedBy || null,
+      now,
+      now,
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getExtraServiceEntries(filters?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]> {
+    let query = 'SELECT * FROM extra_service_entries WHERE 1=1';
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (filters?.date) {
+      query += ` AND service_date = $${paramIndex++}`;
+      params.push(filters.date);
+    } else {
+      if (filters?.startDate) {
+        query += ` AND service_date >= $${paramIndex++}`;
+        params.push(filters.startDate);
+      }
+
+      if (filters?.endDate) {
+        query += ` AND service_date <= $${paramIndex++}`;
+        params.push(filters.endDate);
+      }
+    }
+
+    query += ' ORDER BY created_at DESC';
     const result = await this.pool.query(query, params);
     return this.toCamelCase(result.rows);
   }
@@ -2875,19 +3030,31 @@ export class DatabaseService implements IDatabaseService {
 
   async saveProductionOrderVerification(payload: any): Promise<any> {
     const submittedAt = payload.submittedAt || getLocalISOString();
-    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+    const isPassed = Boolean(
+      payload.isOrderComplete
+      && payload.quantitiesCorrect
+      && payload.tagsVerified
+      && payload.famousTransactionsVerified
+      && payload.documentationReviewedSignedUploadedAndEmailed
+      && payload.leadName
+      && payload.qcName
+      && payload.managerName
+    );
 
     const result = await this.pool.query(`
       INSERT INTO production_order_verifications (
         order_id, line, is_order_complete, quantities_correct, tags_verified,
+        famous_transactions_verified, documentation_reviewed_signed_uploaded_and_emailed,
         lead_name, qc_name, manager_name, notes, submitted_by, submitted_at,
         is_passed, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       ON CONFLICT (order_id) DO UPDATE SET
         line = EXCLUDED.line,
         is_order_complete = EXCLUDED.is_order_complete,
         quantities_correct = EXCLUDED.quantities_correct,
         tags_verified = EXCLUDED.tags_verified,
+        famous_transactions_verified = EXCLUDED.famous_transactions_verified,
+        documentation_reviewed_signed_uploaded_and_emailed = EXCLUDED.documentation_reviewed_signed_uploaded_and_emailed,
         lead_name = EXCLUDED.lead_name,
         qc_name = EXCLUDED.qc_name,
         manager_name = EXCLUDED.manager_name,
@@ -2903,6 +3070,8 @@ export class DatabaseService implements IDatabaseService {
       Boolean(payload.isOrderComplete),
       Boolean(payload.quantitiesCorrect),
       Boolean(payload.tagsVerified),
+      Boolean(payload.famousTransactionsVerified),
+      Boolean(payload.documentationReviewedSignedUploadedAndEmailed),
       payload.leadName || null,
       payload.qcName || null,
       payload.managerName || null,
@@ -2924,19 +3093,31 @@ export class DatabaseService implements IDatabaseService {
 
   async saveOutboundCheckinVerification(payload: any): Promise<any> {
     const submittedAt = payload.submittedAt || getLocalISOString();
-    const isPassed = Boolean(payload.isOrderComplete && payload.quantitiesCorrect && payload.tagsVerified && payload.leadName && payload.qcName && payload.managerName);
+    const isPassed = Boolean(
+      payload.isOrderComplete
+      && payload.quantitiesCorrect
+      && payload.tagsVerified
+      && payload.famousTransactionsVerified
+      && payload.documentationReviewedSignedUploadedAndEmailed
+      && payload.leadName
+      && payload.qcName
+      && payload.managerName
+    );
 
     const result = await this.pool.query(`
       INSERT INTO outbound_checkin_verifications (
         checkin_id, door_id, is_order_complete, quantities_correct, tags_verified,
+        famous_transactions_verified, documentation_reviewed_signed_uploaded_and_emailed,
         lead_name, qc_name, manager_name, notes, submitted_by, submitted_at,
         is_passed, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       ON CONFLICT (checkin_id) DO UPDATE SET
         door_id = EXCLUDED.door_id,
         is_order_complete = EXCLUDED.is_order_complete,
         quantities_correct = EXCLUDED.quantities_correct,
         tags_verified = EXCLUDED.tags_verified,
+        famous_transactions_verified = EXCLUDED.famous_transactions_verified,
+        documentation_reviewed_signed_uploaded_and_emailed = EXCLUDED.documentation_reviewed_signed_uploaded_and_emailed,
         lead_name = EXCLUDED.lead_name,
         qc_name = EXCLUDED.qc_name,
         manager_name = EXCLUDED.manager_name,
@@ -2952,6 +3133,8 @@ export class DatabaseService implements IDatabaseService {
       Boolean(payload.isOrderComplete),
       Boolean(payload.quantitiesCorrect),
       Boolean(payload.tagsVerified),
+      Boolean(payload.famousTransactionsVerified),
+      Boolean(payload.documentationReviewedSignedUploadedAndEmailed),
       payload.leadName || null,
       payload.qcName || null,
       payload.managerName || null,
@@ -2969,6 +3152,164 @@ export class DatabaseService implements IDatabaseService {
   async getOutboundCheckinVerification(checkinId: number): Promise<any | null> {
     const result = await this.pool.query('SELECT * FROM outbound_checkin_verifications WHERE checkin_id = $1', [checkinId]);
     return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
+  }
+
+  async saveOutboundDockCheckerForm(payload: any): Promise<any> {
+    const now = getLocalISOString();
+    const submittedAt = payload.submittedAt || now;
+
+    const result = await this.pool.query(`
+      INSERT INTO outbound_dock_checker_forms (
+        reference_number, company, door_id, checkin_id, pallets_offloaded,
+        checker_name, forklift_operator_name,
+        sales_order_po_matches_pick_ticket, qty_on_pick_tickets_match, pallet_tags_match_pick_ticket,
+        baby_tags_and_labels_removed, loading_sheet_pallet_qty_matches_pick_ticket,
+        ship_to_address_verified_with_clerk, pallets_loaded, paperwork_verified_by_clerk_or_manager,
+        temp_recorder_required, pallets_on_chep, pictures_taken_each_pallet,
+        image_paths_json, notes, submitted_by, submitted_at, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      RETURNING *
+    `, [
+      String(payload.referenceNumber || '').trim(),
+      String(payload.company || '').trim() || null,
+      Number.isFinite(Number(payload.doorId)) ? Number(payload.doorId) : null,
+      Number.isFinite(Number(payload.checkinId)) ? Number(payload.checkinId) : null,
+      Math.max(0, Math.round(Number(payload.palletsOffloaded || 0))),
+      String(payload.checkerName || '').trim(),
+      String(payload.forkliftOperatorName || '').trim(),
+      Boolean(payload.salesOrderPoMatchesPickTicket),
+      Boolean(payload.qtyOnPickTicketsMatch),
+      Boolean(payload.palletTagsMatchPickTicket),
+      Boolean(payload.babyTagsAndLabelsRemoved),
+      Boolean(payload.loadingSheetPalletQtyMatchesPickTicket),
+      Boolean(payload.shipToAddressVerifiedWithClerk),
+      Math.max(0, Math.round(Number(payload.palletsLoaded || 0))),
+      Boolean(payload.paperworkVerifiedByClerkOrManager),
+      Boolean(payload.tempRecorderRequired),
+      Boolean(payload.palletsOnChep),
+      Boolean(payload.picturesTakenEachPallet),
+      JSON.stringify(Array.isArray(payload.imagePaths) ? payload.imagePaths : []),
+      String(payload.notes || '').trim() || null,
+      String(payload.submittedBy || 'System').trim(),
+      submittedAt,
+      now,
+      now,
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async saveInboundDockCheckerForm(payload: any): Promise<any> {
+    const now = getLocalISOString();
+    const submittedAt = payload.submittedAt || now;
+
+    const result = await this.pool.query(`
+      INSERT INTO inbound_dock_checker_forms (
+        reference_number, company, door_id, checkin_id, pallets_offloaded,
+        applied_all_famous_labels, manifest_matched_pallets, qc_issues, qc_issue_notes,
+        damages, damage_notes, temp_recorder_removed, trailer_temperature_checked,
+        paperwork_submitted_to_shipping_receiving, image_paths_json, notes,
+        submitted_by, submitted_at, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      RETURNING *
+    `, [
+      String(payload.referenceNumber || '').trim(),
+      String(payload.company || '').trim() || null,
+      Number.isFinite(Number(payload.doorId)) ? Number(payload.doorId) : null,
+      Number.isFinite(Number(payload.checkinId)) ? Number(payload.checkinId) : null,
+      Math.max(0, Math.round(Number(payload.palletsOffloaded || 0))),
+      Boolean(payload.appliedAllFamousLabels),
+      Boolean(payload.manifestMatchedPallets),
+      Boolean(payload.qcIssues),
+      String(payload.qcIssueNotes || '').trim() || null,
+      Boolean(payload.damages),
+      String(payload.damageNotes || '').trim() || null,
+      Boolean(payload.tempRecorderRemoved),
+      Boolean(payload.trailerTemperatureChecked),
+      Boolean(payload.paperworkSubmittedToShippingReceiving),
+      JSON.stringify(Array.isArray(payload.imagePaths) ? payload.imagePaths : []),
+      String(payload.notes || '').trim() || null,
+      String(payload.submittedBy || 'System').trim(),
+      submittedAt,
+      now,
+      now,
+    ]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getDockCheckerFormsHistory(filters?: {
+    startDate?: string;
+    endDate?: string;
+    type?: 'inbound' | 'outbound' | 'all';
+    search?: string;
+  }): Promise<any[]> {
+    const normalizedType = String(filters?.type || 'all').toLowerCase();
+    const includeInbound = normalizedType === 'all' || normalizedType === 'inbound';
+    const includeOutbound = normalizedType === 'all' || normalizedType === 'outbound';
+    const searchText = String(filters?.search || '').trim();
+    const searchLike = `%${searchText}%`;
+    const historyRows: any[] = [];
+
+    if (includeOutbound) {
+      let query = 'SELECT * FROM outbound_dock_checker_forms WHERE 1=1';
+      const params: any[] = [];
+
+      if (filters?.startDate) {
+        params.push(filters.startDate);
+        query += ` AND submitted_at >= $${params.length}`;
+      }
+      if (filters?.endDate) {
+        params.push(filters.endDate);
+        query += ` AND submitted_at <= $${params.length}`;
+      }
+      if (searchText) {
+        params.push(searchLike);
+        query += ` AND (
+          reference_number ILIKE $${params.length}
+          OR COALESCE(company, '') ILIKE $${params.length}
+          OR COALESCE(checker_name, '') ILIKE $${params.length}
+          OR COALESCE(forklift_operator_name, '') ILIKE $${params.length}
+          OR COALESCE(notes, '') ILIKE $${params.length}
+          OR COALESCE(submitted_by, '') ILIKE $${params.length}
+        )`;
+      }
+
+      const result = await this.pool.query(`${query} ORDER BY submitted_at DESC`, params);
+      const rows = this.toCamelCase(result.rows).map((row: any) => ({ ...row, formType: 'outbound' }));
+      historyRows.push(...rows);
+    }
+
+    if (includeInbound) {
+      let query = 'SELECT * FROM inbound_dock_checker_forms WHERE 1=1';
+      const params: any[] = [];
+
+      if (filters?.startDate) {
+        params.push(filters.startDate);
+        query += ` AND submitted_at >= $${params.length}`;
+      }
+      if (filters?.endDate) {
+        params.push(filters.endDate);
+        query += ` AND submitted_at <= $${params.length}`;
+      }
+      if (searchText) {
+        params.push(searchLike);
+        query += ` AND (
+          reference_number ILIKE $${params.length}
+          OR COALESCE(company, '') ILIKE $${params.length}
+          OR COALESCE(qc_issue_notes, '') ILIKE $${params.length}
+          OR COALESCE(damage_notes, '') ILIKE $${params.length}
+          OR COALESCE(notes, '') ILIKE $${params.length}
+          OR COALESCE(submitted_by, '') ILIKE $${params.length}
+        )`;
+      }
+
+      const result = await this.pool.query(`${query} ORDER BY submitted_at DESC`, params);
+      const rows = this.toCamelCase(result.rows).map((row: any) => ({ ...row, formType: 'inbound' }));
+      historyRows.push(...rows);
+    }
+
+    return historyRows.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
   }
 
   async markLoadStart(checkinId: number): Promise<void> {

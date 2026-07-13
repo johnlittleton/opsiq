@@ -49,6 +49,30 @@ export const HomePage: React.FC = () => {
       description: 'Comprehensive driver check-in records',
       onClick: () => navigate('/checkin-history'),
     },
+    {
+      icon: '🧾',
+      title: 'Extra Services',
+      description: 'Capture restacking, case pick, and other service activity',
+      onClick: () => navigate('/extra-services'),
+    },
+    {
+      icon: '📤',
+      title: 'Outbound Checker Form',
+      description: 'Submit outbound dock verification and pallet checks',
+      onClick: () => navigate('/dock-checker/outbound'),
+    },
+    {
+      icon: '📥',
+      title: 'Inbound Checker Form',
+      description: 'Submit inbound manifest, labels, QC, and damage checks',
+      onClick: () => navigate('/dock-checker/inbound'),
+    },
+    {
+      icon: '📚',
+      title: 'Dock Checker History',
+      description: 'Search all inbound and outbound checker forms by date',
+      onClick: () => navigate('/dock-checker/history'),
+    },
   ];
 
   const appointmentCards = [

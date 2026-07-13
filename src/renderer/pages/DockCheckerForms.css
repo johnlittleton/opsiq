@@ -1,0 +1,464 @@
+.dock-checker-page {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 14px;
+}
+
+.dock-checker-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dock-checker-page__title {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #f8fafc;
+}
+
+.dock-checker-page__home-btn {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.dock-checker-page__home-btn:hover {
+  background: #334155;
+}
+
+.dock-checker-form {
+  background: #111827;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 12px;
+  height: calc(100vh - 72px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dock-checker-form__scroll {
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.dock-checker-form__file-input {
+  display: none;
+}
+
+.dock-checker-form__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dock-checker-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dock-checker-form__field label {
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.dock-checker-form__field input,
+.dock-checker-form__field textarea,
+.dock-checker-form__field select {
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 8px;
+  font-size: 0.86rem;
+}
+
+.dock-checker-form__field textarea {
+  resize: vertical;
+}
+
+.dock-checker-form__questions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dock-checker-form__question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #0b1220;
+}
+
+.dock-checker-form__question span {
+  color: #e5e7eb;
+  font-size: 0.8rem;
+}
+
+.dock-checker-form__bool {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dock-checker-form__bool label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+}
+
+.dock-checker-form__upload-row {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1px dashed #475569;
+  border-radius: 10px;
+  padding: 10px;
+  background: #0b1220;
+}
+
+.dock-checker-form__upload-buttons {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dock-checker-form__upload-list {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dock-checker-form__upload-chip {
+  border: 1px solid #334155;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  background: #111827;
+}
+
+.dock-checker-form__upload-thumb {
+  width: 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.dock-checker-form__upload-thumb img {
+  width: 96px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #000;
+}
+
+.dock-checker-form__upload-thumb span {
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-checker-form__upload-thumb-status {
+  color: #86efac;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.dock-checker-form__upload-thumb-status::before {
+  content: "\2713 ";
+}
+
+.dock-checker-form__upload-thumb-time {
+  color: #93c5fd;
+  font-size: 0.66rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-checker-form__upload-thumb-name {
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dock-checker-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1f2937;
+  background: #111827;
+}
+
+.dock-checker-form__actions button {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dock-checker-form__submit {
+  background: #0ea5e9;
+  border-color: #0284c7;
+  color: #f8fafc;
+}
+
+.dock-checker-form__submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.dock-checker-form__secondary {
+  background: #1f2937;
+  color: #e2e8f0;
+}
+
+.dock-checker-camera-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(2, 6, 23, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.dock-checker-camera-modal__panel {
+  width: min(900px, 100%);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  background: #0b1220;
+  padding: 12px;
+}
+
+.dock-checker-camera-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dock-checker-camera-modal__header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dock-checker-camera-modal__header button {
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #1f2937;
+  color: #e2e8f0;
+}
+
+.dock-checker-camera-modal__controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.dock-checker-camera-modal__controls label {
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.dock-checker-camera-modal__controls select {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 7px 10px;
+  font-size: 0.84rem;
+}
+
+.dock-checker-camera-modal__video,
+.dock-checker-camera-modal__preview {
+  width: 100%;
+  max-height: 70vh;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #000;
+  object-fit: contain;
+}
+
+.dock-checker-camera-modal__error {
+  border: 1px solid #7f1d1d;
+  background: #2b0f0f;
+  color: #fecaca;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.dock-checker-camera-modal__status {
+  margin-top: 10px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+}
+
+.dock-checker-camera-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dock-checker-history__toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.dock-checker-history__toolbar input,
+.dock-checker-history__toolbar select {
+  background: #111827;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #f8fafc;
+  padding: 10px;
+}
+
+.dock-checker-history__list {
+  display: grid;
+  gap: 10px;
+}
+
+.dock-checker-history__item {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #111827;
+  padding: 12px;
+}
+
+.dock-checker-history__item-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dock-checker-history__badge {
+  border: 1px solid #475569;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dock-checker-history__meta {
+  color: #94a3b8;
+  font-size: 0.84rem;
+}
+
+.dock-checker-history__data {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 12px;
+  color: #cbd5e1;
+  font-size: 0.87rem;
+}
+
+.dock-checker-history__images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.dock-checker-history__images a {
+  color: #38bdf8;
+  font-size: 0.82rem;
+}
+
+.dock-checker-history__thumb {
+  width: 110px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.dock-checker-history__thumb img {
+  width: 110px;
+  height: 82px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #000;
+}
+
+.dock-checker-history__thumb span {
+  color: #cbd5e1;
+  font-size: 0.72rem;
+}
+
+.dock-checker-history__thumb-name {
+  color: #cbd5e1;
+  font-size: 0.72rem;
+}
+
+.dock-checker-history__thumb-time {
+  color: #93c5fd;
+  font-size: 0.67rem;
+  line-height: 1.2;
+}
+
+@media (max-width: 1100px) {
+  .dock-checker-page {
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .dock-checker-form {
+    height: auto;
+    overflow: visible;
+  }
+
+  .dock-checker-form__scroll {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .dock-checker-form__questions {
+    grid-template-columns: 1fr;
+  }
+}

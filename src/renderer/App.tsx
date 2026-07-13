@@ -36,8 +36,12 @@ import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
 import StorageBilling from './pages/StorageBilling';
+import ExtraServices from './pages/ExtraServices';
 import AIDualEntry from './pages/AIDualEntry';
 import DriverAvatarPage from './pages/DriverAvatarPage';
+import OutboundDockCheckerForm from './pages/OutboundDockCheckerForm';
+import InboundDockCheckerForm from './pages/InboundDockCheckerForm';
+import DockCheckerHistory from './pages/DockCheckerHistory';
 import { hasRestrictedFeatureAccess } from './utils/restrictedAccess';
 
 type UpdaterStatus = {
@@ -89,6 +93,9 @@ const AppRoutes: React.FC = () => {
       <Route path="/scheduler" element={<Scheduler />} />
       <Route path="/history" element={<DockHistory />} />
       <Route path="/checkin-history" element={<CheckInHistory />} />
+      <Route path="/dock-checker/outbound" element={<OutboundDockCheckerForm />} />
+      <Route path="/dock-checker/inbound" element={<InboundDockCheckerForm />} />
+      <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />
       <Route path="/production" element={<ProductionKPI />} />
       <Route path="/production-kpi-history" element={<ProductionKPIHistory />} />
@@ -113,6 +120,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/downtime-history" element={<DowntimeHistory />} />
       <Route path="/settings" element={<Settings />} />
       <Route path="/storage-billing" element={<StorageBilling />} />
+      <Route path="/extra-services" element={<ExtraServices />} />
       <Route
         path="/ai-dual-entry"
         element={hasRestrictedAccess ? <AIDualEntry /> : <HomePage />}

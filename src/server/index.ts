@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
 import path from 'path';
 import fs from 'fs';
+import multer from 'multer';
 import { ChildProcess, spawn } from 'child_process';
 // Use factory to switch between SQLite (local) and Postgres (Railway)
 import { db } from './db-factory';
@@ -45,6 +46,38 @@ const io = new SocketServer(httpServer, {
 
 app.use(cors());
 app.use(express.json());
+
+const railwayVolumeRoot = String(process.env.RAILWAY_VOLUME_MOUNT_PATH || '').trim();
+const dockCheckerUploadsDir = railwayVolumeRoot
+  ? path.join(railwayVolumeRoot, 'dock-checker-uploads')
+  : path.join(process.cwd(), 'data', 'dock-checker-uploads');
+fs.mkdirSync(dockCheckerUploadsDir, { recursive: true });
+app.use('/uploads/dock-checker', express.static(dockCheckerUploadsDir));
+
+const dockCheckerUploadStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, dockCheckerUploadsDir),
+  filename: (_req, file, cb) => {
+    const safeOriginal = String(file.originalname || 'upload')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(-120);
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeOriginal}`);
+  },
+});
+
+const dockCheckerUpload = multer({
+  storage: dockCheckerUploadStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    if (mime.startsWith('image/')) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Only image uploads are allowed.'));
+  },
+});
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY?.trim();
 const OPENAI_MODEL = process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
@@ -245,6 +278,83 @@ const toNumericString = (value: unknown): string => {
   const normalized = raw.replace(/,/g, '');
   const asNumber = Number(normalized);
   return Number.isFinite(asNumber) ? String(asNumber) : raw;
+};
+
+const EXTRA_SERVICE_RATE_CARD: Record<string, { unitType: 'pallet' | 'case'; unitRate: number }> = {
+  RESTACKING: { unitType: 'pallet', unitRate: 50 },
+  REPALLETIZE: { unitType: 'pallet', unitRate: 50 },
+  FORCED_AIR_COOLING: { unitType: 'pallet', unitRate: 50 },
+  CASE_PICKING: { unitType: 'case', unitRate: 0.95 },
+  RESTRAPPING: { unitType: 'pallet', unitRate: 10 },
+  PALLET_PULL_3RD_PARTY_QC: { unitType: 'pallet', unitRate: 10 },
+};
+
+const EXTRA_SERVICE_LABELS: Record<string, string> = {
+  RESTACKING: 'Restacking',
+  REPALLETIZE: 'Repalletize Pallet',
+  FORCED_AIR_COOLING: 'Forced Air Cooling',
+  CASE_PICKING: 'Case Picking',
+  RESTRAPPING: 'Restrapping Pallet',
+  PALLET_PULL_3RD_PARTY_QC: 'Pallet Pull for 3rd Party QC',
+};
+
+const summarizeExtraServices = (entries: any[]) => {
+  const byType: Record<string, {
+    serviceType: string;
+    label: string;
+    unitType: string;
+    entryCount: number;
+    totalQuantity: number;
+    totalWorkers: number;
+    totalRevenue: number;
+  }> = {};
+
+  let totalRevenue = 0;
+  let totalQuantity = 0;
+  let totalWorkers = 0;
+
+  (entries || []).forEach((entry) => {
+    const serviceType = String(entry?.serviceType || '').trim().toUpperCase();
+    const label = EXTRA_SERVICE_LABELS[serviceType] || serviceType;
+    const unitType = String(entry?.unitType || 'unit');
+    const quantity = Math.max(0, Number(entry?.quantity || 0));
+    const workers = Math.max(0, Number(entry?.workerCount || 0));
+    const revenue = Math.max(0, Number(entry?.totalRevenue || 0));
+
+    totalRevenue += revenue;
+    totalQuantity += quantity;
+    totalWorkers += workers;
+
+    if (!byType[serviceType]) {
+      byType[serviceType] = {
+        serviceType,
+        label,
+        unitType,
+        entryCount: 0,
+        totalQuantity: 0,
+        totalWorkers: 0,
+        totalRevenue: 0,
+      };
+    }
+
+    byType[serviceType].entryCount += 1;
+    byType[serviceType].totalQuantity += quantity;
+    byType[serviceType].totalWorkers += workers;
+    byType[serviceType].totalRevenue += revenue;
+  });
+
+  const topServices = Object.values(byType)
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, 5);
+
+  return {
+    entryCount: (entries || []).length,
+    totalRevenue,
+    totalQuantity,
+    totalWorkers,
+    byType: Object.values(byType),
+    topServices,
+  };
 };
 
 const sanitizeReceivingLine = (input: unknown): Record<string, unknown> => {
@@ -879,11 +989,13 @@ app.post('/api/doors/:doorId/clear', async (req, res) => {
       : null;
     const checkin = targetDoor?.checkin;
 
-    if (checkin && String(checkin.inboundOutbound || '').toLowerCase() === 'outbound') {
+    const checkinType = String(checkin?.inboundOutbound || '').trim().toLowerCase();
+    if (checkin && (checkinType === 'inbound' || checkinType === 'outbound')) {
       const verification = await db.getOutboundCheckinVerification(Number(checkin.id));
       if (!verification || !verification.isPassed) {
+        const checkinTypeLabel = checkinType === 'inbound' ? 'Inbound' : 'Outbound';
         return res.status(409).json({
-          error: `Outbound verification form is required before clearing Door ${data.doorId}.`,
+          error: `${checkinTypeLabel} verification form is required before clearing Door ${data.doorId}.`,
         });
       }
     }
@@ -1693,6 +1805,188 @@ app.delete('/api/appointments/:id', async (req, res) => {
   }
 });
 
+// ==================== DOCK CHECKER FORM API ====================
+
+app.post('/api/dock-checker/upload-image', dockCheckerUpload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image uploaded.' });
+    }
+
+    const imageUrl = `/uploads/dock-checker/${req.file.filename}`;
+    res.json({
+      filename: req.file.filename,
+      url: imageUrl,
+      size: req.file.size,
+      mimeType: req.file.mimetype,
+      uploadedAt: getLocalISOString(),
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to upload image' });
+  }
+});
+
+const isBoolean = (value: unknown): value is boolean => typeof value === 'boolean';
+const isNonNegativeNumber = (value: unknown): boolean => Number.isFinite(Number(value)) && Number(value) >= 0;
+
+app.post('/api/dock-checker/outbound', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const requiredBooleanFields = [
+      'salesOrderPoMatchesPickTicket',
+      'qtyOnPickTicketsMatch',
+      'palletTagsMatchPickTicket',
+      'babyTagsAndLabelsRemoved',
+      'loadingSheetPalletQtyMatchesPickTicket',
+      'shipToAddressVerifiedWithClerk',
+      'paperworkVerifiedByClerkOrManager',
+      'tempRecorderRequired',
+      'palletsOnChep',
+      'picturesTakenEachPallet',
+    ];
+
+    const missingBooleanField = requiredBooleanFields.find((field) => !isBoolean(body[field]));
+    if (missingBooleanField) {
+      return res.status(400).json({ error: `Field ${missingBooleanField} must be true or false.` });
+    }
+
+    if (!String(body.referenceNumber || '').trim()) {
+      return res.status(400).json({ error: 'Reference number (Sales Order/PO) is required.' });
+    }
+    if (!String(body.checkerName || '').trim()) {
+      return res.status(400).json({ error: 'Checker name is required.' });
+    }
+    if (!String(body.forkliftOperatorName || '').trim()) {
+      return res.status(400).json({ error: 'Forklift operator name is required.' });
+    }
+    if (!isNonNegativeNumber(body.palletsOffloaded)) {
+      return res.status(400).json({ error: 'How many pallets were off loaded must be a non-negative number.' });
+    }
+    if (!isNonNegativeNumber(body.palletsLoaded)) {
+      return res.status(400).json({ error: 'How many pallets were loaded must be a non-negative number.' });
+    }
+    if (!Array.isArray(body.imagePaths)) {
+      return res.status(400).json({ error: 'imagePaths must be an array.' });
+    }
+
+    const payload = {
+      referenceNumber: String(body.referenceNumber).trim(),
+      company: String(body.company || '').trim(),
+      doorId: body.doorId,
+      checkinId: body.checkinId,
+      palletsOffloaded: Number(body.palletsOffloaded),
+      checkerName: String(body.checkerName).trim(),
+      forkliftOperatorName: String(body.forkliftOperatorName).trim(),
+      salesOrderPoMatchesPickTicket: Boolean(body.salesOrderPoMatchesPickTicket),
+      qtyOnPickTicketsMatch: Boolean(body.qtyOnPickTicketsMatch),
+      palletTagsMatchPickTicket: Boolean(body.palletTagsMatchPickTicket),
+      babyTagsAndLabelsRemoved: Boolean(body.babyTagsAndLabelsRemoved),
+      loadingSheetPalletQtyMatchesPickTicket: Boolean(body.loadingSheetPalletQtyMatchesPickTicket),
+      shipToAddressVerifiedWithClerk: Boolean(body.shipToAddressVerifiedWithClerk),
+      palletsLoaded: Number(body.palletsLoaded),
+      paperworkVerifiedByClerkOrManager: Boolean(body.paperworkVerifiedByClerkOrManager),
+      tempRecorderRequired: Boolean(body.tempRecorderRequired),
+      palletsOnChep: Boolean(body.palletsOnChep),
+      picturesTakenEachPallet: Boolean(body.picturesTakenEachPallet),
+      imagePaths: body.imagePaths,
+      notes: String(body.notes || '').trim(),
+      submittedBy: String(body.submittedBy || body.updatedBy || 'Dock Team').trim(),
+      submittedAt: getLocalISOString(),
+    };
+
+    const saved = await db.saveOutboundDockCheckerForm(payload);
+    res.json(saved);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to save outbound dock checker form' });
+  }
+});
+
+app.post('/api/dock-checker/inbound', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const requiredBooleanFields = [
+      'appliedAllFamousLabels',
+      'manifestMatchedPallets',
+      'qcIssues',
+      'damages',
+      'tempRecorderRemoved',
+      'trailerTemperatureChecked',
+      'paperworkSubmittedToShippingReceiving',
+    ];
+
+    const missingBooleanField = requiredBooleanFields.find((field) => !isBoolean(body[field]));
+    if (missingBooleanField) {
+      return res.status(400).json({ error: `Field ${missingBooleanField} must be true or false.` });
+    }
+
+    if (!String(body.referenceNumber || '').trim()) {
+      return res.status(400).json({ error: 'Reference number (Sales Order/PO) is required.' });
+    }
+    if (!isNonNegativeNumber(body.palletsOffloaded)) {
+      return res.status(400).json({ error: 'How many pallets were off loaded must be a non-negative number.' });
+    }
+    if (!Array.isArray(body.imagePaths)) {
+      return res.status(400).json({ error: 'imagePaths must be an array.' });
+    }
+
+    const payload = {
+      referenceNumber: String(body.referenceNumber).trim(),
+      company: String(body.company || '').trim(),
+      doorId: body.doorId,
+      checkinId: body.checkinId,
+      palletsOffloaded: Number(body.palletsOffloaded),
+      appliedAllFamousLabels: Boolean(body.appliedAllFamousLabels),
+      manifestMatchedPallets: Boolean(body.manifestMatchedPallets),
+      qcIssues: Boolean(body.qcIssues),
+      qcIssueNotes: String(body.qcIssueNotes || '').trim(),
+      damages: Boolean(body.damages),
+      damageNotes: String(body.damageNotes || '').trim(),
+      tempRecorderRemoved: Boolean(body.tempRecorderRemoved),
+      trailerTemperatureChecked: Boolean(body.trailerTemperatureChecked),
+      paperworkSubmittedToShippingReceiving: Boolean(body.paperworkSubmittedToShippingReceiving),
+      imagePaths: body.imagePaths,
+      notes: String(body.notes || '').trim(),
+      submittedBy: String(body.submittedBy || body.updatedBy || 'Dock Team').trim(),
+      submittedAt: getLocalISOString(),
+    };
+
+    const saved = await db.saveInboundDockCheckerForm(payload);
+    res.json(saved);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to save inbound dock checker form' });
+  }
+});
+
+app.get('/api/dock-checker/history', async (req, res) => {
+  try {
+    const history = await db.getDockCheckerFormsHistory({
+      startDate: String(req.query.startDate || '').trim() || undefined,
+      endDate: String(req.query.endDate || '').trim() || undefined,
+      type: (String(req.query.type || 'all').toLowerCase() as 'inbound' | 'outbound' | 'all'),
+      search: String(req.query.search || '').trim() || undefined,
+    });
+
+    const normalized = (Array.isArray(history) ? history : []).map((entry: any) => {
+      let imagePaths = entry.imagePaths;
+      if (!Array.isArray(imagePaths)) {
+        try {
+          imagePaths = JSON.parse(String(entry.imagePathsJson || '[]'));
+        } catch {
+          imagePaths = [];
+        }
+      }
+      return {
+        ...entry,
+        imagePaths,
+      };
+    });
+
+    res.json(normalized);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load dock checker history' });
+  }
+});
+
 // ==================== AUTO-UPDATER ENDPOINTS ====================
 
 // Serve update files for electron-updater
@@ -2179,6 +2473,8 @@ app.post('/api/verification/production/:orderId', async (req, res) => {
       isOrderComplete: Boolean(req.body?.isOrderComplete),
       quantitiesCorrect: Boolean(req.body?.quantitiesCorrect),
       tagsVerified: Boolean(req.body?.tagsVerified),
+      famousTransactionsVerified: Boolean(req.body?.famousTransactionsVerified),
+      documentationReviewedSignedUploadedAndEmailed: Boolean(req.body?.documentationReviewedSignedUploadedAndEmailed),
       leadName: String(req.body?.leadName || '').trim(),
       qcName: String(req.body?.qcName || '').trim(),
       managerName: String(req.body?.managerName || '').trim(),
@@ -2190,12 +2486,14 @@ app.post('/api/verification/production/:orderId', async (req, res) => {
     const isPassed = payload.isOrderComplete
       && payload.quantitiesCorrect
       && payload.tagsVerified
+      && payload.famousTransactionsVerified
+      && payload.documentationReviewedSignedUploadedAndEmailed
       && payload.leadName
       && payload.qcName
       && payload.managerName;
 
     if (!isPassed) {
-      return res.status(400).json({ error: 'All checklist items and Lead/QC/Manager sign-offs are required.' });
+      return res.status(400).json({ error: 'All checklist items, Famous/accounting attestations, and Lead/QC/Manager sign-offs are required.' });
     }
 
     const saved = await db.saveProductionOrderVerification(payload);
@@ -2267,6 +2565,8 @@ app.post('/api/verification/outbound/:checkinId', async (req, res) => {
       isOrderComplete: Boolean(req.body?.isOrderComplete),
       quantitiesCorrect: Boolean(req.body?.quantitiesCorrect),
       tagsVerified: Boolean(req.body?.tagsVerified),
+      famousTransactionsVerified: Boolean(req.body?.famousTransactionsVerified),
+      documentationReviewedSignedUploadedAndEmailed: Boolean(req.body?.documentationReviewedSignedUploadedAndEmailed),
       leadName: String(req.body?.leadName || '').trim(),
       qcName: String(req.body?.qcName || '').trim(),
       managerName: String(req.body?.managerName || '').trim(),
@@ -2278,12 +2578,14 @@ app.post('/api/verification/outbound/:checkinId', async (req, res) => {
     const isPassed = payload.isOrderComplete
       && payload.quantitiesCorrect
       && payload.tagsVerified
+      && payload.famousTransactionsVerified
+      && payload.documentationReviewedSignedUploadedAndEmailed
       && payload.leadName
       && payload.qcName
       && payload.managerName;
 
     if (!isPassed) {
-      return res.status(400).json({ error: 'All checklist items and Lead/QC/Manager sign-offs are required.' });
+      return res.status(400).json({ error: 'All checklist items, Famous/accounting attestations, and Lead/QC/Manager sign-offs are required.' });
     }
 
     const saved = await db.saveOutboundCheckinVerification(payload);
@@ -2324,10 +2626,12 @@ app.post('/api/checkins/:checkinId/complete', async (req, res) => {
       return res.status(404).json({ error: 'Check-in not found' });
     }
 
-    if (String(checkin.inboundOutbound || '').toLowerCase() === 'outbound') {
+    const checkinType = String(checkin.inboundOutbound || '').trim().toLowerCase();
+    if (checkinType === 'inbound' || checkinType === 'outbound') {
       const verification = await db.getOutboundCheckinVerification(checkinId);
       if (!verification || !verification.isPassed) {
-        return res.status(409).json({ error: 'Outbound verification form is required before completing this check-in.' });
+        const checkinTypeLabel = checkinType === 'inbound' ? 'Inbound' : 'Outbound';
+        return res.status(409).json({ error: `${checkinTypeLabel} verification form is required before completing this check-in.` });
       }
     }
 
@@ -2389,6 +2693,67 @@ app.get('/api/storage/billing', async (req, res) => {
   } catch (error: any) {
     console.error('❌ Error in GET /api/storage/billing:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/services/extra', async (req, res) => {
+  try {
+    const date = String(req.query.date || '').trim() || undefined;
+    const startDate = String(req.query.startDate || '').trim() || undefined;
+    const endDate = String(req.query.endDate || '').trim() || undefined;
+
+    const entries = await db.getExtraServiceEntries({ date, startDate, endDate });
+    const summary = summarizeExtraServices(Array.isArray(entries) ? entries : []);
+
+    res.json({
+      entries,
+      summary,
+      serviceOptions: Object.entries(EXTRA_SERVICE_LABELS).map(([serviceType, label]) => ({
+        serviceType,
+        label,
+        unitType: EXTRA_SERVICE_RATE_CARD[serviceType]?.unitType || 'unit',
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load extra services' });
+  }
+});
+
+app.post('/api/services/extra', async (req, res) => {
+  try {
+    const serviceType = String(req.body?.serviceType || '').trim().toUpperCase();
+    const rateConfig = EXTRA_SERVICE_RATE_CARD[serviceType];
+    if (!rateConfig) {
+      return res.status(400).json({ error: 'Invalid service type' });
+    }
+
+    const quantity = Number(req.body?.quantity || 0);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Quantity must be greater than 0' });
+    }
+
+    const workerCount = Number(req.body?.workerCount || 0);
+    if (!Number.isFinite(workerCount) || workerCount <= 0) {
+      return res.status(400).json({ error: 'Worker count must be greater than 0' });
+    }
+
+    const serviceDate = String(req.body?.serviceDate || '').trim() || getLocalISOString().slice(0, 10);
+    const totalRevenue = quantity * rateConfig.unitRate;
+
+    const created = await db.createExtraServiceEntry({
+      serviceDate,
+      serviceType,
+      unitType: rateConfig.unitType,
+      quantity,
+      workerCount,
+      totalRevenue,
+      notes: String(req.body?.notes || '').trim(),
+      capturedBy: String(req.body?.capturedBy || 'Ops IQ').trim(),
+    });
+
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to save extra service' });
   }
 });
 

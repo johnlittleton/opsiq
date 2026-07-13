@@ -10,10 +10,10 @@
 
 .combined-live-dashboard__content {
   height: calc(100vh - 40px);
-  padding: 8px 10px 10px;
+  padding: 4px 6px 6px;
   display: grid;
-  grid-template-rows: auto auto 1fr;
-  gap: 8px;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 4px;
   overflow: hidden;
 }
 
@@ -27,7 +27,7 @@
 
 .combined-live-dashboard__header h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 18px;
   color: #f8fafc;
   line-height: 1.1;
 }
@@ -35,23 +35,24 @@
 .combined-live-dashboard__header p {
   margin: 2px 0 0;
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .combined-live-dashboard__header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .combined-live-dashboard__clock,
-.combined-live-dashboard__home {
+.combined-live-dashboard__home,
+.combined-live-dashboard__history-toggle {
   border-radius: 8px;
   border: 1px solid rgba(96, 165, 250, 0.35);
   background: rgba(15, 23, 42, 0.72);
   color: #dbeafe;
-  padding: 6px 10px;
-  font-size: 11px;
+  padding: 5px 8px;
+  font-size: 10px;
   font-weight: 700;
 }
 
@@ -59,14 +60,43 @@
   cursor: pointer;
 }
 
+.combined-live-dashboard__history-toggle {
+  cursor: pointer;
+}
+
+.combined-live-dashboard__history-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.85);
+}
+
+.combined-live-dashboard__history-controls input,
+.combined-live-dashboard__history-controls button {
+  border-radius: 6px;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  background: rgba(30, 41, 59, 0.85);
+  color: #dbeafe;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 6px;
+}
+
+.combined-live-dashboard__history-controls button {
+  cursor: pointer;
+}
+
 .combined-live-dashboard__hero {
   border: 1px solid rgba(52, 211, 153, 0.28);
   background: rgba(15, 23, 42, 0.72);
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: 5px 6px;
   display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 8px;
+  grid-template-columns: 160px 1fr;
+  gap: 4px;
   align-items: center;
 }
 
@@ -76,7 +106,7 @@
   gap: 8px;
   color: #34d399;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 11px;
 }
 
 .combined-live-dashboard__hero-badge strong {
@@ -98,7 +128,7 @@
 .combined-live-dashboard__hero-metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .combined-live-dashboard__hero-card,
@@ -112,7 +142,7 @@
 }
 
 .combined-live-dashboard__hero-card {
-  padding: 8px 10px;
+  padding: 5px 6px;
 }
 
 .combined-live-dashboard__hero-card .label,
@@ -128,8 +158,8 @@
 
 .combined-live-dashboard__hero-card strong {
   display: block;
-  margin-top: 4px;
-  font-size: 22px;
+  margin-top: 2px;
+  font-size: 14px;
   color: #f8fafc;
   line-height: 1.1;
 }
@@ -149,16 +179,48 @@
   background: rgba(127, 29, 29, 0.5);
 }
 
+.combined-live-dashboard__revenue {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.combined-live-dashboard__revenue-card {
+  padding: 5px 6px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 12px;
+}
+
+.combined-live-dashboard__revenue-card strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.1;
+  color: #f8fafc;
+}
+
+.combined-live-dashboard__revenue-card p {
+  margin: 2px 0 0;
+  font-size: 8px;
+  color: #a5b4fc;
+}
+
+.combined-live-dashboard__revenue-card.is-total {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(6, 78, 59, 0.28);
+}
+
 .combined-live-dashboard__main {
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(380px, 0.9fr);
-  gap: 8px;
+  gap: 4px;
 }
 
 .panel-shell {
   min-height: 0;
-  padding: 8px;
+  padding: 5px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -169,12 +231,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .panel-shell__header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: 11px;
   color: #f8fafc;
 }
 
@@ -183,22 +245,23 @@
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  grid-auto-rows: minmax(0, auto);
+  grid-template-rows: none;
+  gap: 4px;
+  grid-auto-rows: minmax(92px, auto);
   align-content: start;
-  align-items: start;
-  align-content: start;
+  align-items: stretch;
+  overflow: hidden;
+  padding-right: 0;
 }
 
 .combined-live-dashboard__line-card {
-  padding: 8px;
+  padding: 5px;
   border-left: 4px solid #22c55e;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: auto;
-  max-height: 190px;
+  height: 100%;
+  max-height: none;
 }
 
 .combined-live-dashboard__line-card.is-over {
@@ -209,20 +272,20 @@
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .combined-live-dashboard__line-header h3,
 .combined-live-dashboard__department-top h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: 13px;
   color: #f8fafc;
   line-height: 1.1;
 }
 
 .combined-live-dashboard__line-header p {
-  margin: 2px 0 0;
-  font-size: 10px;
+  margin: 1px 0 0;
+  font-size: 9px;
   color: #93c5fd;
   white-space: nowrap;
   overflow: hidden;
@@ -244,13 +307,13 @@
 .combined-live-dashboard__line-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 8px;
+  gap: 4px 6px;
 }
 
 .combined-live-dashboard__line-metrics strong {
   display: block;
-  margin-top: 2px;
-  font-size: 18px;
+  margin-top: 1px;
+  font-size: 11px;
   color: #f8fafc;
   line-height: 1.1;
 }
@@ -258,78 +321,191 @@
 .combined-live-dashboard__line-footer {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 6px;
-  padding-top: 6px;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 4px;
   flex-wrap: wrap;
+}
+
+.combined-live-dashboard__truncation-note {
+  margin-top: 2px;
+  font-size: 8px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.combined-live-dashboard__line-progress {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.combined-live-dashboard__line-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.25);
+  overflow: hidden;
+}
+
+.combined-live-dashboard__line-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e 0%, #38bdf8 100%);
+}
+
+.combined-live-dashboard__line-progress span {
+  font-size: 9px;
+  font-weight: 700;
+  color: #93c5fd;
+  min-width: 34px;
+  text-align: right;
 }
 
 .combined-live-dashboard__sidebar {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 8px;
+  grid-template-rows: minmax(0, 0.58fr) minmax(0, 0.42fr);
+  gap: 4px;
 }
 
 .combined-live-dashboard__production-forklifts {
-  margin-top: 8px;
-  padding-top: 8px;
+  margin-top: 2px;
+  padding-top: 2px;
   border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.combined-live-dashboard__extra-services {
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.combined-live-dashboard__extra-services-list {
+  display: grid;
+  gap: 3px;
+}
+
+.combined-live-dashboard__extra-services-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 5px;
+  min-height: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.45);
+}
+
+.combined-live-dashboard__extra-services-name {
+  font-size: 9px;
+  font-weight: 700;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.combined-live-dashboard__extra-services-metrics {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+}
+
+.combined-live-dashboard__extra-services-metrics strong {
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #f8fafc;
 }
 
 .combined-live-dashboard__forklift-list {
   display: grid;
-  gap: 6px;
-  max-height: 180px;
-  overflow-y: auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  max-height: none;
+  overflow: hidden;
 }
 
 .combined-live-dashboard__forklift-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 10px;
+  gap: 6px;
+  padding: 3px 5px;
+  min-height: 24px;
+  border-radius: 8px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(30, 41, 59, 0.45);
 }
 
 .combined-live-dashboard__forklift-name {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 700;
   color: #e2e8f0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 160px;
+  max-width: 120px;
 }
 
 .combined-live-dashboard__forklift-metrics {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  font-size: 9px;
+  gap: 6px;
+  font-size: 7px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #94a3b8;
 }
 
 .combined-live-dashboard__forklift-metrics strong {
-  font-size: 12px;
+  font-size: 10px;
   text-transform: none;
   letter-spacing: 0;
   color: #f8fafc;
 }
 
+.combined-live-dashboard__forklift-flow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.combined-live-dashboard__forklift-flow-in {
+  color: #34d399;
+}
+
+.combined-live-dashboard__forklift-flow-sep {
+  color: #64748b;
+}
+
+.combined-live-dashboard__forklift-flow-out {
+  color: #60a5fa;
+}
+
+@media (max-width: 1380px) {
+  .combined-live-dashboard__forklift-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .combined-live-dashboard__department-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .combined-live-dashboard__department-card {
-  padding: 8px;
+  padding: 5px;
 }
 
 .combined-live-dashboard__department-card.active {
@@ -341,7 +517,7 @@
   justify-content: space-between;
   gap: 6px;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .combined-live-dashboard__department-top span {
@@ -351,7 +527,7 @@
 }
 
 .combined-live-dashboard__department-card strong {
-  font-size: 18px;
+  font-size: 12px;
   color: #f8fafc;
   line-height: 1.1;
 }
@@ -360,7 +536,7 @@
   display: flex;
   justify-content: space-between;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .combined-live-dashboard__dock-grid {
@@ -369,7 +545,7 @@
   display: grid;
   grid-template-columns: repeat(var(--dock-grid-columns, 4), minmax(0, 1fr));
   grid-auto-rows: minmax(0, 1fr);
-  gap: 6px;
+  gap: 4px;
   align-content: stretch;
   justify-items: center;
   overflow: hidden;
@@ -382,11 +558,11 @@
   max-height: 100%;
   min-height: 0;
   aspect-ratio: 1 / 1;
-  padding: 6px 5px 5px;
+  padding: 4px 4px 4px;
 }
 
 .combined-live-dashboard__dock-grid .dock-tile.compact .dock-tile__label {
-  font-size: 18px;
+  font-size: 14px;
 }
 
 .combined-live-dashboard__dock-grid .dock-tile.compact .dock-tile__company {
@@ -409,11 +585,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80px;
+  min-height: 36px;
   border: 1px dashed rgba(148, 163, 184, 0.2);
   border-radius: 12px;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: 9px;
 }
 
 .combined-live-dashboard__dock-modal-backdrop {
@@ -497,7 +673,11 @@
 
   .combined-live-dashboard__production-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(3, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+
+  .combined-live-dashboard__revenue {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .combined-live-dashboard__department-grid {
@@ -505,6 +685,12 @@
   }
 
   .combined-live-dashboard__dock-modal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .combined-live-dashboard__revenue {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
