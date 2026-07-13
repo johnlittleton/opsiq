@@ -43,6 +43,9 @@ interface ActiveLineCard {
   currentCasesPerMinute: number | null;
   progressPercent: number | null;
   overTarget: boolean;
+  baseElapsedMs: number;
+  startTimestampMs: number | null;
+  isPaused: boolean;
 }
 
 interface ForkliftDriverCard {
@@ -176,6 +179,26 @@ const normalizePackStyle = (value: unknown): string => {
 const getDateOnly = (value: unknown): string => String(value || '').slice(0, 10);
 const normalizeDriverName = (value: unknown): string => String(value || '').trim().toLowerCase();
 
+const parseTimestampToMs = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const asNumber = Number(value);
+    if (Number.isFinite(asNumber)) {
+      return asNumber;
+    }
+
+    const asDate = new Date(value).getTime();
+    if (Number.isFinite(asDate)) {
+      return asDate;
+    }
+  }
+
+  return null;
+};
+
 const CombinedLiveOperationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const doors = useAppStore((state) => state.doors);
@@ -271,9 +294,12 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
               return null;
             }
 
+            const baseElapsedMs = Number(workOrder.elapsedMs || 0);
+            const startTimestampMs = parseTimestampToMs(workOrder.startTimestamp);
+            const isPaused = Boolean(workOrder.isPaused);
             const elapsedMs = isHistoricalDate
-              ? Number(workOrder.elapsedMs || 0)
-              : (workOrder.elapsedMs || 0) + (workOrder.isPaused ? 0 : Date.now() - Number(workOrder.startTimestamp || 0));
+              ? baseElapsedMs
+              : baseElapsedMs + (isPaused || !startTimestampMs ? 0 : Math.max(0, Date.now() - startTimestampMs));
             const elapsedMinutes = elapsedMs > 0 ? elapsedMs / 60000 : 0;
             const elapsedHours = elapsedMinutes / 60;
             const completedCases = Number(workOrder.completedCases || 0);
@@ -314,6 +340,9 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
               currentCasesPerMinute,
               progressPercent,
               overTarget: costPerCase !== null ? costPerCase > KPI_TARGET_PER_CASE : false,
+              baseElapsedMs,
+              startTimestampMs,
+              isPaused,
             } satisfies ActiveLineCard;
           }).filter(Boolean) as ActiveLineCard[];
 
@@ -733,6 +762,16 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
   const visibleActiveLines = activeLines.slice(0, MAX_VISIBLE_LINES);
   const hiddenActiveLineCount = Math.max(0, activeLines.length - visibleActiveLines.length);
 
+  const getDisplayedLineElapsedMinutes = (line: ActiveLineCard): number => {
+    const baseMinutes = Math.max(0, Math.floor(Number(line.elapsedMinutes || 0)));
+    if (isHistoricalMode || line.isPaused || !line.startTimestampMs) {
+      return baseMinutes;
+    }
+
+    const extraMs = Math.max(0, Date.now() - line.startTimestampMs);
+    return Math.max(0, Math.floor((line.baseElapsedMs + extraMs) / 60000));
+  };
+
   return (
     <div className="combined-live-dashboard">
       <TitleBar showLegend={false} />
@@ -875,7 +914,7 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
                     </div>
                     <div>
                       <span className="label">Elapsed</span>
-                      <strong>{Math.max(0, Math.floor(line.elapsedMinutes))}m</strong>
+                      <strong>{getDisplayedLineElapsedMinutes(line)}m</strong>
                     </div>
                   </div>
                   {!isHistoricalMode && line.progressPercent !== null && (

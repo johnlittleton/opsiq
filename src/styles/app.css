@@ -249,6 +249,37 @@ a:hover {
   width: min(380px, calc(100vw - 28px));
 }
 
+.form-toast-stack__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: color-mix(in oklab, var(--bg2) 88%, black 12%);
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  color: var(--text-bright);
+  border-radius: 10px;
+  box-shadow: var(--shadow-heavy);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-toast-stack__minimize {
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--bg2) 82%, black 18%);
+  color: var(--text-bright);
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-toast-stack__minimize:hover {
+  border-color: color-mix(in oklab, var(--ok) 55%, transparent);
+}
+
 .form-toast-item {
   background: color-mix(in oklab, var(--bg2) 88%, black 12%);
   border: 1px solid color-mix(in oklab, var(--ok) 55%, transparent);
@@ -258,4 +289,25 @@ a:hover {
   padding: 10px 12px;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.form-toast-stack-minimized {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 10000;
+  appearance: none;
+  border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--bg2) 88%, black 12%);
+  color: var(--text-bright);
+  box-shadow: var(--shadow-heavy);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.form-toast-stack-minimized:hover {
+  border-color: color-mix(in oklab, var(--ok) 55%, transparent);
 }

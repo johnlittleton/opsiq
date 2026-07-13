@@ -140,6 +140,7 @@ const AppContent: React.FC = () => {
   const initializeSync = useAppStore(state => state.initializeSync);
   const [updaterStatus, setUpdaterStatus] = React.useState<UpdaterStatus | null>(null);
   const [formToasts, setFormToasts] = React.useState<FormToast[]>([]);
+  const [formToastsMinimized, setFormToastsMinimized] = React.useState(false);
 
   useEffect(() => {
     initializeSync();
@@ -177,6 +178,7 @@ const AppContent: React.FC = () => {
       };
 
       setFormToasts((current) => [...current.slice(-4), toast]);
+      setFormToastsMinimized(false);
       window.setTimeout(() => {
         setFormToasts((current) => current.filter((item) => item.id !== id));
       }, 7000);
@@ -223,14 +225,35 @@ const AppContent: React.FC = () => {
         <AppRoutes />
       </Router>
 
-      {formToasts.length > 0 && (
+      {formToasts.length > 0 && !formToastsMinimized && (
         <div className="form-toast-stack" aria-live="polite">
+          <div className="form-toast-stack__header">
+            <span>Messages ({formToasts.length})</span>
+            <button
+              type="button"
+              className="form-toast-stack__minimize"
+              onClick={() => setFormToastsMinimized(true)}
+            >
+              Minimize
+            </button>
+          </div>
           {formToasts.map((toast) => (
             <div key={toast.id} className="form-toast-item">
               {toast.text}
             </div>
           ))}
         </div>
+      )}
+
+      {formToasts.length > 0 && formToastsMinimized && (
+        <button
+          type="button"
+          className="form-toast-stack-minimized"
+          onClick={() => setFormToastsMinimized(false)}
+          aria-live="polite"
+        >
+          Messages ({formToasts.length})
+        </button>
       )}
     </>
   );
