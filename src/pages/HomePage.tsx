@@ -53,6 +53,7 @@ export const HomePage: React.FC = () => {
       icon: '🧾',
       title: 'Extra Services',
       description: 'Capture restacking, case pick, and other service activity',
+      badge: 'Under Construction',
       onClick: () => navigate('/extra-services'),
     },
     {
@@ -72,6 +73,12 @@ export const HomePage: React.FC = () => {
       title: 'Dock Checker History',
       description: 'Search all inbound and outbound checker forms by date',
       onClick: () => navigate('/dock-checker/history'),
+    },
+    {
+      icon: '📦',
+      title: 'Inventory Auditor',
+      description: 'Upload Famous inventory report, scan locations, and run discrepancy audits',
+      onClick: () => navigate('/inventory-auditor'),
     },
   ];
 

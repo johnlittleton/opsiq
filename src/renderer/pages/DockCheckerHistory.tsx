@@ -74,6 +74,7 @@ export default function DockCheckerHistory() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<any[]>([]);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -115,6 +116,17 @@ export default function DockCheckerHistory() {
     });
   }, [rows]);
 
+  const toggleExpandedRow = (rowKey: string) => {
+    setExpandedRowKey((current) => (current === rowKey ? null : rowKey));
+  };
+
+  const formatSubmittedAt = (value: string | undefined) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
+  };
+
   return (
     <div className="dock-checker-page">
       <div className="dock-checker-page__header">
@@ -145,47 +157,67 @@ export default function DockCheckerHistory() {
           <div className="dock-checker-history__item">No dock checker forms found for this filter.</div>
         )}
 
-        {normalizedRows.map((entry) => (
-          <div className="dock-checker-history__item" key={`${entry.formType}-${entry.id}`}>
-            <div className="dock-checker-history__item-header">
-              <span className="dock-checker-history__badge">{entry.formType}</span>
-              <strong>{entry.referenceNumber || 'No Reference'}</strong>
-              <span className="dock-checker-history__meta">Submitted: {entry.submittedAt || 'N/A'}</span>
-              <span className="dock-checker-history__meta">By: {entry.submittedBy || 'Unknown'}</span>
-            </div>
+        {normalizedRows.map((entry) => {
+          const rowKey = `${entry.formType}-${entry.id}`;
+          const isExpanded = expandedRowKey === rowKey;
 
-            <div className="dock-checker-history__data">
-              <div>Company: {entry.company || 'N/A'}</div>
-              <div>Door ID: {entry.doorId || 'N/A'}</div>
-              <div>Check-in ID: {entry.checkinId || 'N/A'}</div>
-              <div>Pallets Offloaded: {entry.palletsOffloaded ?? 'N/A'}</div>
-              {entry.formType === 'outbound' && <div>Pallets Loaded: {entry.palletsLoaded ?? 'N/A'}</div>}
-              {entry.formType === 'outbound' && <div>Checker: {entry.checkerName || 'N/A'}</div>}
-              {entry.formType === 'outbound' && <div>Forklift: {entry.forkliftOperatorName || 'N/A'}</div>}
-              {entry.formType === 'inbound' && <div>QC Issues: {entry.qcIssues ? 'Yes' : 'No'}</div>}
-              {entry.formType === 'inbound' && <div>Damages: {entry.damages ? 'Yes' : 'No'}</div>}
-            </div>
-
-            {entry.notes && <div style={{ marginTop: '8px', color: '#cbd5e1' }}>Notes: {entry.notes}</div>}
-            {entry.qcIssueNotes && <div style={{ marginTop: '6px', color: '#cbd5e1' }}>QC Notes: {entry.qcIssueNotes}</div>}
-            {entry.damageNotes && <div style={{ marginTop: '6px', color: '#cbd5e1' }}>Damage Notes: {entry.damageNotes}</div>}
-
-            {Array.isArray(entry.imagePaths) && entry.imagePaths.length > 0 && (
-              <div className="dock-checker-history__images">
-                {entry.imagePaths.map((image: HistoryImage, index: number) => {
-                  const fullUrl = String(image.url).startsWith('http') ? image.url : `${API_BASE}${image.url}`;
-                  return (
-                    <a key={`${image.url}-${index}`} className="dock-checker-history__thumb" href={fullUrl} target="_blank" rel="noreferrer" title={`Image ${index + 1}`}>
-                      <img src={fullUrl} alt={`Dock checker image ${index + 1}`} loading="lazy" />
-                      <span className="dock-checker-history__thumb-name">Image {index + 1}</span>
-                      <span className="dock-checker-history__thumb-time">{formatThumbUploadTime(image)}</span>
-                    </a>
-                  );
-                })}
+          return (
+            <div className="dock-checker-history__item" key={rowKey}>
+              <div className="dock-checker-history__summary-row">
+                <span className="dock-checker-history__badge">{entry.formType}</span>
+                <strong className="dock-checker-history__summary-main">{entry.referenceNumber || 'No Reference'}</strong>
+                <span className="dock-checker-history__summary-cell">{entry.company || 'N/A'}</span>
+                <span className="dock-checker-history__summary-cell">Submitted {formatSubmittedAt(entry.submittedAt)}</span>
+                <span className="dock-checker-history__summary-cell">By {entry.submittedBy || entry.checkerName || 'Unknown'}</span>
+                <span className="dock-checker-history__summary-cell">Photos {Array.isArray(entry.imagePaths) ? entry.imagePaths.length : 0}</span>
+                <button
+                  type="button"
+                  className="dock-checker-history__details-btn"
+                  onClick={() => toggleExpandedRow(rowKey)}
+                >
+                  {isExpanded ? 'Hide Details' : 'Details'}
+                </button>
               </div>
-            )}
-          </div>
-        ))}
+
+              {isExpanded && (
+                <div className="dock-checker-history__details-panel">
+                  <div className="dock-checker-history__data">
+                    <div>Door ID: {entry.doorId || 'N/A'}</div>
+                    <div>Check-in ID: {entry.checkinId || 'N/A'}</div>
+                    <div>Pallets Offloaded: {entry.palletsOffloaded ?? 'N/A'}</div>
+                    {entry.formType === 'outbound' && <div>Pallets Loaded: {entry.palletsLoaded ?? 'N/A'}</div>}
+                    {entry.formType === 'outbound' && <div>Checker: {entry.checkerName || 'N/A'}</div>}
+                    {entry.formType === 'outbound' && <div>Forklift: {entry.forkliftOperatorName || 'N/A'}</div>}
+                    {entry.formType === 'inbound' && <div>QC Issues: {entry.qcIssues ? 'Yes' : 'No'}</div>}
+                    {entry.formType === 'inbound' && <div>Damages: {entry.damages ? 'Yes' : 'No'}</div>}
+                    {entry.formType === 'inbound' && <div>Temperature OK: {entry.temperatureOk ? 'Yes' : 'No'}</div>}
+                    {entry.formType === 'outbound' && <div>Load Quality OK: {entry.loadQualityOk ? 'Yes' : 'No'}</div>}
+                    {entry.formType === 'outbound' && <div>Trailer Condition OK: {entry.trailerConditionOk ? 'Yes' : 'No'}</div>}
+                  </div>
+
+                  {entry.notes && <div className="dock-checker-history__note">Notes: {entry.notes}</div>}
+                  {entry.qcIssueNotes && <div className="dock-checker-history__note">QC Notes: {entry.qcIssueNotes}</div>}
+                  {entry.damageNotes && <div className="dock-checker-history__note">Damage Notes: {entry.damageNotes}</div>}
+
+                  {Array.isArray(entry.imagePaths) && entry.imagePaths.length > 0 && (
+                    <div className="dock-checker-history__images">
+                      {entry.imagePaths.map((image: HistoryImage, index: number) => {
+                        const fullUrl = String(image.url).startsWith('http') ? image.url : `${API_BASE}${image.url}`;
+                        return (
+                          <a key={`${image.url}-${index}`} className="dock-checker-history__thumb" href={fullUrl} target="_blank" rel="noreferrer" title={`Image ${index + 1}`}>
+                            <img src={fullUrl} alt={`Dock checker image ${index + 1}`} loading="lazy" />
+                            <span className="dock-checker-history__thumb-name">Image {index + 1}</span>
+                            <span className="dock-checker-history__thumb-time">{formatThumbUploadTime(image)}</span>
+                          </a>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

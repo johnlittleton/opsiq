@@ -588,6 +588,55 @@ export class DatabaseService implements IDatabaseService {
           FOREIGN KEY (user_id) REFERENCES executives(id)
         );
 
+        CREATE TABLE IF NOT EXISTS inventory_audit_reports (
+          id SERIAL PRIMARY KEY,
+          site TEXT NOT NULL,
+          report_name TEXT NOT NULL,
+          report_date TEXT NOT NULL,
+          uploaded_by TEXT NOT NULL,
+          row_count INTEGER NOT NULL DEFAULT 0,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS inventory_audit_report_rows (
+          id SERIAL PRIMARY KEY,
+          report_id INTEGER NOT NULL REFERENCES inventory_audit_reports(id) ON DELETE CASCADE,
+          location_code TEXT NOT NULL,
+          pallet_tag TEXT,
+          sku TEXT,
+          lot TEXT,
+          quantity REAL NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS inventory_audit_sessions (
+          id SERIAL PRIMARY KEY,
+          site TEXT NOT NULL,
+          report_id INTEGER NOT NULL REFERENCES inventory_audit_reports(id),
+          session_name TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'open',
+          started_by TEXT NOT NULL,
+          started_at TIMESTAMP NOT NULL,
+          completed_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS inventory_audit_scans (
+          id SERIAL PRIMARY KEY,
+          session_id INTEGER NOT NULL REFERENCES inventory_audit_sessions(id) ON DELETE CASCADE,
+          location_code TEXT NOT NULL,
+          pallet_tag TEXT,
+          sku TEXT,
+          lot TEXT,
+          quantity REAL NOT NULL,
+          scanned_by TEXT NOT NULL,
+          source TEXT NOT NULL DEFAULT 'scanner',
+          scanned_at TIMESTAMP NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
         CREATE INDEX IF NOT EXISTS idx_checkins_door ON dock_checkins(door_id);
         CREATE INDEX IF NOT EXISTS idx_checkins_status ON dock_checkins(status);
         CREATE INDEX IF NOT EXISTS idx_checkins_created ON dock_checkins(created_at);
@@ -617,6 +666,10 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_outbound_checker_reference ON outbound_dock_checker_forms(reference_number);
         CREATE INDEX IF NOT EXISTS idx_inbound_checker_submitted ON inbound_dock_checker_forms(submitted_at);
         CREATE INDEX IF NOT EXISTS idx_inbound_checker_reference ON inbound_dock_checker_forms(reference_number);
+        CREATE INDEX IF NOT EXISTS idx_inventory_audit_reports_site_date ON inventory_audit_reports(site, report_date);
+        CREATE INDEX IF NOT EXISTS idx_inventory_audit_report_rows_report ON inventory_audit_report_rows(report_id);
+        CREATE INDEX IF NOT EXISTS idx_inventory_audit_sessions_site_status ON inventory_audit_sessions(site, status);
+        CREATE INDEX IF NOT EXISTS idx_inventory_audit_scans_session ON inventory_audit_scans(session_id);
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
         CREATE INDEX IF NOT EXISTS idx_extra_service_date ON extra_service_entries(service_date);
         CREATE INDEX IF NOT EXISTS idx_extra_service_type_date ON extra_service_entries(service_type, service_date);
@@ -3310,6 +3363,383 @@ export class DatabaseService implements IDatabaseService {
     }
 
     return historyRows.sort((a, b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')));
+  }
+
+  private normalizeInventoryAuditText(value: unknown): string | null {
+    const normalized = String(value || '').trim();
+    return normalized || null;
+  }
+
+  private buildInventoryAuditCompositeKey(item: {
+    locationCode?: string | null;
+    palletTag?: string | null;
+    sku?: string | null;
+    lot?: string | null;
+  }): string {
+    const palletTag = String(item.palletTag || '').trim().toUpperCase();
+    if (palletTag) {
+      return `tag:${palletTag}`;
+    }
+
+    const locationCode = String(item.locationCode || '').trim().toUpperCase();
+    const sku = String(item.sku || '').trim().toUpperCase();
+    const lot = String(item.lot || '').trim().toUpperCase();
+    return `fallback:${locationCode}|${sku}|${lot}`;
+  }
+
+  async createInventoryAuditReport(payload: {
+    site: string;
+    reportName: string;
+    reportDate: string;
+    uploadedBy: string;
+    rows: Array<{
+      locationCode: string;
+      palletTag?: string;
+      sku?: string;
+      lot?: string;
+      quantity: number;
+    }>;
+  }): Promise<any> {
+    const site = String(payload.site || '').trim();
+    const reportName = String(payload.reportName || '').trim();
+    const reportDate = String(payload.reportDate || '').trim();
+    const uploadedBy = String(payload.uploadedBy || '').trim();
+    const rows = Array.isArray(payload.rows) ? payload.rows : [];
+
+    if (!site) throw new Error('Site is required.');
+    if (!reportName) throw new Error('Report name is required.');
+    if (!reportDate) throw new Error('Report date is required.');
+    if (!uploadedBy) throw new Error('Uploaded by is required.');
+    if (!rows.length) throw new Error('At least one report row is required.');
+
+    const normalizedRows = rows
+      .map((row) => ({
+        locationCode: String(row.locationCode || '').trim(),
+        palletTag: this.normalizeInventoryAuditText(row.palletTag),
+        sku: this.normalizeInventoryAuditText(row.sku),
+        lot: this.normalizeInventoryAuditText(row.lot),
+        quantity: Number(row.quantity || 0),
+      }))
+      .filter((row) => row.locationCode && Number.isFinite(row.quantity) && row.quantity >= 0);
+
+    if (!normalizedRows.length) throw new Error('No valid report rows were provided.');
+
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const now = getLocalISOString();
+      const reportResult = await client.query(`
+        INSERT INTO inventory_audit_reports (
+          site, report_name, report_date, uploaded_by, row_count, created_at, updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `, [site, reportName, reportDate, uploadedBy, normalizedRows.length, now, now]);
+
+      const report = reportResult.rows[0];
+      const reportId = Number(report.id || 0);
+
+      for (const row of normalizedRows) {
+        await client.query(`
+          INSERT INTO inventory_audit_report_rows (
+            report_id, location_code, pallet_tag, sku, lot, quantity, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [reportId, row.locationCode, row.palletTag, row.sku, row.lot, row.quantity, now]);
+      }
+
+      await client.query('COMMIT');
+      return this.toCamelCase(report);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getInventoryAuditReports(filters?: { site?: string }): Promise<any[]> {
+    let query = 'SELECT * FROM inventory_audit_reports WHERE 1=1';
+    const params: any[] = [];
+
+    if (filters?.site) {
+      params.push(String(filters.site).trim());
+      query += ` AND site = $${params.length}`;
+    }
+
+    query += ' ORDER BY report_date DESC, id DESC';
+    const result = await this.pool.query(query, params);
+    return this.toCamelCase(result.rows);
+  }
+
+  async createInventoryAuditSession(payload: {
+    site: string;
+    reportId: number;
+    sessionName: string;
+    startedBy: string;
+  }): Promise<any> {
+    const site = String(payload.site || '').trim();
+    const reportId = Number(payload.reportId || 0);
+    const sessionName = String(payload.sessionName || '').trim();
+    const startedBy = String(payload.startedBy || '').trim();
+
+    if (!site) throw new Error('Site is required.');
+    if (!Number.isFinite(reportId) || reportId <= 0) throw new Error('Valid report is required.');
+    if (!sessionName) throw new Error('Session name is required.');
+    if (!startedBy) throw new Error('Started by is required.');
+
+    const reportResult = await this.pool.query('SELECT id FROM inventory_audit_reports WHERE id = $1 LIMIT 1', [reportId]);
+    if (!reportResult.rows.length) throw new Error('Baseline report not found.');
+
+    const now = getLocalISOString();
+    const result = await this.pool.query(`
+      INSERT INTO inventory_audit_sessions (
+        site, report_id, session_name, status, started_by, started_at, completed_at, created_at, updated_at
+      ) VALUES ($1, $2, $3, 'open', $4, $5, NULL, $6, $7)
+      RETURNING *
+    `, [site, reportId, sessionName, startedBy, now, now, now]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getInventoryAuditSessions(filters?: { site?: string }): Promise<any[]> {
+    let query = `
+      SELECT s.*, r.report_name, r.report_date, r.row_count
+      FROM inventory_audit_sessions s
+      JOIN inventory_audit_reports r ON r.id = s.report_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (filters?.site) {
+      params.push(String(filters.site).trim());
+      query += ` AND s.site = $${params.length}`;
+    }
+
+    query += ' ORDER BY s.started_at DESC, s.id DESC';
+    const result = await this.pool.query(query, params);
+    return this.toCamelCase(result.rows);
+  }
+
+  async addInventoryAuditScan(sessionId: number, payload: {
+    locationCode: string;
+    palletTag?: string;
+    sku?: string;
+    lot?: string;
+    quantity: number;
+    scannedBy: string;
+    source?: 'scanner' | 'camera' | 'manual';
+  }): Promise<any> {
+    const normalizedSessionId = Number(sessionId || 0);
+    if (!Number.isFinite(normalizedSessionId) || normalizedSessionId <= 0) {
+      throw new Error('Valid session ID is required.');
+    }
+
+    const sessionResult = await this.pool.query('SELECT id FROM inventory_audit_sessions WHERE id = $1 LIMIT 1', [normalizedSessionId]);
+    if (!sessionResult.rows.length) throw new Error('Audit session not found.');
+
+    const locationCode = String(payload.locationCode || '').trim();
+    const palletTag = this.normalizeInventoryAuditText(payload.palletTag);
+    const sku = this.normalizeInventoryAuditText(payload.sku);
+    const lot = this.normalizeInventoryAuditText(payload.lot);
+    const quantity = Number(payload.quantity || 0);
+    const scannedBy = String(payload.scannedBy || '').trim();
+    const source = ['scanner', 'camera', 'manual'].includes(String(payload.source || 'scanner'))
+      ? String(payload.source || 'scanner')
+      : 'scanner';
+
+    if (!locationCode) throw new Error('Location code is required.');
+    if (!palletTag && !sku) throw new Error('Pallet tag or SKU is required.');
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error('Quantity must be greater than 0.');
+    if (!scannedBy) throw new Error('Scanned by is required.');
+
+    const now = getLocalISOString();
+    const result = await this.pool.query(`
+      INSERT INTO inventory_audit_scans (
+        session_id, location_code, pallet_tag, sku, lot, quantity, scanned_by, source, scanned_at, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *
+    `, [normalizedSessionId, locationCode, palletTag, sku, lot, quantity, scannedBy, source, now, now]);
+
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async getInventoryAuditSession(sessionId: number): Promise<any | null> {
+    const normalizedSessionId = Number(sessionId || 0);
+    if (!Number.isFinite(normalizedSessionId) || normalizedSessionId <= 0) {
+      throw new Error('Valid session ID is required.');
+    }
+
+    const sessionResult = await this.pool.query(`
+      SELECT s.*, r.report_name, r.report_date, r.row_count, r.uploaded_by
+      FROM inventory_audit_sessions s
+      JOIN inventory_audit_reports r ON r.id = s.report_id
+      WHERE s.id = $1
+    `, [normalizedSessionId]);
+
+    if (!sessionResult.rows.length) return null;
+
+    const scansResult = await this.pool.query(`
+      SELECT * FROM inventory_audit_scans
+      WHERE session_id = $1
+      ORDER BY scanned_at DESC, id DESC
+    `, [normalizedSessionId]);
+
+    const reportLocationsResult = await this.pool.query(`
+      SELECT DISTINCT location_code
+      FROM inventory_audit_report_rows
+      WHERE report_id = $1
+      ORDER BY location_code ASC
+    `, [Number((this.toCamelCase(sessionResult.rows[0]) as any).reportId || 0)]);
+
+    return {
+      ...this.toCamelCase(sessionResult.rows[0]),
+      scans: this.toCamelCase(scansResult.rows),
+      reportLocations: reportLocationsResult.rows.map((row: any) => String(row.location_code || '').trim()).filter(Boolean),
+    };
+  }
+
+  async getInventoryAuditReconciliation(sessionId: number): Promise<any> {
+    const normalizedSessionId = Number(sessionId || 0);
+    if (!Number.isFinite(normalizedSessionId) || normalizedSessionId <= 0) {
+      throw new Error('Valid session ID is required.');
+    }
+
+    const sessionResult = await this.pool.query('SELECT * FROM inventory_audit_sessions WHERE id = $1 LIMIT 1', [normalizedSessionId]);
+    if (!sessionResult.rows.length) throw new Error('Audit session not found.');
+
+    const session = this.toCamelCase(sessionResult.rows[0]);
+    const reportRows = this.toCamelCase((await this.pool.query(
+      'SELECT * FROM inventory_audit_report_rows WHERE report_id = $1 ORDER BY id ASC',
+      [session.reportId]
+    )).rows);
+    const scanRows = this.toCamelCase((await this.pool.query(
+      'SELECT * FROM inventory_audit_scans WHERE session_id = $1 ORDER BY id ASC',
+      [normalizedSessionId]
+    )).rows);
+
+    const expectedMap = new Map<string, any>();
+    const actualMap = new Map<string, any>();
+
+    reportRows.forEach((row: any) => {
+      const key = this.buildInventoryAuditCompositeKey(row);
+      const current = expectedMap.get(key) || {
+        key,
+        locationCode: row.locationCode,
+        palletTag: row.palletTag || null,
+        sku: row.sku || null,
+        lot: row.lot || null,
+        expectedQty: 0,
+        actualQty: 0,
+      };
+      current.expectedQty += Number(row.quantity || 0);
+      expectedMap.set(key, current);
+    });
+
+    scanRows.forEach((row: any) => {
+      const key = this.buildInventoryAuditCompositeKey(row);
+      const current = actualMap.get(key) || {
+        key,
+        locationCode: row.locationCode,
+        palletTag: row.palletTag || null,
+        sku: row.sku || null,
+        lot: row.lot || null,
+        expectedQty: 0,
+        actualQty: 0,
+      };
+      current.actualQty += Number(row.quantity || 0);
+      current.locationCode = current.locationCode || row.locationCode;
+      actualMap.set(key, current);
+    });
+
+    const discrepancies: any[] = [];
+    let matchedQty = 0;
+
+    expectedMap.forEach((expectedRow, key) => {
+      const actualRow = actualMap.get(key);
+      if (!actualRow) {
+        discrepancies.push({
+          key,
+          type: 'missing_in_scan',
+          locationCode: expectedRow.locationCode,
+          palletTag: expectedRow.palletTag,
+          sku: expectedRow.sku,
+          lot: expectedRow.lot,
+          expectedQty: expectedRow.expectedQty,
+          actualQty: 0,
+          quantityDifference: 0 - expectedRow.expectedQty,
+        });
+        return;
+      }
+
+      const isTagged = Boolean(expectedRow.palletTag);
+      const sameLocation = String(expectedRow.locationCode || '').trim().toUpperCase() === String(actualRow.locationCode || '').trim().toUpperCase();
+      if (isTagged && !sameLocation) {
+        discrepancies.push({
+          key,
+          type: 'wrong_location',
+          locationCode: `${expectedRow.locationCode} -> ${actualRow.locationCode}`,
+          palletTag: expectedRow.palletTag,
+          sku: expectedRow.sku,
+          lot: expectedRow.lot,
+          expectedQty: expectedRow.expectedQty,
+          actualQty: actualRow.actualQty,
+          quantityDifference: actualRow.actualQty - expectedRow.expectedQty,
+        });
+        return;
+      }
+
+      matchedQty += Math.min(Number(expectedRow.expectedQty || 0), Number(actualRow.actualQty || 0));
+
+      if (Number(expectedRow.expectedQty || 0) !== Number(actualRow.actualQty || 0)) {
+        discrepancies.push({
+          key,
+          type: 'quantity_mismatch',
+          locationCode: expectedRow.locationCode,
+          palletTag: expectedRow.palletTag,
+          sku: expectedRow.sku,
+          lot: expectedRow.lot,
+          expectedQty: expectedRow.expectedQty,
+          actualQty: actualRow.actualQty,
+          quantityDifference: actualRow.actualQty - expectedRow.expectedQty,
+        });
+      }
+    });
+
+    actualMap.forEach((actualRow, key) => {
+      if (expectedMap.has(key)) {
+        return;
+      }
+
+      discrepancies.push({
+        key,
+        type: 'unexpected_in_scan',
+        locationCode: actualRow.locationCode,
+        palletTag: actualRow.palletTag,
+        sku: actualRow.sku,
+        lot: actualRow.lot,
+        expectedQty: 0,
+        actualQty: actualRow.actualQty,
+        quantityDifference: actualRow.actualQty,
+      });
+    });
+
+    const totalExpectedQty = reportRows.reduce((sum: number, row: any) => sum + Number(row.quantity || 0), 0);
+    const totalActualQty = scanRows.reduce((sum: number, row: any) => sum + Number(row.quantity || 0), 0);
+    const accuracyPercent = totalExpectedQty > 0
+      ? Math.max(0, Math.min(100, (matchedQty / totalExpectedQty) * 100))
+      : (totalActualQty > 0 ? 0 : 100);
+
+    return {
+      sessionId: normalizedSessionId,
+      reportId: Number(session.reportId || 0),
+      summary: {
+        totalExpectedQty,
+        totalActualQty,
+        matchedQty,
+        discrepancyCount: discrepancies.length,
+        accuracyPercent,
+      },
+      discrepancies,
+    };
   }
 
   async markLoadStart(checkinId: number): Promise<void> {

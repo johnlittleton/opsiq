@@ -42,6 +42,7 @@ import DriverAvatarPage from './pages/DriverAvatarPage';
 import OutboundDockCheckerForm from './pages/OutboundDockCheckerForm';
 import InboundDockCheckerForm from './pages/InboundDockCheckerForm';
 import DockCheckerHistory from './pages/DockCheckerHistory';
+import InventoryAuditor from './pages/InventoryAuditor';
 import { hasRestrictedFeatureAccess } from './utils/restrictedAccess';
 
 type UpdaterStatus = {
@@ -96,6 +97,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/dock-checker/outbound" element={<OutboundDockCheckerForm />} />
       <Route path="/dock-checker/inbound" element={<InboundDockCheckerForm />} />
       <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
+      <Route path="/inventory-auditor" element={<InventoryAuditor />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />
       <Route path="/production" element={<ProductionKPI />} />
       <Route path="/production-kpi-history" element={<ProductionKPIHistory />} />

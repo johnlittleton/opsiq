@@ -20,6 +20,7 @@ class ApiClient {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private appointmentListenersRegistered = false;
+  private localDevApiBase = 'http://localhost:3000';
 
   constructor() {
     this.initSocket();
@@ -94,6 +95,52 @@ class ApiClient {
     if (Array.isArray(data)) return data;
     if (data === null || data === undefined) return [];
     return [data];
+  }
+
+  private async parseJsonResponse(response: Response, endpointLabel: string): Promise<any> {
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      const raw = await response.text().catch(() => '');
+      const preview = raw.replace(/\s+/g, ' ').slice(0, 120);
+      throw new Error(
+        `${endpointLabel} returned non-JSON (${response.status}). ` +
+        'This usually means API_BASE points to a web page or a route is not deployed. ' +
+        (preview ? `Response: ${preview}` : '')
+      );
+    }
+
+    try {
+      return await response.json();
+    } catch {
+      throw new Error(`${endpointLabel} returned invalid JSON (${response.status}).`);
+    }
+  }
+
+  private isJsonResponse(response: Response): boolean {
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    return contentType.includes('application/json');
+  }
+
+  private shouldUseLocalInventoryFallback(response: Response): boolean {
+    if (!import.meta.env.DEV) return false;
+    if (API_BASE.includes(this.localDevApiBase)) return false;
+
+    // Fallback when route is missing or response is HTML/page content.
+    return response.status === 404 || response.status === 405 || !this.isJsonResponse(response);
+  }
+
+  private async fetchInventoryAuditorWithDevFallback(path: string, init?: RequestInit): Promise<Response> {
+    const primaryResponse = await fetch(`${API_BASE}${path}`, init);
+
+    if (!this.shouldUseLocalInventoryFallback(primaryResponse)) {
+      return primaryResponse;
+    }
+
+    try {
+      return await fetch(`${this.localDevApiBase}${path}`, init);
+    } catch {
+      return primaryResponse;
+    }
   }
 
   // REST API calls
@@ -958,6 +1005,180 @@ class ApiClient {
       throw new Error(error?.error || 'Failed to load dock checker history');
     }
     return response.json();
+  }
+
+  async createInventoryAuditReport(payload: {
+    site: string;
+    reportName: string;
+    reportDate: string;
+    uploadedBy: string;
+    rows: Array<{
+      locationCode: string;
+      palletTag?: string;
+      sku?: string;
+      lot?: string;
+      quantity: number;
+    }>;
+  }): Promise<any> {
+    const response = await this.fetchInventoryAuditorWithDevFallback('/api/inventory-auditor/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory report upload').catch(() => null);
+      throw new Error(error?.error || 'Failed to upload inventory report');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory report upload');
+  }
+
+  async parseInventoryAuditPdf(file: File): Promise<Array<{
+    locationCode: string;
+    palletTag?: string;
+    sku?: string;
+    lot?: string;
+    quantity: number;
+  }>> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await this.fetchInventoryAuditorWithDevFallback('/api/inventory-auditor/parse-pdf', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory PDF parse');
+      throw new Error(error?.error || 'Failed to parse PDF report');
+    }
+
+    const payload = await this.parseJsonResponse(response, 'Inventory PDF parse');
+    return Array.isArray(payload?.rows) ? payload.rows : [];
+  }
+
+  async getInventoryAuditReports(filters?: { site?: string }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.site) params.append('site', filters.site);
+
+    const response = await this.fetchInventoryAuditorWithDevFallback(
+      `/api/inventory-auditor/reports?${params.toString()}`
+    );
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory reports load').catch(() => null);
+      throw new Error(error?.error || 'Failed to load inventory reports');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory reports load');
+  }
+
+  async createInventoryAuditSession(payload: {
+    site: string;
+    reportId: number;
+    sessionName: string;
+    startedBy: string;
+  }): Promise<any> {
+    const response = await this.fetchInventoryAuditorWithDevFallback('/api/inventory-auditor/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory session create').catch(() => null);
+      throw new Error(error?.error || 'Failed to create audit session');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory session create');
+  }
+
+  async getInventoryAuditSessions(filters?: { site?: string }): Promise<any[]> {
+    const params = new URLSearchParams();
+    if (filters?.site) params.append('site', filters.site);
+
+    const response = await this.fetchInventoryAuditorWithDevFallback(
+      `/api/inventory-auditor/sessions?${params.toString()}`
+    );
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory sessions load').catch(() => null);
+      throw new Error(error?.error || 'Failed to load audit sessions');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory sessions load');
+  }
+
+  async addInventoryAuditScan(sessionId: number, payload: {
+    locationCode: string;
+    palletTag?: string;
+    sku?: string;
+    lot?: string;
+    quantity: number;
+    scannedBy: string;
+    source?: 'scanner' | 'camera' | 'manual';
+  }): Promise<any> {
+    const response = await this.fetchInventoryAuditorWithDevFallback(`/api/inventory-auditor/sessions/${sessionId}/scans`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory scan save').catch(() => null);
+      throw new Error(error?.error || 'Failed to save audit scan');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory scan save');
+  }
+
+  async getInventoryAuditSession(sessionId: number): Promise<any> {
+    const response = await this.fetchInventoryAuditorWithDevFallback(`/api/inventory-auditor/sessions/${sessionId}`);
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory session detail').catch(() => null);
+      throw new Error(error?.error || 'Failed to load audit session');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory session detail');
+  }
+
+  async getInventoryAuditReconciliation(sessionId: number): Promise<any> {
+    const response = await this.fetchInventoryAuditorWithDevFallback(
+      `/api/inventory-auditor/sessions/${sessionId}/reconciliation`
+    );
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory reconciliation').catch(() => null);
+      throw new Error(error?.error || 'Failed to run reconciliation');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory reconciliation');
+  }
+
+  async getInventoryAuditAiBrief(sessionId: number, context?: {
+    activeLaneCode?: string;
+    totalScannedPallets?: number;
+  }): Promise<{
+    provider: 'openai' | 'fallback-rules';
+    model: string;
+    summary: string;
+    insights: Array<{ level: 'high' | 'medium' | 'low'; message: string }>;
+    warnings?: string[];
+    generatedAt: string;
+  }> {
+    const response = await this.fetchInventoryAuditorWithDevFallback(`/api/inventory-auditor/sessions/${sessionId}/ai-brief`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        activeLaneCode: context?.activeLaneCode || '',
+        totalScannedPallets: Number(context?.totalScannedPallets || 0),
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await this.parseJsonResponse(response, 'Inventory AI brief').catch(() => null);
+      throw new Error(error?.error || 'Failed to generate AI brief');
+    }
+
+    return this.parseJsonResponse(response, 'Inventory AI brief');
   }
 
   onAppointmentCreated(callback: (appointment: any) => void) {

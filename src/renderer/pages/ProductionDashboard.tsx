@@ -59,6 +59,8 @@ export default function ProductionDashboard() {
   const [remindedShiftKey, setRemindedShiftKey] = useState<string | null>(null);
   const [kpiAlertsMinimized, setKpiAlertsMinimized] = useState(false);
   const [rateAlertsMinimized, setRateAlertsMinimized] = useState(false);
+  const [kpiOnTargetMinimized, setKpiOnTargetMinimized] = useState(false);
+  const [rateOnTargetMinimized, setRateOnTargetMinimized] = useState(false);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -656,10 +658,13 @@ export default function ProductionDashboard() {
         </div>
       )}
 
-      {linesOnTargetKpi.length > 0 && (
+      {linesOnTargetKpi.length > 0 && !kpiOnTargetMinimized && (
         <div className="line-kpi-ok" role="status" aria-live="polite">
           <div className="line-kpi-ok__header">
             <span>✅ KPI On Target ({linesOnTargetKpi.length})</span>
+            <button type="button" className="line-kpi-alert__minimize" onClick={() => setKpiOnTargetMinimized(true)}>
+              Minimize
+            </button>
           </div>
           {linesOnTargetKpi.map(({ line }) => (
             <div key={line.id} className="line-kpi-ok__item">
@@ -667,6 +672,16 @@ export default function ProductionDashboard() {
             </div>
           ))}
         </div>
+      )}
+
+      {linesOnTargetKpi.length > 0 && kpiOnTargetMinimized && (
+        <button
+          type="button"
+          className="line-kpi-ok-minimized"
+          onClick={() => setKpiOnTargetMinimized(false)}
+        >
+          ✅ KPI On Target ({linesOnTargetKpi.length})
+        </button>
       )}
 
       {linesAboveKpi.length > 0 && kpiAlertsMinimized && (
@@ -695,10 +710,13 @@ export default function ProductionDashboard() {
         </div>
       )}
 
-      {linesHittingPlannedRate.length > 0 && (
+      {linesHittingPlannedRate.length > 0 && !rateOnTargetMinimized && (
         <div className="line-rate-ok" role="status" aria-live="polite">
           <div className="line-rate-ok__header">
             <span className="line-rate-ok__title">✅ Planned Rate On Target ({linesHittingPlannedRate.length})</span>
+            <button type="button" className="line-rate-alert__minimize" onClick={() => setRateOnTargetMinimized(true)}>
+              Minimize
+            </button>
           </div>
           {linesHittingPlannedRate.map(({ line }) => (
             <div key={line.id} className="line-rate-ok__item">
@@ -706,6 +724,16 @@ export default function ProductionDashboard() {
             </div>
           ))}
         </div>
+      )}
+
+      {linesHittingPlannedRate.length > 0 && rateOnTargetMinimized && (
+        <button
+          type="button"
+          className="line-rate-ok-minimized"
+          onClick={() => setRateOnTargetMinimized(false)}
+        >
+          ✅ Planned Rate On Target ({linesHittingPlannedRate.length})
+        </button>
       )}
 
       {linesBelowPlannedRate.length > 0 && rateAlertsMinimized && (

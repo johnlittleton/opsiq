@@ -6,6 +6,7 @@ import { Server as SocketServer } from 'socket.io';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { PDFParse } from 'pdf-parse';
 import { ChildProcess, spawn } from 'child_process';
 // Use factory to switch between SQLite (local) and Postgres (Railway)
 import { db } from './db-factory';
@@ -76,6 +77,22 @@ const dockCheckerUpload = multer({
       return;
     }
     cb(new Error('Only image uploads are allowed.'));
+  },
+});
+
+const inventoryAuditorPdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 20 * 1024 * 1024,
+  },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    const ext = path.extname(String(file.originalname || '')).toLowerCase();
+    if (mime === 'application/pdf' || ext === '.pdf') {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Only PDF files are allowed.'));
   },
 });
 
@@ -255,6 +272,34 @@ interface DualEntryAiAnalysis {
   mappedFields: DualEntryMappedField[];
   normalizedPayload: Record<string, unknown>;
 }
+
+interface InventoryAuditorAiInsight {
+  level: 'high' | 'medium' | 'low';
+  message: string;
+}
+
+interface InventoryAuditorAiBrief {
+  provider: 'openai' | 'fallback-rules';
+  model: string;
+  summary: string;
+  insights: InventoryAuditorAiInsight[];
+  warnings?: string[];
+  generatedAt: string;
+}
+
+const hasUsableOpenAiKey = (key?: string): boolean => {
+  const trimmed = String(key || '').trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  const normalized = trimmed.toLowerCase();
+  if (normalized.startsWith('paste-') || normalized.includes('your_openai_api_key') || normalized.includes('paste your')) {
+    return false;
+  }
+
+  return true;
+};
 
 const toSafeText = (value: unknown, maxLen: number = 600): string => {
   return String(value || '')
@@ -799,6 +844,214 @@ const analyzeDualEntryPayload = async (payload: unknown, targetSystem: unknown):
   }
 
   return fallbackReceivingAiAnalysis(payload, `No AI template configured for target system: ${asString(targetSystem) || 'unknown'}`);
+};
+
+const normalizeInventoryInsightLevel = (value: unknown): 'high' | 'medium' | 'low' => {
+  const normalized = asString(value).toLowerCase();
+  if (normalized === 'high' || normalized === 'medium') {
+    return normalized;
+  }
+  return 'low';
+};
+
+const buildInventoryAuditorFallbackBrief = (input: {
+  session: any;
+  reconciliation: any;
+  activeLaneCode?: string;
+  totalScannedPallets?: number;
+  warning?: string;
+}): InventoryAuditorAiBrief => {
+  const summary = asRecord(input.reconciliation?.summary);
+  const discrepancyCount = asNumber(summary.discrepancyCount, 0);
+  const accuracyPercent = asNumber(summary.accuracyPercent, 0);
+  const expectedQty = asNumber(summary.totalExpectedQty, 0);
+  const actualQty = asNumber(summary.totalActualQty, 0);
+  const insights: InventoryAuditorAiInsight[] = [];
+
+  if (asString(input.activeLaneCode)) {
+    insights.push({
+      level: 'medium',
+      message: `Lane ${asString(input.activeLaneCode)} is still active. Finish scan pass before final sign-off.`,
+    });
+  }
+
+  if (accuracyPercent < 95) {
+    insights.push({
+      level: 'high',
+      message: `Accuracy is ${accuracyPercent.toFixed(2)}%. Recount highest-variance lanes before closeout.`,
+    });
+  } else if (accuracyPercent < 99.5) {
+    insights.push({
+      level: 'medium',
+      message: `Accuracy is ${accuracyPercent.toFixed(2)}%. Perform spot checks on top discrepancy items.`,
+    });
+  } else {
+    insights.push({
+      level: 'low',
+      message: `Accuracy is ${accuracyPercent.toFixed(2)}%. Audit quality is strong for supervisor review.`,
+    });
+  }
+
+  if (discrepancyCount > 0) {
+    insights.push({
+      level: discrepancyCount >= 5 ? 'high' : 'medium',
+      message: `${discrepancyCount} discrepancies detected. Prioritize largest quantity deltas first.`,
+    });
+  } else {
+    insights.push({
+      level: 'low',
+      message: 'No discrepancies detected. Baseline and physical scan are aligned.',
+    });
+  }
+
+  if (expectedQty > 0 && actualQty > expectedQty) {
+    insights.push({
+      level: 'medium',
+      message: 'Scanned quantity exceeds expected quantity. Review for duplicate scans or overcounting.',
+    });
+  }
+
+  return {
+    provider: 'fallback-rules',
+    model: 'inventory-fallback-rules-v1',
+    summary: discrepancyCount > 0
+      ? `Audit has ${discrepancyCount} discrepancy items with ${accuracyPercent.toFixed(2)}% accuracy.`
+      : `Audit shows a full match with ${accuracyPercent.toFixed(2)}% accuracy.`,
+    insights,
+    warnings: input.warning ? [input.warning] : undefined,
+    generatedAt: getLocalISOString(),
+  };
+};
+
+const runOpenAiInventoryAuditorBrief = async (input: {
+  session: any;
+  reconciliation: any;
+  activeLaneCode?: string;
+  totalScannedPallets?: number;
+}): Promise<InventoryAuditorAiBrief> => {
+  if (!hasUsableOpenAiKey(OPENAI_API_KEY)) {
+    return buildInventoryAuditorFallbackBrief({
+      ...input,
+      warning: 'OpenAI API key is not configured correctly. Using fallback audit guidance.',
+    });
+  }
+
+  const summary = asRecord(input.reconciliation?.summary);
+  const discrepancies = Array.isArray(input.reconciliation?.discrepancies)
+    ? input.reconciliation.discrepancies.slice(0, 25).map((item: any) => ({
+        type: asString(item?.type),
+        locationCode: asString(item?.locationCode),
+        palletTag: asString(item?.palletTag),
+        sku: asString(item?.sku),
+        lot: asString(item?.lot),
+        expectedQty: asNumber(item?.expectedQty, 0),
+        actualQty: asNumber(item?.actualQty, 0),
+        quantityDifference: asNumber(item?.quantityDifference, 0),
+      }))
+    : [];
+
+  const promptPayload = {
+    session: {
+      id: input.session?.id,
+      site: asString(input.session?.site),
+      sessionName: asString(input.session?.sessionName),
+      status: asString(input.session?.status),
+      startedBy: asString(input.session?.startedBy),
+      startedAt: asString(input.session?.startedAt),
+      activeLaneCode: asString(input.activeLaneCode),
+      totalScannedPallets: asNumber(input.totalScannedPallets, 0),
+    },
+    summary: {
+      discrepancyCount: asNumber(summary.discrepancyCount, 0),
+      accuracyPercent: asNumber(summary.accuracyPercent, 0),
+      totalExpectedQty: asNumber(summary.totalExpectedQty, 0),
+      totalActualQty: asNumber(summary.totalActualQty, 0),
+    },
+    topDiscrepancies: discrepancies,
+  };
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You are OPSIQ Inventory Auditor AI Assistant.',
+              'Return strict JSON only.',
+              'Provide operational guidance for warehouse audit reconciliation.',
+              'Output schema: {"summary": string, "insights": [{"level":"high|medium|low","message": string}]}.',
+              'Keep insights actionable and concise (max 30 words each).',
+              'Do not include markdown.'
+            ].join(' '),
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(promptPayload),
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const warning = response.status === 401 || response.status === 403
+        ? 'OpenAI API key was rejected. Using fallback audit guidance.'
+        : `OpenAI request failed (${response.status}). Using fallback audit guidance.`;
+      return buildInventoryAuditorFallbackBrief({
+        ...input,
+        warning,
+      });
+    }
+
+    const completion = (await response.json()) as ChatCompletionPayload;
+    const content = completion?.choices?.[0]?.message?.content;
+    if (!content) {
+      return buildInventoryAuditorFallbackBrief({
+        ...input,
+        warning: 'OpenAI returned no content. Using fallback guidance.',
+      });
+    }
+
+    const parsed = asRecord(JSON.parse(content));
+    const summaryText = asString(parsed.summary) || 'AI summary was empty. Review discrepancy metrics directly.';
+    const rawInsights = Array.isArray(parsed.insights) ? parsed.insights : [];
+    const insights: InventoryAuditorAiInsight[] = rawInsights
+      .map((entry) => asRecord(entry))
+      .map((entry) => ({
+        level: normalizeInventoryInsightLevel(entry.level),
+        message: toSafeText(entry.message, 240),
+      }))
+      .filter((entry) => Boolean(entry.message))
+      .slice(0, 6);
+
+    if (!insights.length) {
+      return buildInventoryAuditorFallbackBrief({
+        ...input,
+        warning: 'OpenAI output did not include usable insights. Using fallback guidance.',
+      });
+    }
+
+    return {
+      provider: 'openai',
+      model: OPENAI_MODEL,
+      summary: summaryText,
+      insights,
+      generatedAt: getLocalISOString(),
+    };
+  } catch (error: any) {
+    return buildInventoryAuditorFallbackBrief({
+      ...input,
+      warning: `OpenAI analysis exception: ${String(error?.message || error)}`,
+    });
+  }
 };
 
 const getAuthorizedUser = async (authorizationHeader?: string): Promise<SessionUser | null> => {
@@ -1984,6 +2237,264 @@ app.get('/api/dock-checker/history', async (req, res) => {
     res.json(normalized);
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to load dock checker history' });
+  }
+});
+
+// ==================== INVENTORY AUDITOR API ====================
+
+app.post('/api/inventory-auditor/reports', async (req, res) => {
+  try {
+    const body = req.body || {};
+    if (!String(body.site || '').trim()) {
+      return res.status(400).json({ error: 'Site is required.' });
+    }
+    if (!String(body.reportName || '').trim()) {
+      return res.status(400).json({ error: 'Report name is required.' });
+    }
+    if (!String(body.reportDate || '').trim()) {
+      return res.status(400).json({ error: 'Report date is required.' });
+    }
+    if (!String(body.uploadedBy || '').trim()) {
+      return res.status(400).json({ error: 'Uploaded by is required.' });
+    }
+    if (!Array.isArray(body.rows) || body.rows.length === 0) {
+      return res.status(400).json({ error: 'At least one report row is required.' });
+    }
+
+    const saved = await db.createInventoryAuditReport({
+      site: String(body.site).trim(),
+      reportName: String(body.reportName).trim(),
+      reportDate: String(body.reportDate).trim(),
+      uploadedBy: String(body.uploadedBy).trim(),
+      rows: body.rows,
+    });
+
+    res.status(201).json(saved);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to upload inventory audit report' });
+  }
+});
+
+app.get('/api/inventory-auditor/reports', async (req, res) => {
+  try {
+    const reports = await db.getInventoryAuditReports({
+      site: String(req.query.site || '').trim() || undefined,
+    });
+    res.json(Array.isArray(reports) ? reports : []);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load inventory audit reports' });
+  }
+});
+
+app.post('/api/inventory-auditor/sessions', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const reportId = Number(body.reportId || 0);
+    if (!String(body.site || '').trim()) {
+      return res.status(400).json({ error: 'Site is required.' });
+    }
+    if (!Number.isFinite(reportId) || reportId <= 0) {
+      return res.status(400).json({ error: 'Valid reportId is required.' });
+    }
+    if (!String(body.sessionName || '').trim()) {
+      return res.status(400).json({ error: 'Session name is required.' });
+    }
+    if (!String(body.startedBy || '').trim()) {
+      return res.status(400).json({ error: 'Started by is required.' });
+    }
+
+    const created = await db.createInventoryAuditSession({
+      site: String(body.site).trim(),
+      reportId,
+      sessionName: String(body.sessionName).trim(),
+      startedBy: String(body.startedBy).trim(),
+    });
+
+    res.status(201).json(created);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to create inventory audit session' });
+  }
+});
+
+app.get('/api/inventory-auditor/sessions', async (req, res) => {
+  try {
+    const sessions = await db.getInventoryAuditSessions({
+      site: String(req.query.site || '').trim() || undefined,
+    });
+    res.json(Array.isArray(sessions) ? sessions : []);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load inventory audit sessions' });
+  }
+});
+
+app.post('/api/inventory-auditor/sessions/:sessionId/scans', async (req, res) => {
+  try {
+    const sessionId = Number(req.params.sessionId || 0);
+    const body = req.body || {};
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return res.status(400).json({ error: 'Valid sessionId is required.' });
+    }
+    if (!String(body.locationCode || '').trim()) {
+      return res.status(400).json({ error: 'Location code is required.' });
+    }
+    if (!String(body.palletTag || '').trim() && !String(body.sku || '').trim()) {
+      return res.status(400).json({ error: 'Pallet tag or SKU is required.' });
+    }
+    if (!Number.isFinite(Number(body.quantity)) || Number(body.quantity) <= 0) {
+      return res.status(400).json({ error: 'Quantity must be greater than 0.' });
+    }
+    if (!String(body.scannedBy || '').trim()) {
+      return res.status(400).json({ error: 'Scanned by is required.' });
+    }
+
+    const saved = await db.addInventoryAuditScan(sessionId, {
+      locationCode: String(body.locationCode).trim(),
+      palletTag: String(body.palletTag || '').trim() || undefined,
+      sku: String(body.sku || '').trim() || undefined,
+      lot: String(body.lot || '').trim() || undefined,
+      quantity: Number(body.quantity),
+      scannedBy: String(body.scannedBy).trim(),
+      source: String(body.source || 'scanner').trim(),
+    });
+
+    res.status(201).json(saved);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to save inventory audit scan' });
+  }
+});
+
+app.get('/api/inventory-auditor/sessions/:sessionId', async (req, res) => {
+  try {
+    const sessionId = Number(req.params.sessionId || 0);
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return res.status(400).json({ error: 'Valid sessionId is required.' });
+    }
+
+    const session = await db.getInventoryAuditSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Inventory audit session not found.' });
+    }
+
+    res.json(session);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to load inventory audit session' });
+  }
+});
+
+app.get('/api/inventory-auditor/sessions/:sessionId/reconciliation', async (req, res) => {
+  try {
+    const sessionId = Number(req.params.sessionId || 0);
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return res.status(400).json({ error: 'Valid sessionId is required.' });
+    }
+
+    const reconciliation = await db.getInventoryAuditReconciliation(sessionId);
+    res.json(reconciliation);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to run inventory audit reconciliation' });
+  }
+});
+
+app.post('/api/inventory-auditor/parse-pdf', (req, res) => {
+  inventoryAuditorPdfUpload.single('file')(req, res, async (uploadError: any) => {
+    if (uploadError) {
+      return res.status(400).json({ error: uploadError?.message || 'Invalid PDF upload.' });
+    }
+
+    try {
+      const uploaded = (req as any).file;
+      if (!uploaded || !uploaded.buffer?.length) {
+        return res.status(400).json({ error: 'PDF file is required.' });
+      }
+
+      const parser = new PDFParse({ data: uploaded.buffer });
+      const textResult = await parser.getText();
+      await parser.destroy();
+
+      const rawText = String(textResult?.text || '');
+      const lines = rawText
+        .split(/\r?\n/)
+        .map((line) => line.replace(/\s+/g, ' ').trim())
+        .filter(Boolean);
+
+      const rows: Array<{
+        locationCode: string;
+        palletTag?: string;
+        quantity: number;
+      }> = [];
+
+      lines.forEach((line) => {
+        if (/(location|quantity|qty|inventory by location|page\s+\d+)/i.test(line) && !/\d{2}[A-Z]{2}\d{8}/i.test(line)) {
+          return;
+        }
+
+        const tokens = line.split(' ');
+        const location = tokens.find((token) => /^[A-Z]{1,4}\d{1,4}[A-Z0-9-]*$/i.test(token));
+        const qtyToken = [...tokens].reverse().find((token) => /^\d+(\.\d+)?$/.test(token));
+        const palletTagToken = tokens.find((token) => /\d{2}[A-Z]{2}\d{8}/i.test(token));
+
+        if (!location || !qtyToken) {
+          return;
+        }
+
+        const quantity = Number(qtyToken);
+        if (!Number.isFinite(quantity) || quantity < 0) {
+          return;
+        }
+
+        const palletTag = palletTagToken
+          ? String(palletTagToken).toUpperCase().replace(/[^A-Z0-9]/g, '').match(/(\d{2}[A-Z]{2}\d{8})/)?.[1]
+          : undefined;
+
+        rows.push({
+          locationCode: String(location).toUpperCase(),
+          quantity,
+          palletTag,
+        });
+      });
+
+      const deduped = Array.from(new Map(rows.map((row) => [`${row.locationCode}|${row.palletTag || ''}|${row.quantity}`, row])).values());
+
+      if (!deduped.length) {
+        return res.status(400).json({
+          error: 'Could not parse this PDF into inventory rows. This PDF may be image-only or differently formatted. Try CSV/XLSX export.',
+          textSample: rawText.slice(0, 240),
+        });
+      }
+
+      res.json({ rows: deduped });
+    } catch (error: any) {
+      res.status(400).json({ error: error?.message || 'Failed to parse inventory PDF.' });
+    }
+  });
+});
+
+app.post('/api/inventory-auditor/sessions/:sessionId/ai-brief', async (req, res) => {
+  try {
+    const sessionId = Number(req.params.sessionId || 0);
+    if (!Number.isFinite(sessionId) || sessionId <= 0) {
+      return res.status(400).json({ error: 'Valid sessionId is required.' });
+    }
+
+    const session = await db.getInventoryAuditSession(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: 'Inventory audit session not found.' });
+    }
+
+    const reconciliation = await db.getInventoryAuditReconciliation(sessionId);
+    const activeLaneCode = asString(req.body?.activeLaneCode);
+    const totalScannedPallets = asNumber(req.body?.totalScannedPallets, 0);
+
+    const brief = await runOpenAiInventoryAuditorBrief({
+      session,
+      reconciliation,
+      activeLaneCode,
+      totalScannedPallets,
+    });
+
+    res.json(brief);
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to generate inventory audit AI brief' });
   }
 });
 

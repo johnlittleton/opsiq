@@ -1,7 +1,10 @@
 // Centralized API base URL configuration
-// In production (Railway), frontend and backend are on same origin
-// In development browser mode, uses localhost:3000
-// In Electron desktop app (including dev), connects directly to Railway unless overridden
+// In production (Railway), frontend and backend are on same origin.
+// In development browser mode, default to localhost:3000.
+// In development Electron mode, default to Railway to mirror deployed desktop behavior.
+// Optional overrides:
+// - VITE_FORCE_LOCAL_DEV_API=true   -> force localhost in dev
+// - VITE_FORCE_RAILWAY_DEV_API=true -> force Railway in dev
 
 // Hard-coded Railway URL for Electron builds
 const RAILWAY_URL = 'https://opsiq-production.up.railway.app';
@@ -22,14 +25,32 @@ export const getApiBase = (): string => {
     return envApiBase.trim();
   }
 
+  const forceLocalDevApi = String(import.meta.env.VITE_FORCE_LOCAL_DEV_API || '').toLowerCase() === 'true';
+  const forceRailwayDevApi = String(import.meta.env.VITE_FORCE_RAILWAY_DEV_API || '').toLowerCase() === 'true';
+
+  // Dev defaults:
+  // - Browser dev: local API
+  // - Electron dev: Railway API (parity with deployed desktop app)
+  if (import.meta.env.DEV) {
+    if (forceRailwayDevApi) {
+      return RAILWAY_URL;
+    }
+
+    if (forceLocalDevApi) {
+      return LOCAL_DEV_API_URL;
+    }
+
+    if (isElectronRenderer()) {
+      return RAILWAY_URL;
+    }
+
+    return LOCAL_DEV_API_URL;
+  }
+
   // Electron renderer should use hosted API by default, even during dev.
   // Use VITE_API_BASE to force local API when needed.
   if (isElectronRenderer()) {
     return RAILWAY_URL;
-  }
-
-  if (import.meta.env.DEV) {
-    return LOCAL_DEV_API_URL;
   }
 
   if (typeof window !== 'undefined') {
