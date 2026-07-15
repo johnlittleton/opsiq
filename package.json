@@ -125,7 +125,7 @@
     "publish": {
       "provider": "github",
       "owner": "johnlittleton",
-      "repo": "opsiq",
+      "repo": "opsiq-updates",
       "releaseType": "release"
     }
   }
