@@ -202,7 +202,12 @@ export default function DockCheckerHistory() {
                   {Array.isArray(entry.imagePaths) && entry.imagePaths.length > 0 && (
                     <div className="dock-checker-history__images">
                       {entry.imagePaths.map((image: HistoryImage, index: number) => {
-                        const fullUrl = String(image.url).startsWith('http') ? image.url : `${API_BASE}${image.url}`;
+                        // For dock checker images, try localhost first (local storage), then fallback to API_BASE
+                        let fullUrl = String(image.url).startsWith('http') ? image.url : `${API_BASE}${image.url}`;
+                        // If API_BASE is Railway but image URL is dock-checker, try localhost first
+                        if (fullUrl.includes('opsiq-production') && image.url?.includes('dock-checker')) {
+                          fullUrl = `http://localhost:3000${image.url}`;
+                        }
                         return (
                           <a key={`${image.url}-${index}`} className="dock-checker-history__thumb" href={fullUrl} target="_blank" rel="noreferrer" title={`Image ${index + 1}`}>
                             <img src={fullUrl} alt={`Dock checker image ${index + 1}`} loading="lazy" />
