@@ -1,0 +1,54 @@
+Subject: Quick Guide – Inventory Auditor & Dock Checker History
+
+---
+
+Hi Team,
+
+We've streamlined two important tools in OpsIQ to help you work more efficiently. Here's how to use them:
+
+📦 INVENTORY AUDITOR (Simplified 3-Step Process)
+
+The Inventory Auditor helps verify shelf inventory against Famous inventory records.
+
+How to use:
+
+1. Upload – Start on the Inventory Auditor page and upload your Famous inventory CSV report
+
+2. Scan – The system will guide you through each lane:
+   - Scan the lane placard to confirm the location
+   - Scan each pallet in that lane (the system will automatically switch to pallet scan mode)
+   - Mark the lane complete once all pallets are scanned
+
+3. Audit – The system automatically runs the audit when you've completed all lanes, showing any discrepancies between scanned quantities and the Famous report
+
+The process displays exactly what's needed at each step, so you'll always know what to do next.
+
+---
+
+📚 DOCK CHECKER HISTORY (Search & Review Forms)
+
+The Dock Checker History lets you search and review all inbound and outbound dock checker forms submitted by your team.
+
+How to use:
+
+1. Go to Dock Checker History from the home screen
+
+2. Use the filters to narrow results:
+   - Date Range – Select start and end dates (defaults to last 7 days)
+   - Form Type – Choose "Inbound," "Outbound," or "All Forms"
+   - Search – Find forms by reference number, company, checker name, or notes
+
+3. Click "Details" on any form to expand and see:
+   - Who submitted it and when
+   - Door ID, check-in ID, pallets offloaded/loaded
+   - QC issues or damage flags
+   - All attached photos from the inspection
+
+This makes it easy to verify work, track team activity, and resolve any questions about past shipments.
+
+---
+
+If you have any questions or need help, please reach out!
+
+Best regards,
+[Your Name/Team]
