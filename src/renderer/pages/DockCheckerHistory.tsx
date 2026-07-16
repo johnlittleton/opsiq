@@ -76,6 +76,26 @@ export default function DockCheckerHistory() {
   const [rows, setRows] = useState<any[]>([]);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [imageSrcOverrides, setImageSrcOverrides] = useState<Record<string, string>>({});
+
+  const getImageCandidates = (rawUrl: string): string[] => {
+    const trimmed = String(rawUrl || '').trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return [trimmed];
+    }
+
+    const remote = `${API_BASE}${trimmed}`;
+    const local = `http://localhost:3000${trimmed}`;
+
+    if (trimmed.includes('/uploads/dock-checker/')) {
+      // Prefer hosted API in packaged app; use localhost only if image fails to load.
+      return [remote, local];
+    }
+
+    return [remote];
+  };
 
   const loadHistory = async () => {
     setLoading(true);
@@ -220,15 +240,22 @@ export default function DockCheckerHistory() {
                   {Array.isArray(entry.imagePaths) && entry.imagePaths.length > 0 && (
                     <div className="dock-checker-history__images">
                       {entry.imagePaths.map((image: HistoryImage, index: number) => {
-                        // For dock checker images, try localhost first (local storage), then fallback to API_BASE
-                        let fullUrl = String(image.url).startsWith('http') ? image.url : `${API_BASE}${image.url}`;
-                        // If API_BASE is Railway but image URL is dock-checker, try localhost first
-                        if (fullUrl.includes('opsiq-production') && image.url?.includes('dock-checker')) {
-                          fullUrl = `http://localhost:3000${image.url}`;
-                        }
+                        const imageKey = `${rowKey}-${image.url}-${index}`;
+                        const candidates = getImageCandidates(image.url);
+                        const currentSrc = imageSrcOverrides[imageKey] || candidates[0] || '';
                         return (
-                          <div key={`${image.url}-${index}`} className="dock-checker-history__thumb" onClick={() => setLightboxUrl(fullUrl)} title={`Image ${index + 1}`} style={{cursor:'pointer'}}>
-                            <img src={fullUrl} alt={`Dock checker image ${index + 1}`} loading="lazy" />
+                          <div key={`${image.url}-${index}`} className="dock-checker-history__thumb" onClick={() => currentSrc && setLightboxUrl(currentSrc)} title={`Image ${index + 1}`} style={{cursor:'pointer'}}>
+                            <img
+                              src={currentSrc}
+                              alt={`Dock checker image ${index + 1}`}
+                              loading="lazy"
+                              onError={() => {
+                                const activeIndex = candidates.indexOf(currentSrc);
+                                const nextSrc = activeIndex >= 0 ? candidates[activeIndex + 1] : undefined;
+                                if (!nextSrc || nextSrc === currentSrc) return;
+                                setImageSrcOverrides((prev) => ({ ...prev, [imageKey]: nextSrc }));
+                              }}
+                            />
                             <span className="dock-checker-history__thumb-name">Image {index + 1}</span>
                             <span className="dock-checker-history__thumb-time">{formatThumbUploadTime(image)}</span>
                           </div>
