@@ -239,6 +239,14 @@ const sendUpdaterStatus = (payload: UpdaterStatusPayload) => {
 };
 
 // Configure auto-updater
+// Explicitly override app-update.yml so all installed versions (including older
+// builds that pointed to the wrong repo) always check opsiq-updates for updates.
+autoUpdater.setFeedURL({
+  provider: 'github',
+  owner: 'johnlittleton',
+  repo: 'opsiq-updates',
+  releaseType: 'release',
+} as any);
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
