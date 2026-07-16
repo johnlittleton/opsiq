@@ -75,6 +75,7 @@ export default function DockCheckerHistory() {
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<any[]>([]);
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -129,6 +130,23 @@ export default function DockCheckerHistory() {
 
   return (
     <div className="dock-checker-page">
+      {lightboxUrl && (
+        <div
+          onClick={() => setLightboxUrl(null)}
+          style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out'}}
+        >
+          <img
+            src={lightboxUrl}
+            alt="Full size"
+            onClick={(e) => e.stopPropagation()}
+            style={{maxWidth:'90vw',maxHeight:'90vh',borderRadius:8,boxShadow:'0 4px 32px rgba(0,0,0,0.7)',cursor:'default'}}
+          />
+          <button
+            onClick={() => setLightboxUrl(null)}
+            style={{position:'absolute',top:16,right:24,background:'transparent',border:'none',color:'#fff',fontSize:32,cursor:'pointer',lineHeight:1}}
+          >✕</button>
+        </div>
+      )}
       <div className="dock-checker-page__header">
         <h1 className="dock-checker-page__title">Dock Checker History</h1>
         <button className="dock-checker-page__home-btn" onClick={() => navigate('/home')}>Back Home</button>
@@ -209,11 +227,11 @@ export default function DockCheckerHistory() {
                           fullUrl = `http://localhost:3000${image.url}`;
                         }
                         return (
-                          <a key={`${image.url}-${index}`} className="dock-checker-history__thumb" href={fullUrl} target="_blank" rel="noreferrer" title={`Image ${index + 1}`}>
+                          <div key={`${image.url}-${index}`} className="dock-checker-history__thumb" onClick={() => setLightboxUrl(fullUrl)} title={`Image ${index + 1}`} style={{cursor:'pointer'}}>
                             <img src={fullUrl} alt={`Dock checker image ${index + 1}`} loading="lazy" />
                             <span className="dock-checker-history__thumb-name">Image {index + 1}</span>
                             <span className="dock-checker-history__thumb-time">{formatThumbUploadTime(image)}</span>
-                          </a>
+                          </div>
                         );
                       })}
                     </div>
