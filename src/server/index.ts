@@ -49,14 +49,22 @@ app.use(cors());
 app.use(express.json());
 
 const railwayVolumeRoot = String(process.env.RAILWAY_VOLUME_MOUNT_PATH || '').trim();
-const dockCheckerUploadsDir = railwayVolumeRoot
+const dockCheckerPrimaryUploadsDir = railwayVolumeRoot
   ? path.join(railwayVolumeRoot, 'dock-checker-uploads')
   : path.join(process.cwd(), 'data', 'dock-checker-uploads');
-fs.mkdirSync(dockCheckerUploadsDir, { recursive: true });
-app.use('/uploads/dock-checker', express.static(dockCheckerUploadsDir));
+const dockCheckerLegacyUploadsDir = path.join(process.cwd(), 'data', 'dock-checker-uploads');
+
+const dockCheckerStaticDirs = Array.from(
+  new Set([dockCheckerPrimaryUploadsDir, dockCheckerLegacyUploadsDir])
+);
+
+dockCheckerStaticDirs.forEach((dirPath) => {
+  fs.mkdirSync(dirPath, { recursive: true });
+  app.use('/uploads/dock-checker', express.static(dirPath));
+});
 
 const dockCheckerUploadStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, dockCheckerUploadsDir),
+  destination: (_req, _file, cb) => cb(null, dockCheckerPrimaryUploadsDir),
   filename: (_req, file, cb) => {
     const safeOriginal = String(file.originalname || 'upload')
       .replace(/[^a-zA-Z0-9._-]/g, '_')
