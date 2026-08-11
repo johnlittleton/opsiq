@@ -14,8 +14,9 @@ const LINES = [
   { id: 2, name: 'Giro Line 2' },
   { id: 3, name: 'Giro Line 3' },
   { id: 4, name: 'Giro Line 4' },
-  { id: 5, name: 'Hand Pack' },
-  { id: 6, name: 'Regrade' }
+  { id: 5, name: 'Giro Line 5' },
+  { id: 6, name: 'Giro Line 6' },
+  { id: 7, name: 'HP Line 7' }
 ];
 
 const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00'];
@@ -1320,7 +1321,7 @@ export default function ProductionScheduler() {
                 📋 WO History
               </button>
               <button className="history-btn" onClick={() => navigate('/pallet-tracker')}>
-                🏷️ Pallet Tracker
+                🏷️ Inventory Tracker
               </button>
               <button className="downtime-history-btn" onClick={() => navigate('/downtime-history')}>
                 ⏱️ Downtime
@@ -1388,7 +1389,7 @@ export default function ProductionScheduler() {
               📋 WO History
             </button>
             <button className="history-btn" onClick={() => navigate('/pallet-tracker')}>
-              🏷️ Pallet Tracker
+              🏷️ Inventory Tracker
             </button>
           </div>
         </div>

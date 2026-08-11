@@ -13,8 +13,9 @@ const LINES = [
   { id: 2, name: 'Giro Line 2' },
   { id: 3, name: 'Giro Line 3' },
   { id: 4, name: 'Giro Line 4' },
-  { id: 5, name: 'Hand Pack' },
-  { id: 6, name: 'Regrade' }
+  { id: 5, name: 'Giro Line 5' },
+  { id: 6, name: 'Giro Line 6' },
+  { id: 7, name: 'HP Line 7' }
 ];
 
 const LABOR_KPI_TARGET_PER_CASE = 1.25;

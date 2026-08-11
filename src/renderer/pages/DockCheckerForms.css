@@ -5,6 +5,8 @@
   background: #0f172a;
   color: #e2e8f0;
   padding: 14px;
+  display: flex;
+  flex-direction: column;
 }
 
 .dock-checker-page__header {
@@ -358,6 +360,10 @@
 .dock-checker-history__list {
   display: grid;
   gap: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
 }
 
 .dock-checker-history__item {
@@ -492,6 +498,11 @@
   .dock-checker-page {
     overflow-y: auto;
     padding: 12px;
+  }
+
+  .dock-checker-history__list {
+    overflow: visible;
+    padding-right: 0;
   }
 
   .dock-checker-form {
