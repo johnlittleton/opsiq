@@ -244,14 +244,15 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: none;
   gap: 4px;
   grid-auto-rows: minmax(92px, auto);
   align-content: start;
   align-items: stretch;
-  overflow: hidden;
-  padding-right: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
 }
 
 .combined-live-dashboard__line-card {
@@ -262,6 +263,7 @@
   min-height: 0;
   height: 100%;
   max-height: none;
+  transform: translateZ(0);
 }
 
 .combined-live-dashboard__line-card.is-over {
@@ -278,19 +280,19 @@
 .combined-live-dashboard__line-header h3,
 .combined-live-dashboard__department-top h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: #f8fafc;
   line-height: 1.1;
 }
 
 .combined-live-dashboard__line-header p {
   margin: 1px 0 0;
-  font-size: 9px;
+  font-size: 8px;
   color: #93c5fd;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 170px;
 }
 
 .combined-live-dashboard__line-status {
@@ -313,7 +315,7 @@
 .combined-live-dashboard__line-metrics strong {
   display: block;
   margin-top: 1px;
-  font-size: 11px;
+  font-size: 10px;
   color: #f8fafc;
   line-height: 1.1;
 }
@@ -321,10 +323,11 @@
 .combined-live-dashboard__line-footer {
   display: flex;
   justify-content: space-between;
-  gap: 6px;
+  gap: 4px;
   margin-top: 4px;
   padding-top: 4px;
   flex-wrap: wrap;
+  font-size: 8px;
 }
 
 .combined-live-dashboard__truncation-note {
@@ -427,68 +430,43 @@
   color: #f8fafc;
 }
 
-.combined-live-dashboard__forklift-list {
+.combined-live-dashboard__forklift-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px;
-  max-height: none;
-  overflow: hidden;
+  gap: 6px;
+  margin-top: 4px;
 }
 
-.combined-live-dashboard__forklift-row {
+.combined-live-dashboard__forklift-stat {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 3px 5px;
-  min-height: 24px;
-  border-radius: 8px;
+  justify-content: center;
+  gap: 2px;
+  min-height: 54px;
+  border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(30, 41, 59, 0.45);
 }
 
-.combined-live-dashboard__forklift-name {
-  font-size: 9px;
-  font-weight: 700;
-  color: #e2e8f0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 120px;
-}
-
-.combined-live-dashboard__forklift-metrics {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  font-size: 7px;
+.combined-live-dashboard__forklift-stat span {
+  font-size: 8px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
   color: #94a3b8;
 }
 
-.combined-live-dashboard__forklift-metrics strong {
-  font-size: 10px;
-  text-transform: none;
-  letter-spacing: 0;
+.combined-live-dashboard__forklift-stat strong {
+  font-size: 24px;
   color: #f8fafc;
+  line-height: 1;
 }
 
-.combined-live-dashboard__forklift-flow {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-}
-
-.combined-live-dashboard__forklift-flow-in {
+.combined-live-dashboard__forklift-stat.inbound strong {
   color: #34d399;
 }
 
-.combined-live-dashboard__forklift-flow-sep {
-  color: #64748b;
-}
-
-.combined-live-dashboard__forklift-flow-out {
+.combined-live-dashboard__forklift-stat.outbound strong {
   color: #60a5fa;
 }
 

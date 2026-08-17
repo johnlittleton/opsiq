@@ -104,7 +104,7 @@ const KPI_TARGET_PER_CASE = 1.25;
 const PALLET_STORAGE_RATE = 41;
 const STORAGE_BASELINE_DATE = '2026-06-01';
 const HISTORICAL_MIN_DATE = '2026-07-08';
-const MAX_VISIBLE_LINES = 3;
+const MAX_VISIBLE_LINES = Number.MAX_SAFE_INTEGER;
 const CITRUS_PACKING_RATES: Record<string, number> = {
   '4-8': 4.43,
   '5-6': 4.45,
@@ -208,6 +208,8 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
   const [activeLines, setActiveLines] = useState<ActiveLineCard[]>([]);
   const [forkliftDrivers, setForkliftDrivers] = useState<ForkliftDriverCard[]>([]);
   const [forkliftTotalLoads, setForkliftTotalLoads] = useState(0);
+  const [forkliftInboundLoads, setForkliftInboundLoads] = useState(0);
+  const [forkliftOutboundLoads, setForkliftOutboundLoads] = useState(0);
   const [selectedDock, setSelectedDock] = useState<DockDoorWithCheckin | null>(null);
   const [productionVerificationSummary, setProductionVerificationSummary] = useState<VerificationSummary>({ total: 0, verified: 0, missing: 0 });
   const [dockVerificationSummary, setDockVerificationSummary] = useState<VerificationSummary>({ total: 0, verified: 0, missing: 0 });
@@ -408,6 +410,20 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
             : [];
 
           setClosedCheckins(normalizedClosedCheckins);
+
+          const inboundLoadsToday = normalizedClosedCheckins.filter((checkin) => {
+            const closeDate = getDateOnly(checkin.closedAt);
+            return closeDate === effectiveDate && String(checkin.inboundOutbound || '').toLowerCase() === 'inbound';
+          }).length;
+
+          const outboundLoadsToday = normalizedClosedCheckins.filter((checkin) => {
+            const closeDate = getDateOnly(checkin.closedAt);
+            return closeDate === effectiveDate && String(checkin.inboundOutbound || '').toLowerCase() === 'outbound';
+          }).length;
+
+          setForkliftInboundLoads(inboundLoadsToday);
+          setForkliftOutboundLoads(outboundLoadsToday);
+          setForkliftTotalLoads(inboundLoadsToday + outboundLoadsToday);
 
           const outboundCheckinIds = normalizedClosedCheckins
             .filter((checkin) => {
@@ -949,25 +965,17 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
             <div className="combined-live-dashboard__production-forklifts">
               <div className="panel-shell__header">
                 <h2>Forklift Loads Completed</h2>
-                <span>{forkliftTotalLoads} loads</span>
+                <span>{forkliftTotalLoads} total</span>
               </div>
-              <div className="combined-live-dashboard__forklift-list">
-                {forkliftDrivers.length > 0 ? forkliftDrivers.map((driver) => (
-                  <div key={driver.name} className="combined-live-dashboard__forklift-row">
-                    <div className="combined-live-dashboard__forklift-name">{driver.name}</div>
-                    <div className="combined-live-dashboard__forklift-metrics">
-                      <span>{driver.loads} loads</span>
-                      <span className="combined-live-dashboard__forklift-flow">
-                        <span className="combined-live-dashboard__forklift-flow-in">In {driver.inboundPallets}</span>
-                        <span className="combined-live-dashboard__forklift-flow-sep">/</span>
-                        <span className="combined-live-dashboard__forklift-flow-out">Out {driver.outboundPallets}</span>
-                      </span>
-                      <strong>{driver.pallets} pallets</strong>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="combined-live-dashboard__empty">No completed loads yet today.</div>
-                )}
+              <div className="combined-live-dashboard__forklift-summary">
+                <div className="combined-live-dashboard__forklift-stat inbound">
+                  <span>Inbound</span>
+                  <strong>{forkliftInboundLoads}</strong>
+                </div>
+                <div className="combined-live-dashboard__forklift-stat outbound">
+                  <span>Outbound</span>
+                  <strong>{forkliftOutboundLoads}</strong>
+                </div>
               </div>
             </div>
 

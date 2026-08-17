@@ -1,10 +1,35 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../services/api';
 import { API_BASE } from '../services/config';
 import { useAuth } from '../context/AuthContext';
 import CameraCaptureModal from '../components/CameraCaptureModal';
 import './DockCheckerForms.css';
+
+const OUTBOUND_DRAFT_KEY = 'opsiq-outbound-dock-checker-draft';
+
+const readOutboundDraft = () => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(OUTBOUND_DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as {
+      referenceNumber: string;
+      company: string;
+      doorId: string;
+      checkinId: string;
+      palletsOffloaded: string;
+      checkerName: string;
+      forkliftOperatorName: string;
+      palletsLoaded: string;
+      notes: string;
+      bools: BoolFields;
+    };
+  } catch {
+    return null;
+  }
+};
 
 type UploadedImage = {
   url: string;
@@ -70,21 +95,84 @@ export default function OutboundDockCheckerForm() {
   const navigate = useNavigate();
   const { executiveName } = useAuth();
 
-  const [referenceNumber, setReferenceNumber] = useState('');
-  const [company, setCompany] = useState('');
-  const [doorId, setDoorId] = useState('');
-  const [checkinId, setCheckinId] = useState('');
-  const [palletsOffloaded, setPalletsOffloaded] = useState('0');
-  const [checkerName, setCheckerName] = useState('');
-  const [forkliftOperatorName, setForkliftOperatorName] = useState('');
-  const [palletsLoaded, setPalletsLoaded] = useState('0');
-  const [notes, setNotes] = useState('');
-  const [bools, setBools] = useState<BoolFields>(defaultBools);
+  const savedDraft = readOutboundDraft();
+  const [referenceNumber, setReferenceNumber] = useState(savedDraft?.referenceNumber ?? '');
+  const [company, setCompany] = useState(savedDraft?.company ?? '');
+  const [doorId, setDoorId] = useState(savedDraft?.doorId ?? '');
+  const [checkinId, setCheckinId] = useState(savedDraft?.checkinId ?? '');
+  const [palletsOffloaded, setPalletsOffloaded] = useState(savedDraft?.palletsOffloaded ?? '0');
+  const [checkerName, setCheckerName] = useState(savedDraft?.checkerName ?? '');
+  const [forkliftOperatorName, setForkliftOperatorName] = useState(savedDraft?.forkliftOperatorName ?? '');
+  const [palletsLoaded, setPalletsLoaded] = useState(savedDraft?.palletsLoaded ?? '0');
+  const [notes, setNotes] = useState(savedDraft?.notes ?? '');
+  const [bools, setBools] = useState<BoolFields>(savedDraft?.bools ?? defaultBools);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+  const [lastUndoState, setLastUndoState] = useState<{
+    referenceNumber: string;
+    company: string;
+    doorId: string;
+    checkinId: string;
+    palletsOffloaded: string;
+    checkerName: string;
+    forkliftOperatorName: string;
+    palletsLoaded: string;
+    notes: string;
+    bools: BoolFields;
+  } | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (submitting) return;
+
+    const draft = {
+      referenceNumber,
+      company,
+      doorId,
+      checkinId,
+      palletsOffloaded,
+      checkerName,
+      forkliftOperatorName,
+      palletsLoaded,
+      notes,
+      bools,
+    };
+
+    window.localStorage.setItem(OUTBOUND_DRAFT_KEY, JSON.stringify(draft));
+  }, [bools, checkinId, checkerName, company, doorId, forkliftOperatorName, notes, palletsLoaded, palletsOffloaded, referenceNumber, submitting]);
+
+  const pushUndoState = () => {
+    setLastUndoState({
+      referenceNumber,
+      company,
+      doorId,
+      checkinId,
+      palletsOffloaded,
+      checkerName,
+      forkliftOperatorName,
+      palletsLoaded,
+      notes,
+      bools,
+    });
+  };
+
+  const handleUndo = () => {
+    if (!lastUndoState) return;
+
+    setReferenceNumber(lastUndoState.referenceNumber);
+    setCompany(lastUndoState.company);
+    setDoorId(lastUndoState.doorId);
+    setCheckinId(lastUndoState.checkinId);
+    setPalletsOffloaded(lastUndoState.palletsOffloaded);
+    setCheckerName(lastUndoState.checkerName);
+    setForkliftOperatorName(lastUndoState.forkliftOperatorName);
+    setPalletsLoaded(lastUndoState.palletsLoaded);
+    setNotes(lastUndoState.notes);
+    setBools(lastUndoState.bools);
+    setLastUndoState(null);
+  };
 
   const imagePayload = useMemo(
     () => uploadedImages.map((item) => ({ url: item.url, uploadedAt: item.uploadedAt, fileName: item.fileName })),
@@ -171,6 +259,8 @@ export default function OutboundDockCheckerForm() {
         submittedBy: executiveName || 'Dock Team',
       });
 
+      window.localStorage.removeItem(OUTBOUND_DRAFT_KEY);
+      setLastUndoState(null);
       alert('Outbound dock checker form saved.');
       navigate('/dock-checker/history');
     } catch (error: any) {
@@ -221,78 +311,78 @@ export default function OutboundDockCheckerForm() {
           <div className="dock-checker-form__grid">
             <div className="dock-checker-form__field">
               <label>Sales Order / PO Reference</label>
-              <input value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} placeholder="SO or PO number" />
+              <input value={referenceNumber} onChange={(e) => { pushUndoState(); setReferenceNumber(e.target.value); }} placeholder="SO or PO number" />
             </div>
             <div className="dock-checker-form__field">
               <label>Company</label>
-              <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Optional" />
+              <input value={company} onChange={(e) => { pushUndoState(); setCompany(e.target.value); }} placeholder="Optional" />
             </div>
             <div className="dock-checker-form__field">
               <label>Door ID</label>
-              <input type="number" min="1" value={doorId} onChange={(e) => setDoorId(e.target.value)} placeholder="Optional" />
+              <input type="number" min="1" value={doorId} onChange={(e) => { pushUndoState(); setDoorId(e.target.value); }} placeholder="Optional" />
             </div>
             <div className="dock-checker-form__field">
               <label>Check-in ID</label>
-              <input type="number" min="1" value={checkinId} onChange={(e) => setCheckinId(e.target.value)} placeholder="Optional" />
+              <input type="number" min="1" value={checkinId} onChange={(e) => { pushUndoState(); setCheckinId(e.target.value); }} placeholder="Optional" />
             </div>
             <div className="dock-checker-form__field">
               <label>How many pallets were off loaded</label>
-              <input type="number" min="0" value={palletsOffloaded} onChange={(e) => setPalletsOffloaded(e.target.value)} />
+              <input type="number" min="0" value={palletsOffloaded} onChange={(e) => { pushUndoState(); setPalletsOffloaded(e.target.value); }} />
             </div>
             <div className="dock-checker-form__field">
               <label>How many pallets were loaded</label>
-              <input type="number" min="0" value={palletsLoaded} onChange={(e) => setPalletsLoaded(e.target.value)} />
+              <input type="number" min="0" value={palletsLoaded} onChange={(e) => { pushUndoState(); setPalletsLoaded(e.target.value); }} />
             </div>
             <div className="dock-checker-form__field">
-              <label>Checker</label>
-              <input value={checkerName} onChange={(e) => setCheckerName(e.target.value)} placeholder="Required" />
+              <label>QC</label>
+              <input value={checkerName} onChange={(e) => { pushUndoState(); setCheckerName(e.target.value); }} placeholder="Required" />
             </div>
             <div className="dock-checker-form__field">
               <label>Forklift Operator</label>
-              <input value={forkliftOperatorName} onChange={(e) => setForkliftOperatorName(e.target.value)} placeholder="Required" />
+              <input value={forkliftOperatorName} onChange={(e) => { pushUndoState(); setForkliftOperatorName(e.target.value); }} placeholder="Required" />
             </div>
           </div>
 
           <div className="dock-checker-form__questions">
             <div className="dock-checker-form__question">
               <span>Does the Sales Order/PO match the pick ticket?</span>
-              {yesNo(bools.salesOrderPoMatchesPickTicket, (next) => setBools((c) => ({ ...c, salesOrderPoMatchesPickTicket: next })), 'salesOrderPoMatchesPickTicket')}
+              {yesNo(bools.salesOrderPoMatchesPickTicket, (next) => { pushUndoState(); setBools((c) => ({ ...c, salesOrderPoMatchesPickTicket: next })); }, 'salesOrderPoMatchesPickTicket')}
             </div>
             <div className="dock-checker-form__question">
               <span>Does the qty on the pick tickets match?</span>
-              {yesNo(bools.qtyOnPickTicketsMatch, (next) => setBools((c) => ({ ...c, qtyOnPickTicketsMatch: next })), 'qtyOnPickTicketsMatch')}
+              {yesNo(bools.qtyOnPickTicketsMatch, (next) => { pushUndoState(); setBools((c) => ({ ...c, qtyOnPickTicketsMatch: next })); }, 'qtyOnPickTicketsMatch')}
             </div>
             <div className="dock-checker-form__question">
               <span>Do the pallet tags match the pick ticket?</span>
-              {yesNo(bools.palletTagsMatchPickTicket, (next) => setBools((c) => ({ ...c, palletTagsMatchPickTicket: next })), 'palletTagsMatchPickTicket')}
+              {yesNo(bools.palletTagsMatchPickTicket, (next) => { pushUndoState(); setBools((c) => ({ ...c, palletTagsMatchPickTicket: next })); }, 'palletTagsMatchPickTicket')}
             </div>
             <div className="dock-checker-form__question">
               <span>Have all baby tags and labels been removed?</span>
-              {yesNo(bools.babyTagsAndLabelsRemoved, (next) => setBools((c) => ({ ...c, babyTagsAndLabelsRemoved: next })), 'babyTagsAndLabelsRemoved')}
+              {yesNo(bools.babyTagsAndLabelsRemoved, (next) => { pushUndoState(); setBools((c) => ({ ...c, babyTagsAndLabelsRemoved: next })); }, 'babyTagsAndLabelsRemoved')}
             </div>
             <div className="dock-checker-form__question">
               <span>Does loading sheet pallet qty match the pick ticket pallet qty?</span>
-              {yesNo(bools.loadingSheetPalletQtyMatchesPickTicket, (next) => setBools((c) => ({ ...c, loadingSheetPalletQtyMatchesPickTicket: next })), 'loadingSheetPalletQtyMatchesPickTicket')}
+              {yesNo(bools.loadingSheetPalletQtyMatchesPickTicket, (next) => { pushUndoState(); setBools((c) => ({ ...c, loadingSheetPalletQtyMatchesPickTicket: next })); }, 'loadingSheetPalletQtyMatchesPickTicket')}
             </div>
             <div className="dock-checker-form__question">
               <span>Is the ship-to address correct (verified with clerk)?</span>
-              {yesNo(bools.shipToAddressVerifiedWithClerk, (next) => setBools((c) => ({ ...c, shipToAddressVerifiedWithClerk: next })), 'shipToAddressVerifiedWithClerk')}
+              {yesNo(bools.shipToAddressVerifiedWithClerk, (next) => { pushUndoState(); setBools((c) => ({ ...c, shipToAddressVerifiedWithClerk: next })); }, 'shipToAddressVerifiedWithClerk')}
             </div>
             <div className="dock-checker-form__question">
               <span>Was paperwork verified by clerk or manager?</span>
-              {yesNo(bools.paperworkVerifiedByClerkOrManager, (next) => setBools((c) => ({ ...c, paperworkVerifiedByClerkOrManager: next })), 'paperworkVerifiedByClerkOrManager')}
+              {yesNo(bools.paperworkVerifiedByClerkOrManager, (next) => { pushUndoState(); setBools((c) => ({ ...c, paperworkVerifiedByClerkOrManager: next })); }, 'paperworkVerifiedByClerkOrManager')}
             </div>
             <div className="dock-checker-form__question">
               <span>Is a temp recorder required?</span>
-              {yesNo(bools.tempRecorderRequired, (next) => setBools((c) => ({ ...c, tempRecorderRequired: next })), 'tempRecorderRequired')}
+              {yesNo(bools.tempRecorderRequired, (next) => { pushUndoState(); setBools((c) => ({ ...c, tempRecorderRequired: next })); }, 'tempRecorderRequired')}
             </div>
             <div className="dock-checker-form__question">
               <span>Were the pallets on CHEP?</span>
-              {yesNo(bools.palletsOnChep, (next) => setBools((c) => ({ ...c, palletsOnChep: next })), 'palletsOnChep')}
+              {yesNo(bools.palletsOnChep, (next) => { pushUndoState(); setBools((c) => ({ ...c, palletsOnChep: next })); }, 'palletsOnChep')}
             </div>
             <div className="dock-checker-form__question">
               <span>Did you take pictures of each pallet?</span>
-              {yesNo(bools.picturesTakenEachPallet, (next) => setBools((c) => ({ ...c, picturesTakenEachPallet: next })), 'picturesTakenEachPallet')}
+              {yesNo(bools.picturesTakenEachPallet, (next) => { pushUndoState(); setBools((c) => ({ ...c, picturesTakenEachPallet: next })); }, 'picturesTakenEachPallet')}
             </div>
           </div>
 
@@ -347,12 +437,13 @@ export default function OutboundDockCheckerForm() {
 
           <div className="dock-checker-form__field">
             <label>Notes</label>
-            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" />
+            <textarea rows={3} value={notes} onChange={(e) => { pushUndoState(); setNotes(e.target.value); }} placeholder="Optional" />
           </div>
         </div>
 
         <div className="dock-checker-form__actions">
           <button className="dock-checker-form__secondary" onClick={() => navigate('/dock-checker/history')} disabled={submitting}>View History</button>
+          <button className="dock-checker-form__secondary" onClick={handleUndo} disabled={submitting || !lastUndoState}>Undo Last Edit</button>
           <button className="dock-checker-form__submit" onClick={submit} disabled={submitting || uploading}>
             {submitting ? 'Submitting...' : 'Submit Outbound Form'}
           </button>
