@@ -15,7 +15,9 @@ const LINES = [
   { id: 4, name: 'Giro Line 4' },
   { id: 5, name: 'Giro Line 5' },
   { id: 6, name: 'Giro Line 6' },
-  { id: 7, name: 'HP Line 7' }
+  { id: 7, name: 'HP7' },
+  { id: 8, name: 'RG1' },
+  { id: 9, name: 'RG2' }
 ];
 
 const LABOR_KPI_TARGET_PER_CASE = 1.25;
@@ -679,9 +681,11 @@ export default function ProductionDashboard() {
         <button
           type="button"
           className="line-kpi-ok-minimized"
+          aria-label={`Expand KPI on target alerts for ${linesOnTargetKpi.length} lines`}
+          title={`KPI On Target (${linesOnTargetKpi.length})`}
           onClick={() => setKpiOnTargetMinimized(false)}
         >
-          ✅ KPI On Target ({linesOnTargetKpi.length})
+          <span aria-hidden="true" />
         </button>
       )}
 
@@ -689,9 +693,11 @@ export default function ProductionDashboard() {
         <button
           type="button"
           className="line-kpi-alert-minimized"
+          aria-label={`Expand KPI alerts for ${linesAboveKpi.length} lines`}
+          title={`KPI Alerts (${linesAboveKpi.length})`}
           onClick={() => setKpiAlertsMinimized(false)}
         >
-          ⚠ KPI Alerts ({linesAboveKpi.length})
+          <span aria-hidden="true" />
         </button>
       )}
 
@@ -731,9 +737,11 @@ export default function ProductionDashboard() {
         <button
           type="button"
           className="line-rate-ok-minimized"
+          aria-label={`Expand planned rate on target alerts for ${linesHittingPlannedRate.length} lines`}
+          title={`Planned Rate On Target (${linesHittingPlannedRate.length})`}
           onClick={() => setRateOnTargetMinimized(false)}
         >
-          ✅ Planned Rate On Target ({linesHittingPlannedRate.length})
+          <span aria-hidden="true" />
         </button>
       )}
 
@@ -741,9 +749,11 @@ export default function ProductionDashboard() {
         <button
           type="button"
           className="line-rate-alert-minimized"
+          aria-label={`Expand planned rate misses for ${linesBelowPlannedRate.length} lines`}
+          title={`Planned Rate Misses (${linesBelowPlannedRate.length})`}
           onClick={() => setRateAlertsMinimized(false)}
         >
-          ⚠ Planned Rate Misses ({linesBelowPlannedRate.length})
+          <span aria-hidden="true" />
         </button>
       )}
 

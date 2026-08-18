@@ -111,6 +111,12 @@ export const HomePage: React.FC = () => {
       onClick: () => navigate('/production-dashboard'),
     },
     {
+      icon: '🧮',
+      title: 'Production Capacity',
+      description: 'Calculate room capacity, lines, people, and production time',
+      onClick: () => navigate('/production-capacity'),
+    },
+    {
       icon: '📑',
       title: 'Work Order History',
       description: 'View completed work orders',

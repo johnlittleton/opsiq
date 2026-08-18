@@ -16,7 +16,9 @@ const LINES = [
   { id: 4, name: 'Giro Line 4' },
   { id: 5, name: 'Giro Line 5' },
   { id: 6, name: 'Giro Line 6' },
-  { id: 7, name: 'HP Line 7' }
+  { id: 7, name: 'HP7' },
+  { id: 8, name: 'RG1' },
+  { id: 9, name: 'RG2' }
 ];
 
 const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00'];

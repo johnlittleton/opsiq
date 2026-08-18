@@ -31,6 +31,7 @@ import ProductionLaborPlanner from './pages/ProductionLaborPlanner';
 import ProductionLaborPlannerHistory from './pages/ProductionLaborPlannerHistory';
 import ProductionScheduler from './pages/ProductionScheduler';
 import ProductionDashboard from './pages/ProductionDashboard';
+import ProductionCapacity from './pages/ProductionCapacity';
 import CombinedLiveOperationsDashboard from './pages/CombinedLiveOperationsDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
@@ -116,6 +117,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/production-labor-planner-history" element={<ProductionLaborPlannerHistory />} />
       <Route path="/production-scheduler" element={<ProductionScheduler />} />
       <Route path="/production-dashboard" element={<ProductionDashboard />} />
+      <Route path="/production-capacity" element={<ProductionCapacity />} />
       <Route path="/dashboard" element={<ProductionDashboard />} />
       <Route path="/pallet-tracker" element={<PalletTracker />} />
       <Route path="/work-order-history" element={<WorkOrderHistory />} />
