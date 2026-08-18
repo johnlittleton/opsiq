@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { apiClient } from './services/api';
@@ -44,6 +44,7 @@ import OutboundDockCheckerForm from './pages/OutboundDockCheckerForm';
 import InboundDockCheckerForm from './pages/InboundDockCheckerForm';
 import DockCheckerHistory from './pages/DockCheckerHistory';
 import InventoryAuditor from './pages/InventoryAuditor';
+import LoadBalancer from './pages/LoadBalancer';
 import { hasRestrictedFeatureAccess } from './utils/restrictedAccess';
 
 type UpdaterStatus = {
@@ -99,6 +100,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/dock-checker/inbound" element={<InboundDockCheckerForm />} />
       <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
       <Route path="/inventory-auditor" element={<InventoryAuditor />} />
+      <Route path="/load-balancer" element={<LoadBalancer />} />
+      <Route path="/load-calculator" element={<Navigate to="/load-balancer" replace />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />
       <Route path="/production" element={<ProductionKPI />} />
       <Route path="/production-kpi-history" element={<ProductionKPIHistory />} />

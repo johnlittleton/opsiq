@@ -1,15 +1,58 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../renderer/context/AuthContext';
+import { API_BASE } from '../renderer/services/config';
 import { hasRestrictedFeatureAccess } from '../renderer/utils/restrictedAccess';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { executiveName, userRole, logout } = useAuth();
+  const { executiveName, userRole, logout, sessionToken } = useAuth();
   const hasRestrictedAccess = hasRestrictedFeatureAccess(executiveName);
   const [viewMode, setViewMode] = useState<'grid' | 'compact'>('compact');
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const [activeUsers, setActiveUsers] = useState<string[]>([]);
+  const normalizedExecutiveName = String(executiveName || '').trim().toLowerCase();
+  const isJohnView = normalizedExecutiveName === 'john littleton' || normalizedExecutiveName === 'john';
+
+  useEffect(() => {
+    if (!isJohnView) {
+      setActiveUsers([]);
+      return;
+    }
+
+    const loadActiveUsers = async () => {
+      const token = sessionToken || localStorage.getItem('opsiq-session-token');
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/active-sessions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!response.ok) {
+          setActiveUsers([]);
+          return;
+        }
+
+        const data = await response.json();
+        const names = Array.isArray(data?.users)
+          ? data.users
+              .map((user: any) => user?.name)
+              .filter((name: string | undefined) => Boolean(name && String(name).trim()))
+          : [];
+
+        setActiveUsers(names);
+      } catch (error) {
+        console.error('Failed to load active users:', error);
+        setActiveUsers([]);
+      }
+    };
+
+    loadActiveUsers();
+    const intervalId = window.setInterval(loadActiveUsers, 15000);
+    return () => window.clearInterval(intervalId);
+  }, [isJohnView, sessionToken]);
   
   const dockOperationsCards = [
     {
@@ -80,6 +123,12 @@ export const HomePage: React.FC = () => {
       description: 'Upload Famous inventory report, scan locations, and run discrepancy audits',
       onClick: () => navigate('/inventory-auditor'),
     },
+    {
+      icon: '🚛',
+      title: 'Trailer Load Optimizer',
+      description: 'Optimize legal weight, axle balance, and securement instructions',
+      onClick: () => navigate('/load-balancer'),
+    },
   ];
 
   const appointmentCards = [
@@ -124,8 +173,8 @@ export const HomePage: React.FC = () => {
     },
     {
       icon: '🏷️',
-      title: 'Pallet Tracker',
-      description: 'Scan build-in and finished-out pallets by order',
+      title: 'Inventory Tracker',
+      description: 'Scan pallet tags for receiving, cycle count, and outbound',
       onClick: () => navigate('/pallet-tracker'),
     },
   ];
@@ -156,7 +205,7 @@ export const HomePage: React.FC = () => {
       onClick: () => navigate('/labor-tracker'),
     }] : []),
     ...((userRole === 'executive' || userRole === 'manager') ? [{
-      icon: '📱',
+      icon: '�📱',
       title: 'Labor Kiosk',
       description: 'Open the employee punch kiosk and admin access',
       onClick: () => navigate('/labor-kiosk'),
@@ -237,6 +286,24 @@ export const HomePage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {isJohnView && activeUsers.length > 0 && (
+        <div className="home-page__active-users-banner" aria-live="polite">
+          <div className="home-page__active-users-label">Active users</div>
+          <div className="home-page__active-users-ticker">
+            {[0, 1].map((repeatIndex) => (
+              <div className="home-page__active-users-track" key={repeatIndex}>
+                {activeUsers.map((name, index) => (
+                  <span key={`${repeatIndex}-${index}`} className="home-page__active-user-pill">
+                    <span className="home-page__active-user-dot" />
+                    {name}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="home-page__header">
         <h1 className="home-page__title">OPSIQ Desktop</h1>

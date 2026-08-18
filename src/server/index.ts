@@ -48,6 +48,19 @@ const io = new SocketServer(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+interface ForecastWeek {
+  label: string;
+  startDate: string;
+  endDate: string;
+  productionHeadcount: number;
+  warehouseHeadcount: number;
+  totalHeadcount: number;
+  laborCost: number;
+  overtimeHours: number;
+  demandScore: number;
+  recommendedAction: string;
+}
+
 const railwayVolumeRoot = String(process.env.RAILWAY_VOLUME_MOUNT_PATH || '').trim();
 const dockCheckerPrimaryUploadsDir = railwayVolumeRoot
   ? path.join(railwayVolumeRoot, 'dock-checker-uploads')
@@ -2580,6 +2593,86 @@ app.get('/api/labor/summary', async (req, res) => {
   }
 });
 
+app.get('/api/labor/forecast', async (req, res) => {
+  try {
+    const weeks = Math.max(1, Math.min(8, Number(req.query.weeks || 4)));
+    const startDateString = String(req.query.startDate || '');
+    const startDate = startDateString ? new Date(`${startDateString}T00:00:00`) : new Date();
+
+    const snapshots = await db.getLaborSnapshots({ limit: 1000 });
+    const normalized = snapshots
+      .map((snapshot: any) => ({
+        ...snapshot,
+        timestamp: snapshot.timestamp ? new Date(snapshot.timestamp) : null,
+      }))
+      .filter((snapshot: any) => snapshot.timestamp && !Number.isNaN(snapshot.timestamp.getTime()));
+
+    const sorted = normalized.sort((a: any, b: any) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    const weeklyBuckets: ForecastWeek[] = [];
+    const baseDate = new Date(startDate);
+
+    for (let index = 0; index < weeks; index += 1) {
+      const weekStart = new Date(baseDate);
+      weekStart.setDate(baseDate.getDate() + index * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      const weekLabel = `W${index + 1}`;
+
+      const entries = sorted.filter((snapshot: any) => {
+        const value = snapshot.timestamp.getTime();
+        return value >= weekStart.getTime() && value <= weekEnd.getTime();
+      });
+
+      const avgProd = entries.length > 0
+        ? entries.reduce((sum: number, entry: any) => sum + Number(entry.productionHeadcount || 0), 0) / entries.length
+        : 0;
+      const avgWarehouse = entries.length > 0
+        ? entries.reduce((sum: number, entry: any) => sum + Number(entry.shippingReceivingHeadcount || 0), 0) / entries.length
+        : 0;
+      const avgTotal = avgProd + avgWarehouse;
+      const projectedCost = (avgProd * 24.5 + avgWarehouse * 27) * 5;
+      const overtimeHours = Math.max(0, avgTotal - 10) * 1.2;
+      const demandScore = Math.min(100, Math.round(((avgProd + avgWarehouse) / 16) * 100));
+      let recommendedAction = 'Maintain baseline staffing';
+      if (demandScore >= 80) {
+        recommendedAction = 'Add labor coverage';
+      } else if (demandScore <= 50) {
+        recommendedAction = 'Hold steady';
+      }
+
+      weeklyBuckets.push({
+        label: weekLabel,
+        startDate: weekStart.toISOString().split('T')[0],
+        endDate: weekEnd.toISOString().split('T')[0],
+        productionHeadcount: Number(avgProd.toFixed(1)),
+        warehouseHeadcount: Number(avgWarehouse.toFixed(1)),
+        totalHeadcount: Number(avgTotal.toFixed(1)),
+        laborCost: Number(projectedCost.toFixed(2)),
+        overtimeHours: Number(overtimeHours.toFixed(1)),
+        demandScore,
+        recommendedAction,
+      });
+    }
+
+    const summary = {
+      projectedWeeklyLaborCost: Number((weeklyBuckets.reduce((sum, week) => sum + week.laborCost, 0) / weeks).toFixed(2)),
+      projectedOvertimeHours: Number(weeklyBuckets.reduce((sum, week) => sum + week.overtimeHours, 0).toFixed(1)),
+      recommendedAverageHeadcount: Number((weeklyBuckets.reduce((sum, week) => sum + week.totalHeadcount, 0) / weeks).toFixed(1)),
+      confidence: weeklyBuckets.some((week) => week.demandScore >= 80) ? 'High' : 'Moderate',
+      periodLabel: `${weeks}-week outlook`,
+    };
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      summary,
+      weeks: weeklyBuckets,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get current active shift session (for live tracking)
 app.get('/api/labor/shift/current', async (req, res) => {
   try {
@@ -3433,18 +3526,15 @@ app.get('/api/production/pallet-tracker/orders', async (_req, res) => {
 app.post('/api/production/pallet-tracker/scan', async (req, res) => {
   try {
     const payload = {
-      orderType: req.body.orderType,
-      orderId: req.body.orderId,
-      line: req.body.line,
+      action: req.body.action || req.body.direction,
       palletTag: req.body.palletTag,
-      direction: req.body.direction,
       scannedBy: req.body.scannedBy,
       scannerSource: req.body.scannerSource,
       notes: req.body.notes,
     };
 
     const event = await db.recordPalletTrackerScan(payload);
-    const summary = await db.getPalletTrackerSummary(payload.orderType, payload.orderId, {
+    const summary = await db.getPalletTrackerSummary({
       limit: 25,
       offset: 0,
     });
@@ -3453,16 +3543,17 @@ app.post('/api/production/pallet-tracker/scan', async (req, res) => {
     io.emit('pallet-tracker:summary', {
       orderType: summary.orderType,
       orderId: summary.orderId,
-      inCount: summary.inCount,
-      outCount: summary.outCount,
-      netWip: summary.netWip,
+      receivedCount: summary.receivedCount,
+      outboundCount: summary.outboundCount,
+      countScanCount: summary.countScanCount,
+      onHandCount: summary.onHandCount,
       lastScannedAt: summary.lastScannedAt,
     });
 
     res.status(201).json({ event, summary });
   } catch (error: any) {
     const message = String(error?.message || 'Failed to record pallet scan');
-    if (message.includes('Duplicate')) {
+    if (message.includes('Duplicate') || message.includes('already')) {
       res.status(409).json({ error: message });
       return;
     }
@@ -3476,15 +3567,13 @@ app.post('/api/production/pallet-tracker/scan', async (req, res) => {
 
 app.get('/api/production/pallet-tracker/summary', async (req, res) => {
   try {
-    const orderType = String(req.query.orderType || 'WO') as 'WO' | 'SO';
-    const orderId = String(req.query.orderId || '');
     const search = String(req.query.search || '');
     const startDate = String(req.query.startDate || '');
     const endDate = String(req.query.endDate || '');
     const limit = Number(req.query.limit || 25);
     const page = Math.max(Number(req.query.page || 1), 1);
     const offset = (page - 1) * Math.min(Math.max(limit, 1), 100);
-    const summary = await db.getPalletTrackerSummary(orderType, orderId, {
+    const summary = await db.getPalletTrackerSummary({
       search,
       startDate,
       endDate,
@@ -3634,10 +3723,32 @@ app.get('/api/auth/session', async (req, res) => {
 
     const user = await db.validateSession(sessionToken);
     if (user) {
-      res.json({ success: true, name: user.name, role: user.role });
+      res.json({ success: true, name: user.name, role: user.role, id: user.id });
     } else {
       res.status(401).json({ success: false, error: 'Invalid or expired session' });
     }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/auth/active-sessions', async (req, res) => {
+  try {
+    const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+    if (!sessionToken) {
+      return res.status(401).json({ success: false, error: 'No session token' });
+    }
+
+    const currentUser = await db.validateSession(sessionToken);
+    const normalizedCurrentName = String(currentUser?.name || '').trim().toLowerCase();
+    const isAuthorizedOwner = normalizedCurrentName === 'john littleton' || normalizedCurrentName === 'john';
+
+    if (!currentUser || !isAuthorizedOwner) {
+      return res.status(403).json({ success: false, error: 'Only John Littleton can view active sessions.' });
+    }
+
+    const users = await db.getActiveSessionUsers();
+    res.json({ success: true, users });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

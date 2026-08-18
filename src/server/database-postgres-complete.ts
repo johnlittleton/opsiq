@@ -4939,46 +4939,57 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async recordPalletTrackerScan(payload: {
-    orderType: 'WO' | 'SO';
-    orderId: string;
-    line?: number | null;
+    action?: 'RECEIVED' | 'COUNT' | 'OUTBOUND' | 'IN' | 'OUT';
     palletTag: string;
-    direction: 'IN' | 'OUT';
     scannedBy: string;
     scannerSource?: string;
     notes?: string;
   }): Promise<any> {
-    const orderType = String(payload.orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
-    const orderId = String(payload.orderId || '').trim();
+    const orderType = 'INV';
+    const orderId = 'GENERAL';
     const palletTag = String(payload.palletTag || '').trim();
-    const direction = String(payload.direction || '').toUpperCase() === 'OUT' ? 'OUT' : 'IN';
+    const rawAction = String(payload.action || 'RECEIVED').toUpperCase();
+    const direction = rawAction === 'OUT' || rawAction === 'OUTBOUND'
+      ? 'OUT'
+      : rawAction === 'COUNT' || rawAction === 'AUDIT' || rawAction === 'INVENTORY'
+        ? 'COUNT'
+        : 'IN';
     const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
     const scannerSource = String(payload.scannerSource || 'wireless').trim() || 'wireless';
-
-    if (!orderId) {
-      throw new Error('Order number is required');
-    }
 
     if (!palletTag) {
       throw new Error('Pallet tag is required');
     }
 
-    if (orderType === 'WO') {
-      const workOrder = await this.pool.query('SELECT id FROM work_orders WHERE id = $1 LIMIT 1', [orderId]);
-      if (!workOrder.rowCount) {
-        throw new Error('Work order not found');
-      }
-    }
-
-    const duplicate = await this.pool.query(
-      `SELECT id FROM pallet_tracker_events
-       WHERE order_type = $1 AND order_id = $2 AND pallet_tag = $3 AND direction = $4
+    const latestForTag = await this.pool.query(
+      `SELECT direction, scanned_at
+       FROM pallet_tracker_events
+       WHERE order_type = $1 AND order_id = $2 AND pallet_tag = $3
+       ORDER BY id DESC
        LIMIT 1`,
-      [orderType, orderId, palletTag, direction]
+      [orderType, orderId, palletTag]
     );
 
-    if (duplicate.rowCount) {
-      throw new Error(`Duplicate ${direction} scan for pallet ${palletTag}`);
+    const latestDirection = latestForTag.rows[0]?.direction;
+
+    if (direction === 'IN' && latestDirection && latestDirection !== 'OUT') {
+      throw new Error(`Pallet ${palletTag} is already in inventory`);
+    }
+
+    if (direction === 'COUNT' && !latestDirection) {
+      throw new Error(`Pallet tag ${palletTag} not found in inventory history`);
+    }
+
+    if (direction === 'COUNT' && latestDirection === 'OUT') {
+      throw new Error(`Pallet ${palletTag} has already been shipped outbound`);
+    }
+
+    if (direction === 'OUT' && !latestDirection) {
+      throw new Error(`Pallet tag ${palletTag} not found in inventory. Receive it first.`);
+    }
+
+    if (direction === 'OUT' && latestDirection === 'OUT') {
+      throw new Error(`Duplicate OUTBOUND scan for pallet ${palletTag}`);
     }
 
     const result = await this.pool.query(
@@ -4989,7 +5000,7 @@ export class DatabaseService implements IDatabaseService {
       [
         orderType,
         orderId,
-        payload.line ?? null,
+        null,
         palletTag,
         direction,
         scannedBy,
@@ -5002,8 +5013,6 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async getPalletTrackerSummary(
-    orderType: 'WO' | 'SO',
-    orderId: string,
     options?: {
       search?: string;
       startDate?: string;
@@ -5012,17 +5021,13 @@ export class DatabaseService implements IDatabaseService {
       offset?: number;
     }
   ): Promise<any> {
-    const normalizedType = String(orderType || 'WO').toUpperCase() === 'SO' ? 'SO' : 'WO';
-    const normalizedOrderId = String(orderId || '').trim();
+    const normalizedType = 'INV';
+    const normalizedOrderId = 'GENERAL';
     const normalizedSearch = String(options?.search || '').trim();
     const normalizedStartDate = String(options?.startDate || '').trim();
     const normalizedEndDate = String(options?.endDate || '').trim();
     const limit = Math.min(Math.max(Number(options?.limit || 25), 1), 100);
     const offset = Math.max(Number(options?.offset || 0), 0);
-
-    if (!normalizedOrderId) {
-      throw new Error('Order number is required');
-    }
 
     const whereClauses = ['order_type = $1', 'order_id = $2'];
     const params: any[] = [normalizedType, normalizedOrderId];
@@ -5054,6 +5059,7 @@ export class DatabaseService implements IDatabaseService {
       `SELECT
         COALESCE(SUM(CASE WHEN direction = 'IN' THEN 1 ELSE 0 END), 0) AS in_count,
         COALESCE(SUM(CASE WHEN direction = 'OUT' THEN 1 ELSE 0 END), 0) AS out_count,
+        COALESCE(SUM(CASE WHEN direction = 'COUNT' THEN 1 ELSE 0 END), 0) AS count_scan_count,
         MAX(scanned_at) AS last_scanned_at
       FROM pallet_tracker_events
       WHERE ${whereSql}`,
@@ -5079,11 +5085,33 @@ export class DatabaseService implements IDatabaseService {
 
     const inCount = Number(counts.rows[0]?.in_count || 0);
     const outCount = Number(counts.rows[0]?.out_count || 0);
+    const countScanCount = Number(counts.rows[0]?.count_scan_count || 0);
     const totalCount = Number(totalResult.rows[0]?.total_count || 0);
+
+    const onHandResult = await this.pool.query(
+      `WITH latest AS (
+        SELECT e.pallet_tag, e.direction
+        FROM pallet_tracker_events e
+        INNER JOIN (
+          SELECT pallet_tag, MAX(id) AS latest_id
+          FROM pallet_tracker_events
+          WHERE order_type = $1 AND order_id = $2
+          GROUP BY pallet_tag
+        ) grouped ON grouped.latest_id = e.id
+      )
+      SELECT COUNT(*)::int AS on_hand_count
+      FROM latest
+      WHERE direction IN ('IN', 'COUNT')`,
+      [normalizedType, normalizedOrderId]
+    );
 
     return {
       orderType: normalizedType,
       orderId: normalizedOrderId,
+      receivedCount: inCount,
+      countScanCount,
+      outboundCount: outCount,
+      onHandCount: Number(onHandResult.rows[0]?.on_hand_count || 0),
       inCount,
       outCount,
       netWip: inCount - outCount,
@@ -5356,6 +5384,23 @@ export class DatabaseService implements IDatabaseService {
 
   async cleanupExpiredSessions(): Promise<void> {
     await this.pool.query('DELETE FROM sessions WHERE expires_at < NOW()');
+  }
+
+  async getActiveSessionUsers(): Promise<Array<{ id: number; name: string; role: string; lastActivity: string }>> {
+    const result = await this.pool.query(`
+      SELECT e.id, e.name, e.role, s.last_activity AS "lastActivity"
+      FROM sessions s
+      JOIN executives e ON e.id = s.user_id
+      WHERE e.is_active = true AND s.expires_at > NOW()
+      ORDER BY s.last_activity DESC
+    `);
+
+    return result.rows.map((row: any) => ({
+      id: Number(row.id),
+      name: String(row.name),
+      role: String(row.role),
+      lastActivity: String(row.lastActivity),
+    }));
   }
 
   async seedExecutives(): Promise<any[]> {

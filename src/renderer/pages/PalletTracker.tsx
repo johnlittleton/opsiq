@@ -5,41 +5,26 @@ import { TitleBar } from '../../components/layout/TitleBar';
 import { useAuth } from '../context/AuthContext';
 import './PalletTracker.css';
 
-type OrderType = 'WO' | 'SO';
-type Direction = 'IN' | 'OUT';
-
-const TRACKER_LINES = [
-  { id: 1, name: 'Giro Line 1' },
-  { id: 2, name: 'Giro Line 2' },
-  { id: 3, name: 'Giro Line 3' },
-  { id: 4, name: 'Giro Line 4' },
-  { id: 5, name: 'Hand Pack' },
-  { id: 6, name: 'Regrade' },
-];
-
-interface TrackerOrder {
-  id: string;
-  line: number;
-  date: string;
-  product?: string;
-  customer?: string;
-  status?: string;
-}
+type InventoryAction = 'RECEIVED' | 'COUNT' | 'OUTBOUND';
 
 interface TrackerEvent {
   id: number;
-  orderType: OrderType;
+  orderType: string;
   orderId: string;
   line: number | null;
   palletTag: string;
-  direction: Direction;
+  direction: 'IN' | 'COUNT' | 'OUT';
   scannedBy: string;
   scannedAt: string;
 }
 
 interface TrackerSummary {
-  orderType: OrderType;
+  orderType: string;
   orderId: string;
+  receivedCount: number;
+  countScanCount: number;
+  outboundCount: number;
+  onHandCount: number;
   inCount: number;
   outCount: number;
   netWip: number;
@@ -55,24 +40,52 @@ interface TrackerSummary {
   recent: TrackerEvent[];
 }
 
-const RECENT_PAGE_SIZE = 25;
+const RECENT_PAGE_SIZE = 10;
+const AUTO_SUBMIT_DELAY_MS = 150;
+
+const playScanFeedbackTone = (kind: 'success' | 'error') => {
+  try {
+    const AudioContextCtor = (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextCtor) {
+      return;
+    }
+
+    const ctx = new AudioContextCtor();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = kind === 'success' ? 880 : 220;
+    gainNode.gain.value = 0.0001;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    const now = ctx.currentTime;
+    gainNode.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.13);
+
+    window.setTimeout(() => {
+      void ctx.close().catch(() => undefined);
+    }, 220);
+  } catch {
+    // Keep scanning uninterrupted even if audio output is unavailable.
+  }
+};
 
 const PalletTracker: React.FC = () => {
   const navigate = useNavigate();
   const { executiveName, logout } = useAuth();
-  const orderInputRef = useRef<HTMLInputElement>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const autoSubmitTimerRef = useRef<number | null>(null);
 
-  const [orders, setOrders] = useState<TrackerOrder[]>([]);
-  const [orderType, setOrderType] = useState<OrderType>('WO');
-  const [orderId, setOrderId] = useState('');
-  const [line, setLine] = useState<number>(1);
-  const [direction, setDirection] = useState<Direction>('IN');
+  const [action, setAction] = useState<InventoryAction>('RECEIVED');
   const [scanValue, setScanValue] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [autoSubmitEnabled, setAutoSubmitEnabled] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [summary, setSummary] = useState<TrackerSummary | null>(null);
   const [statusMessage, setStatusMessage] = useState('Ready to scan');
   const [errorMessage, setErrorMessage] = useState('');
@@ -87,78 +100,15 @@ const PalletTracker: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const loadOrders = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/production/pallet-tracker/orders`);
-        if (!response.ok) throw new Error('Failed to load work orders');
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          setOrders(data);
-        }
-      } catch (error) {
-        console.error('Failed to load tracker orders:', error);
-      }
-    };
-
-    loadOrders();
-  }, []);
-
-  useEffect(() => {
     scanInputRef.current?.focus();
-  }, [direction]);
+  }, [action]);
 
-  useEffect(() => {
-    orderInputRef.current?.focus();
-  }, []);
-
-  const selectedOrder = useMemo(
-    () => orders.find((order) => order.id === orderId),
-    [orders, orderId]
-  );
-
-  useEffect(() => {
-    if (selectedOrder?.line) {
-      setLine(selectedOrder.line);
-    }
-  }, [selectedOrder]);
-
-  const loadSummary = useCallback(async (
-    targetOrderType: OrderType,
-    targetOrderId: string,
-    page = currentPage,
-    filters?: {
-      searchTerm?: string;
-      startDate?: string;
-      endDate?: string;
-    }
-  ) => {
-    if (!targetOrderId.trim()) {
-      setSummary(null);
-      return;
-    }
-
+  const loadSummary = useCallback(async () => {
     try {
-      const activeSearchTerm = filters?.searchTerm ?? searchTerm;
-      const activeStartDate = filters?.startDate ?? startDate;
-      const activeEndDate = filters?.endDate ?? endDate;
       const params = new URLSearchParams({
-        orderType: targetOrderType,
-        orderId: targetOrderId.trim(),
         limit: String(RECENT_PAGE_SIZE),
-        page: String(page),
+        page: '1',
       });
-
-      if (activeSearchTerm.trim()) {
-        params.set('search', activeSearchTerm.trim());
-      }
-
-      if (activeStartDate) {
-        params.set('startDate', activeStartDate);
-      }
-
-      if (activeEndDate) {
-        params.set('endDate', activeEndDate);
-      }
 
       const response = await fetch(
         `${API_BASE}/api/production/pallet-tracker/summary?${params.toString()}`
@@ -170,52 +120,20 @@ const PalletTracker: React.FC = () => {
       console.error('Failed to load tracker summary:', error);
       setErrorMessage(error?.message || 'Failed to load summary');
     }
-  }, [currentPage, endDate, parseApiResponse, searchTerm, startDate]);
+  }, [parseApiResponse]);
 
   useEffect(() => {
-    const normalizedOrderId = orderId.trim();
-    if (!normalizedOrderId) {
-      setSummary(null);
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setErrorMessage('');
-      setCurrentPage(1);
-      void loadSummary(orderType, normalizedOrderId, 1);
-    }, 350);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [loadSummary, orderId, orderType]);
-
-  const handleLoadSummary = async () => {
     setErrorMessage('');
-    setCurrentPage(1);
-    await loadSummary(orderType, orderId, 1);
-    scanInputRef.current?.focus();
-  };
-
-  const handleClearFilters = async () => {
-    setSearchTerm('');
-    setStartDate('');
-    setEndDate('');
-    setCurrentPage(1);
-    setErrorMessage('');
-    await loadSummary(orderType, orderId, 1, {
-      searchTerm: '',
-      startDate: '',
-      endDate: '',
-    });
-    scanInputRef.current?.focus();
-  };
+    void loadSummary();
+  }, [loadSummary]);
 
   const submitScan = async (rawTag: string) => {
     const palletTag = rawTag.trim();
     if (!palletTag) return;
 
-    if (!orderId.trim()) {
-      setErrorMessage('Enter a Sales Order or Work Order number first');
-      return;
+    if (autoSubmitTimerRef.current) {
+      window.clearTimeout(autoSubmitTimerRef.current);
+      autoSubmitTimerRef.current = null;
     }
 
     setLoading(true);
@@ -226,11 +144,8 @@ const PalletTracker: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderType,
-          orderId: orderId.trim(),
-          line,
           palletTag,
-          direction,
+          action,
           scannedBy: executiveName || 'Unknown',
           scannerSource: 'wireless',
         }),
@@ -241,13 +156,18 @@ const PalletTracker: React.FC = () => {
         throw new Error(result?.error || 'Failed to record scan');
       }
 
-      setCurrentPage(1);
-      await loadSummary(orderType, orderId, 1);
-      setStatusMessage(`${direction} scan saved: ${palletTag}`);
+      await loadSummary();
+      setStatusMessage(`${action} scan saved: ${palletTag}`);
+      if (soundEnabled) {
+        playScanFeedbackTone('success');
+      }
       setScanValue('');
       scanInputRef.current?.focus();
     } catch (error: any) {
       setErrorMessage(error?.message || 'Failed to record scan');
+      if (soundEnabled) {
+        playScanFeedbackTone('error');
+      }
     } finally {
       setLoading(false);
     }
@@ -260,15 +180,32 @@ const PalletTracker: React.FC = () => {
     }
   };
 
-  const handleOrderKeyDown: React.KeyboardEventHandler<HTMLInputElement> = async (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      await handleLoadSummary();
-      scanInputRef.current?.focus();
-    }
-  };
+  useEffect(() => {
+    if (!autoSubmitEnabled || loading) return;
+    const candidate = scanValue.trim();
+    if (!candidate) return;
 
-  const totalPages = summary ? Math.max(Math.ceil(summary.recentCount / summary.recentPageSize), 1) : 1;
+    if (autoSubmitTimerRef.current) {
+      window.clearTimeout(autoSubmitTimerRef.current);
+    }
+
+    autoSubmitTimerRef.current = window.setTimeout(() => {
+      void submitScan(candidate);
+    }, AUTO_SUBMIT_DELAY_MS);
+
+    return () => {
+      if (autoSubmitTimerRef.current) {
+        window.clearTimeout(autoSubmitTimerRef.current);
+        autoSubmitTimerRef.current = null;
+      }
+    };
+  }, [autoSubmitEnabled, loading, scanValue]);
+
+  const actionDescription = useMemo(() => {
+    if (action === 'RECEIVED') return 'Use for inbound pallets entering inventory';
+    if (action === 'COUNT') return 'Use for cycle counts and inventory verification';
+    return 'Use for outbound pallets leaving inventory';
+  }, [action]);
 
   return (
     <div className="pallet-tracker-page">
@@ -276,11 +213,12 @@ const PalletTracker: React.FC = () => {
       <div className="pallet-tracker-container">
         <div className="pallet-tracker-header">
           <div>
-            <h1>Pallet Tracker</h1>
-            <p>Scanner workflow for build pallets in and finished pallets out</p>
+            <h1>Inventory Pallet Tracker</h1>
+            <p>Scan pallet tags for receiving, inventory count, and outbound shipping</p>
           </div>
           <div className="pallet-tracker-header-actions">
-            <button className="nav-btn" onClick={() => navigate('/production-scheduler')}>Production Scheduler</button>
+            <button className="summary-btn" onClick={() => navigate('/inventory-pallet-history')}>History / Database</button>
+            <button className="nav-btn" onClick={() => navigate('/production-scheduler')}>Scheduler</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
             <button className="logout-btn" onClick={logout}>Logout</button>
           </div>
@@ -288,92 +226,38 @@ const PalletTracker: React.FC = () => {
 
         <div className="tracker-controls">
           <div className="field-group">
-            <label>Order Type</label>
-            <select value={orderType} onChange={(e) => setOrderType(e.target.value as OrderType)}>
-              <option value="WO">Work Order (WO)</option>
-              <option value="SO">Sales Order (SO)</option>
+            <label>Scan Workflow</label>
+            <select value={action} onChange={(e) => setAction(e.target.value as InventoryAction)}>
+              <option value="RECEIVED">Received</option>
+              <option value="COUNT">Inventory Count</option>
+              <option value="OUTBOUND">Outbound</option>
             </select>
           </div>
 
-          <div className="field-group grow">
-            <label>{orderType === 'WO' ? 'Work Order Number' : 'Sales Order Number'}</label>
-            <input
-              ref={orderInputRef}
-              value={orderId}
-              onChange={(e) => setOrderId(e.target.value)}
-              onKeyDown={handleOrderKeyDown}
-              list="tracker-order-options"
-              placeholder={orderType === 'WO' ? 'Example: SO-12345' : 'Enter sales order'}
-            />
-            <div className="field-hint">Type SO/WO and press Enter. History auto-loads after you stop typing.</div>
-            <datalist id="tracker-order-options">
-              {orders.map((order) => (
-                <option key={order.id} value={order.id}>{`${order.id} | Line ${order.line} | ${order.product || 'No product'}`}</option>
-              ))}
-            </datalist>
-          </div>
-
-          <div className="field-group">
-            <label>Line</label>
-            <select value={line} onChange={(e) => setLine(parseInt(e.target.value, 10))}>
-              {TRACKER_LINES.map((lineOption) => (
-                <option key={lineOption.id} value={lineOption.id}>
-                  {lineOption.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="field-group">
-            <label>&nbsp;</label>
-            <button className="summary-btn" onClick={handleLoadSummary}>Load History</button>
+          <div className="field-group tracker-controls-fill">
+            <label>Mode Guidance</label>
+            <div className="field-hint">{actionDescription}</div>
           </div>
         </div>
-
-        <div className="tracker-filters">
-          <div className="field-group grow">
-            <label>Search Pallet Tag or User</label>
-            <input
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search pallet tag or scanner name"
-            />
-          </div>
-
-          <div className="field-group">
-            <label>Start Date</label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-          </div>
-
-          <div className="field-group">
-            <label>End Date</label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-          </div>
-
-          <div className="tracker-filter-actions">
-            <button className="summary-btn" onClick={handleLoadSummary}>Apply Filters</button>
-            <button className="nav-btn" onClick={handleClearFilters}>Clear</button>
-          </div>
-        </div>
-
-        {selectedOrder && (
-          <div className="selected-order-banner">
-            {selectedOrder.id} | Line {selectedOrder.line} | {selectedOrder.product || 'No product'} | {selectedOrder.status || 'Unknown'}
-          </div>
-        )}
 
         <div className="scan-mode-row">
           <button
-            className={`mode-btn ${direction === 'IN' ? 'active in' : ''}`}
-            onClick={() => setDirection('IN')}
+            className={`mode-btn ${action === 'RECEIVED' ? 'active received' : ''}`}
+            onClick={() => setAction('RECEIVED')}
           >
-            Build Pallets In
+            Receive Pallet
           </button>
           <button
-            className={`mode-btn ${direction === 'OUT' ? 'active out' : ''}`}
-            onClick={() => setDirection('OUT')}
+            className={`mode-btn ${action === 'COUNT' ? 'active count' : ''}`}
+            onClick={() => setAction('COUNT')}
           >
-            Finished Pallets Out
+            Inventory Count
+          </button>
+          <button
+            className={`mode-btn ${action === 'OUTBOUND' ? 'active outbound' : ''}`}
+            onClick={() => setAction('OUTBOUND')}
+          >
+            Ship Outbound
           </button>
         </div>
 
@@ -386,6 +270,22 @@ const PalletTracker: React.FC = () => {
             onKeyDown={handleScanKeyDown}
             placeholder="Click here then scan with wireless scanner"
           />
+          <label className="auto-submit-row">
+            <input
+              type="checkbox"
+              checked={autoSubmitEnabled}
+              onChange={(e) => setAutoSubmitEnabled(e.target.checked)}
+            />
+            Auto-submit on scan
+          </label>
+          <label className="auto-submit-row">
+            <input
+              type="checkbox"
+              checked={soundEnabled}
+              onChange={(e) => setSoundEnabled(e.target.checked)}
+            />
+            Beep on scan result
+          </label>
           <div className="scanner-actions">
             <button
               className="scan-submit-btn"
@@ -401,16 +301,20 @@ const PalletTracker: React.FC = () => {
 
         <div className="summary-grid">
           <div className="summary-card">
-            <div className="summary-label">Pallets In</div>
-            <div className="summary-value">{summary?.inCount || 0}</div>
+            <div className="summary-label">Received Scans</div>
+            <div className="summary-value">{summary?.receivedCount ?? summary?.inCount ?? 0}</div>
           </div>
           <div className="summary-card">
-            <div className="summary-label">Pallets Out</div>
-            <div className="summary-value">{summary?.outCount || 0}</div>
+            <div className="summary-label">Inventory Count Scans</div>
+            <div className="summary-value">{summary?.countScanCount || 0}</div>
           </div>
           <div className="summary-card">
-            <div className="summary-label">Net WIP</div>
-            <div className="summary-value">{summary?.netWip || 0}</div>
+            <div className="summary-label">Outbound Scans</div>
+            <div className="summary-value">{summary?.outboundCount ?? summary?.outCount ?? 0}</div>
+          </div>
+          <div className="summary-card">
+            <div className="summary-label">Pallets In Inventory</div>
+            <div className="summary-value">{summary?.onHandCount ?? summary?.netWip ?? 0}</div>
           </div>
         </div>
 
@@ -420,53 +324,26 @@ const PalletTracker: React.FC = () => {
               <h3>Recent Scans</h3>
               <div className="recent-subtitle">
                 {summary
-                  ? `${summary.recentCount} matching scans${summary.lastScannedAt ? ` | Last scan ${new Date(summary.lastScannedAt).toLocaleString()}` : ''}`
-                  : 'Load an order to review scan history'}
+                  ? `Showing latest ${Math.min(summary.recent.length, RECENT_PAGE_SIZE)} scans${summary.lastScannedAt ? ` | Last scan ${new Date(summary.lastScannedAt).toLocaleString()}` : ''}`
+                  : 'Scan a pallet tag to start inventory history'}
               </div>
             </div>
-            {summary && summary.recentCount > 0 && (
-              <div className="recent-pagination">
-                <button
-                  className="nav-btn"
-                  disabled={summary.recentPage <= 1}
-                  onClick={() => {
-                    const nextPage = Math.max(summary.recentPage - 1, 1);
-                    setCurrentPage(nextPage);
-                    void loadSummary(orderType, orderId, nextPage);
-                  }}
-                >
-                  Previous
-                </button>
-                <span>
-                  Page {summary.recentPage} of {totalPages}
-                </span>
-                <button
-                  className="nav-btn"
-                  disabled={summary.recentPage >= totalPages}
-                  onClick={() => {
-                    const nextPage = Math.min(summary.recentPage + 1, totalPages);
-                    setCurrentPage(nextPage);
-                    void loadSummary(orderType, orderId, nextPage);
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            )}
           </div>
           {summary?.recent?.length ? (
             <div className="recent-list">
               {summary.recent.map((event) => (
                 <div key={event.id} className="recent-item">
-                  <span className={`pill ${event.direction === 'IN' ? 'in' : 'out'}`}>{event.direction}</span>
+                  <span className={`pill ${event.direction === 'IN' ? 'received' : event.direction === 'COUNT' ? 'count' : 'outbound'}`}>
+                    {event.direction === 'IN' ? 'RECEIVED' : event.direction === 'COUNT' ? 'COUNT' : 'OUTBOUND'}
+                  </span>
                   <span className="tag">{event.palletTag}</span>
                   <span className="scanner-user">{event.scannedBy}</span>
-                  <span className="meta">Line {event.line || '-'} | {new Date(event.scannedAt).toLocaleString()}</span>
+                  <span className="meta">{new Date(event.scannedAt).toLocaleString()}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="no-data">No scans found for the current order and filters</div>
+            <div className="no-data">No recent scans yet</div>
           )}
         </div>
       </div>
