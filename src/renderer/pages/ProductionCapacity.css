@@ -114,11 +114,73 @@
   box-shadow: 0 0 12px rgba(52, 211, 153, 0.8);
 }
 
+.production-capacity__header-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.production-capacity__header-actions button,
+.production-capacity__history button {
+  border: 1px solid rgba(56, 189, 248, 0.48);
+  border-radius: 5px;
+  padding: 6px 9px;
+  color: #bae6fd;
+  background: rgba(15, 23, 42, 0.78);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.production-capacity__header-actions button:hover,
+.production-capacity__history button:hover {
+  color: #f8fafc;
+  border-color: #38bdf8;
+  background: rgba(14, 116, 144, 0.32);
+}
+
 .production-capacity__controls {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 10px;
   margin-top: 18px;
+}
+
+.production-capacity__staffing {
+  width: min(1400px, 100%);
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.production-capacity__staffing > div {
+  padding: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.68);
+}
+
+.production-capacity__staffing span,
+.production-capacity__staffing small {
+  display: block;
+  color: var(--text-muted);
+}
+
+.production-capacity__staffing strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-bright);
+  font-size: 20px;
+}
+
+.production-capacity__staffing strong.is-short {
+  color: #fca5a5;
+}
+
+.production-capacity__staffing strong.is-ready {
+  color: #86efac;
 }
 
 .production-capacity__controls label {
@@ -318,10 +380,63 @@
   font-size: 11px;
 }
 
+.production-capacity__history {
+  width: min(1380px, 100%);
+  margin: 12px auto 0;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  background: #101a2a;
+}
+
+.production-capacity__history .production-capacity__section-heading {
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.production-capacity__history-empty {
+  margin-bottom: 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.production-capacity__history-list {
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.production-capacity__history-item {
+  display: grid;
+  grid-template-columns: 155px 1.5fr 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 5px;
+  background: #172235;
+  color: #cbd5e1;
+  font-size: 10px;
+}
+
+.production-capacity__history-item strong {
+  color: #f8fafc;
+}
+
+.production-capacity__history-item b {
+  color: #86efac;
+  text-align: right;
+}
+
 @media (max-width: 1000px) {
   .production-capacity__header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .production-capacity__header-actions {
+    order: -1;
   }
 
   .production-capacity__navigation {
@@ -337,6 +452,10 @@
   .production-capacity__line-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .production-capacity__history-item {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 600px) {
@@ -346,7 +465,174 @@
 
   .production-capacity__controls,
   .production-capacity__summary,
-  .production-capacity__line-grid {
+  .production-capacity__line-grid,
+  .production-capacity__history-item {
     grid-template-columns: 1fr;
+  }
+
+  .production-capacity__history-item b {
+    text-align: left;
+  }
+}
+
+@media (min-width: 1001px) and (max-height: 850px) {
+  .production-capacity {
+    padding: 14px 24px 16px;
+  }
+
+  .production-capacity__header {
+    gap: 16px;
+    padding-bottom: 10px;
+  }
+
+  .production-capacity h1 {
+    margin-bottom: 4px;
+    font-size: 30px;
+  }
+
+  .production-capacity__subtitle {
+    font-size: 11px;
+  }
+
+  .production-capacity__eyebrow {
+    margin-bottom: 3px;
+    font-size: 9px;
+  }
+
+  .production-capacity__status {
+    padding: 6px 9px;
+    font-size: 10px;
+  }
+
+  .production-capacity__controls {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+    margin-top: 10px;
+  }
+
+  .production-capacity__controls label {
+    gap: 3px;
+    padding: 7px 8px;
+  }
+
+  .production-capacity__controls label span {
+    font-size: 9px;
+  }
+
+  .production-capacity__controls input {
+    font-size: 19px;
+  }
+
+  .production-capacity__staffing {
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 7px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+  }
+
+  .production-capacity__staffing > div {
+    padding: 8px 10px;
+  }
+
+  .production-capacity__staffing strong {
+    margin-top: 3px;
+    font-size: 15px;
+  }
+
+  .production-capacity__staffing span,
+  .production-capacity__staffing small {
+    font-size: 10px;
+  }
+
+  .production-capacity__summary {
+    gap: 7px;
+    margin-top: 8px;
+  }
+
+  .production-capacity__summary article {
+    min-height: 62px;
+    padding: 8px 10px;
+  }
+
+  .production-capacity__summary span,
+  .production-capacity__summary small {
+    font-size: 9px;
+  }
+
+  .production-capacity__summary strong {
+    margin: 4px 0 1px;
+    font-size: 18px;
+  }
+
+  .production-capacity__allocation {
+    margin-top: 10px;
+    padding: 9px;
+  }
+
+  .production-capacity__section-heading {
+    margin-bottom: 7px;
+  }
+
+  .production-capacity h2 {
+    font-size: 16px;
+  }
+
+  .production-capacity__section-heading > span {
+    font-size: 10px;
+  }
+
+  .production-capacity__line-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .production-capacity__line {
+    padding: 6px;
+  }
+
+  .production-capacity__line-heading strong {
+    font-size: 10px;
+  }
+
+  .production-capacity__line-heading span,
+  .production-capacity__line small {
+    font-size: 8px;
+  }
+
+  .production-capacity__line-cases {
+    margin: 7px 0 4px;
+  }
+
+  .production-capacity__line-cases strong {
+    font-size: 15px;
+  }
+
+  .production-capacity__line-cases span {
+    font-size: 8px;
+  }
+
+  .production-capacity__line small {
+    margin-top: 4px;
+  }
+
+  .production-capacity__assumption {
+    margin-top: 6px;
+    font-size: 8px;
+    line-height: 1.15;
+  }
+
+  .production-capacity__history {
+    margin-top: 8px;
+    padding: 8px;
+  }
+
+  .production-capacity__history-list {
+    max-height: 180px;
+  }
+
+  .production-capacity__history-item {
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 8px;
   }
 }

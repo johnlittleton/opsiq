@@ -388,3 +388,94 @@
   font-weight: 600;
   color: var(--text-bright);
 }
+
+@media (min-width: 900px) and (max-height: 850px) {
+  .home-page {
+    padding: 8px 18px 12px;
+  }
+
+  .home-page__active-users-banner {
+    margin-top: 40px;
+    padding: 4px 10px;
+  }
+
+  .home-page__active-user-pill {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  .home-page__active-user-dot {
+    width: 6px;
+    height: 6px;
+  }
+
+  .home-page__header {
+    margin-top: 12px;
+    margin-bottom: 8px;
+  }
+
+  .home-page__title {
+    font-size: 25px;
+    margin-bottom: 2px;
+  }
+
+  .home-page__subtitle {
+    font-size: 11px;
+  }
+
+  .home-page__section {
+    margin-bottom: 10px;
+  }
+
+  .home-page__section-title {
+    margin-bottom: 5px;
+    padding-bottom: 3px;
+    font-size: 10px;
+  }
+
+  .home-page__quick-access {
+    gap: 6px;
+  }
+
+  .home-page__quick-access--compact {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .home-page__card {
+    min-height: 54px;
+    padding: 6px 8px;
+    gap: 7px;
+  }
+
+  .home-page__card-icon {
+    font-size: 17px;
+  }
+
+  .home-page__card-title {
+    font-size: 11px;
+    margin-bottom: 1px;
+  }
+
+  .home-page__card-desc {
+    font-size: 9px;
+    line-height: 1.15;
+  }
+
+  .home-page__card-badge {
+    padding: 1px 5px;
+    font-size: 8px;
+  }
+
+  .home-page__status {
+    gap: 6px;
+  }
+
+  .home-page__status-card {
+    padding: 7px 9px;
+    gap: 7px;
+  }
+
+  .home-page__status-value {
+    font-size: 11px;
+  }
+}

@@ -95,8 +95,11 @@ const LINES = [
   { id: 2, name: 'Giro Line 2' },
   { id: 3, name: 'Giro Line 3' },
   { id: 4, name: 'Giro Line 4' },
-  { id: 5, name: 'Hand Pack' },
-  { id: 6, name: 'Regrade' },
+  { id: 5, name: 'Giro Line 5' },
+  { id: 6, name: 'Giro Line 6' },
+  { id: 7, name: 'HP7' },
+  { id: 8, name: 'RG1' },
+  { id: 9, name: 'RG2' },
 ];
 
 const DIRECT_LABOR_HOURLY_RATE = 25.38;
