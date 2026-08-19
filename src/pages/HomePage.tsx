@@ -67,13 +67,6 @@ export const HomePage: React.FC = () => {
       description: 'Check in drivers and assign dock doors',
       onClick: () => navigate('/checkin'),
     },
-    ...(hasRestrictedAccess ? [{
-      icon: '🤖',
-      title: 'Driver Avatar',
-      description: 'Open the dedicated avatar stage view',
-      badge: 'Under Construction',
-      onClick: () => navigate('/driver-avatar'),
-    }] : []),
     {
       icon: '👥',
       title: 'Active Drivers',
@@ -93,13 +86,6 @@ export const HomePage: React.FC = () => {
       onClick: () => navigate('/checkin-history'),
     },
     {
-      icon: '🧾',
-      title: 'Extra Services',
-      description: 'Capture restacking, case pick, and other service activity',
-      badge: 'Under Construction',
-      onClick: () => navigate('/extra-services'),
-    },
-    {
       icon: '📤',
       title: 'Outbound Checker Form',
       description: 'Submit outbound dock verification and pallet checks',
@@ -116,18 +102,6 @@ export const HomePage: React.FC = () => {
       title: 'Dock Checker History',
       description: 'Search all inbound and outbound checker forms by date',
       onClick: () => navigate('/dock-checker/history'),
-    },
-    {
-      icon: '📦',
-      title: 'Inventory Auditor',
-      description: 'Upload Famous inventory report, scan locations, and run discrepancy audits',
-      onClick: () => navigate('/inventory-auditor'),
-    },
-    {
-      icon: '🚛',
-      title: 'Trailer Load Optimizer',
-      description: 'Optimize legal weight, axle balance, and securement instructions',
-      onClick: () => navigate('/load-balancer'),
     },
   ];
 
@@ -180,13 +154,6 @@ export const HomePage: React.FC = () => {
   ];
 
   const managementCards = [
-    ...((userRole === 'executive' || userRole === 'manager') && hasRestrictedAccess ? [{
-      icon: '🤖',
-      title: 'AI Dual Entry',
-      description: 'Mirror Famous WMS entries with runner status and exception review',
-      badge: 'Under Construction',
-      onClick: () => navigate('/ai-dual-entry'),
-    }] : []),
     ...(userRole === 'executive' ? [{
       icon: '📊',
       title: 'Executive Dashboard',
