@@ -61,7 +61,14 @@ interface ForecastWeek {
   recommendedAction: string;
 }
 
-const railwayVolumeRoot = String(process.env.RAILWAY_VOLUME_MOUNT_PATH || '').trim();
+const isRailwayRuntime = Boolean(
+  process.env.RAILWAY_ENVIRONMENT
+  || process.env.RAILWAY_SERVICE_ID
+  || process.env.RAILWAY_PROJECT_ID
+);
+const railwayVolumeRoot = String(
+  process.env.RAILWAY_VOLUME_MOUNT_PATH || (isRailwayRuntime ? '/app/data' : '')
+).trim();
 const dockCheckerPrimaryUploadsDir = railwayVolumeRoot
   ? path.join(railwayVolumeRoot, 'dock-checker-uploads')
   : path.join(process.cwd(), 'data', 'dock-checker-uploads');
