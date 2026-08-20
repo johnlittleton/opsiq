@@ -150,7 +150,7 @@
 .production-capacity__staffing {
   width: min(1400px, 100%);
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -225,6 +225,73 @@
   background: transparent;
   font-size: 25px;
   font-weight: 800;
+}
+
+.production-capacity__support-controls {
+  width: min(1400px, 100%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin: 8px auto 0;
+}
+
+.production-capacity__support-controls label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 6px;
+  background: #111827;
+}
+
+.production-capacity__support-controls label.is-short {
+  border-color: rgba(248, 113, 113, 0.58);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.production-capacity__support-controls label.is-covered {
+  border-color: rgba(52, 211, 153, 0.42);
+}
+
+.production-capacity__support-controls span {
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.production-capacity__support-input {
+  width: 58px;
+  min-height: 28px;
+  box-sizing: border-box;
+  border: 1px solid rgba(56, 189, 248, 0.42) !important;
+  border-radius: 4px;
+  outline: 0;
+  color: #f8fafc;
+  background: #0b1220 !important;
+  font-size: 17px;
+  font-weight: 800;
+  text-align: right;
+  padding: 3px 6px;
+}
+
+.production-capacity__support-input:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.16);
+}
+
+.production-capacity__support-controls small {
+  flex-shrink: 0;
+  color: #fca5a5;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.production-capacity__support-controls label.is-covered small {
+  color: #86efac;
 }
 
 .production-capacity__summary {
@@ -510,6 +577,30 @@
     margin-top: 10px;
   }
 
+  .production-capacity__support-controls {
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .production-capacity__support-controls label {
+    gap: 3px;
+    padding: 5px 6px;
+  }
+
+  .production-capacity__support-controls span {
+    font-size: 8px;
+  }
+
+  .production-capacity__support-controls small {
+    font-size: 8px;
+  }
+
+  .production-capacity__support-input {
+    width: 42px;
+    min-height: 24px;
+    font-size: 15px;
+  }
+
   .production-capacity__controls label {
     gap: 3px;
     padding: 7px 8px;
@@ -524,7 +615,7 @@
   }
 
   .production-capacity__staffing {
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
     gap: 7px;
     margin-top: 8px;
     margin-bottom: 8px;

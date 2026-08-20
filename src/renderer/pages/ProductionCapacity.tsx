@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './ProductionCapacity.css';
 
@@ -7,6 +7,8 @@ const GIRO_CASES_PER_SHIFT = 1200;
 const HP_CASES_PER_HOUR = 1100;
 const RG_CASES_PER_SHIFT = 1200;
 const PEOPLE_PER_LINE = 8;
+const REQUIRED_COMPACTOR_OPERATORS = 1;
+const REQUIRED_STRAPPER_OPERATORS = 1;
 const CAPACITY_HISTORY_KEY = 'opsiq-production-capacity-history';
 
 type CapacityHistoryEntry = {
@@ -17,11 +19,16 @@ type CapacityHistoryEntry = {
   rg1Cases: number;
   rg2Cases: number;
   availableHeadcount: number;
+  availableTaggers: number;
+  availableForkliftDrivers: number;
+  availableCompactorOperators: number;
+  availableStrapperOperators: number;
   activeLines: number;
   requiredHeadcount: number;
   staffingStatus: string;
+  requiredManHours: number;
+  completionHoursWithStaff: number;
 };
-
 const PRODUCTION_LINES = [
   ...Array.from({ length: 6 }, (_, index) => ({
     name: `Giro Line ${index + 1}`,
@@ -55,26 +62,20 @@ export default function ProductionCapacity() {
   const [rg1CasesInput, setRg1CasesInput] = useState('');
   const [rg2CasesInput, setRg2CasesInput] = useState('');
   const [availableHeadcountInput, setAvailableHeadcountInput] = useState('');
-  const [history, setHistory] = useState<CapacityHistoryEntry[]>([]);
-  const [showHistory, setShowHistory] = useState(false);
-
-  useEffect(() => {
-    try {
-      const storedHistory = JSON.parse(localStorage.getItem(CAPACITY_HISTORY_KEY) || '[]');
-      if (Array.isArray(storedHistory)) {
-        setHistory(storedHistory.slice(0, 20));
-      }
-    } catch {
-      setHistory([]);
-    }
-  }, []);
-
+  const [availableTaggersInput, setAvailableTaggersInput] = useState('');
+  const [availableForkliftDriversInput, setAvailableForkliftDriversInput] = useState('');
+  const [availableCompactorOperatorsInput, setAvailableCompactorOperatorsInput] = useState('');
+  const [availableStrapperOperatorsInput, setAvailableStrapperOperatorsInput] = useState('');
   const capacity = useMemo(() => {
     const giroCases = Math.max(0, Number(giroCasesInput) || 0);
     const hpCases = Math.max(0, Number(hpCasesInput) || 0);
     const rg1Cases = Math.max(0, Number(rg1CasesInput) || 0);
     const rg2Cases = Math.max(0, Number(rg2CasesInput) || 0);
     const availableHeadcount = Math.max(0, Number(availableHeadcountInput) || 0);
+    const availableTaggers = Math.max(0, Number(availableTaggersInput) || 0);
+    const availableForkliftDrivers = Math.max(0, Number(availableForkliftDriversInput) || 0);
+    const availableCompactorOperators = Math.max(0, Number(availableCompactorOperatorsInput) || 0);
+    const availableStrapperOperators = Math.max(0, Number(availableStrapperOperatorsInput) || 0);
     const totalCases = giroCases + hpCases + rg1Cases + rg2Cases;
     const roomCapacity = PRODUCTION_LINES.reduce((total, line) => total + line.casesPerShift, 0);
     const remainingCasesByType = { Giro: giroCases, HP7: hpCases, RG1: rg1Cases, RG2: rg2Cases };
@@ -93,6 +94,22 @@ export default function ProductionCapacity() {
     const requiredHeadcount = activeLines.length * PEOPLE_PER_LINE;
     const staffSupportedLines = Math.min(PRODUCTION_LINES.length, Math.floor(availableHeadcount / PEOPLE_PER_LINE));
     const estimatedHours = activeLines.reduce((longest, line) => Math.max(longest, line.lineHours), 0);
+    const requiredManHours = activeLines.reduce((total, line) => total + (line.lineHours * PEOPLE_PER_LINE), 0);
+    const completionHoursWithStaff = availableHeadcount > 0 ? requiredManHours / availableHeadcount : 0;
+    const requiredTaggers = Math.ceil(activeLines.length / 2);
+    const requiredForkliftDrivers = Math.ceil(activeLines.length / 2);
+    const supportRequirements = [
+      { label: 'Taggers', required: requiredTaggers, available: availableTaggers },
+      { label: 'Forklift drivers', required: requiredForkliftDrivers, available: availableForkliftDrivers },
+      { label: 'Compactor operators', required: REQUIRED_COMPACTOR_OPERATORS, available: availableCompactorOperators },
+      { label: 'Strapper operators', required: REQUIRED_STRAPPER_OPERATORS, available: availableStrapperOperators },
+    ];
+    const supportInputsEntered = [availableTaggersInput, availableForkliftDriversInput, availableCompactorOperatorsInput, availableStrapperOperatorsInput]
+      .every((value) => value.trim().length > 0);
+    const supportShortage = supportRequirements.reduce((total, role) => total + Math.max(0, role.required - role.available), 0);
+    const supportManHours = completionHoursWithStaff > 0
+      ? supportRequirements.reduce((total, role) => total + (role.required * completionHoursWithStaff), 0)
+      : 0;
     const utilization = roomCapacity === 0 ? 0 : (totalCases / roomCapacity) * 100;
     const unassignedCases = Object.values(remainingCasesByType).reduce((total, cases) => total + cases, 0);
 
@@ -102,6 +119,10 @@ export default function ProductionCapacity() {
       rg1Cases,
       rg2Cases,
       availableHeadcount,
+      availableTaggers,
+      availableForkliftDrivers,
+      availableCompactorOperators,
+      availableStrapperOperators,
       totalCases,
       roomCapacity,
       allocation,
@@ -111,12 +132,20 @@ export default function ProductionCapacity() {
       staffSupportedLines,
       headcountDifference: availableHeadcount - requiredHeadcount,
       estimatedHours,
+      requiredManHours,
+      completionHoursWithStaff,
+      supportRequirements,
+      requiredTaggers,
+      requiredForkliftDrivers,
+      supportShortage,
+      supportManHours,
+      supportInputsEntered,
       utilization,
       fitsInOneShift: totalCases <= roomCapacity,
       unassignedCases,
       hasHeadcountInput: availableHeadcountInput.trim().length > 0,
     };
-  }, [giroCasesInput, hpCasesInput, rg1CasesInput, rg2CasesInput, availableHeadcountInput]);
+  }, [giroCasesInput, hpCasesInput, rg1CasesInput, rg2CasesInput, availableHeadcountInput, availableTaggersInput, availableForkliftDriversInput, availableCompactorOperatorsInput, availableStrapperOperatorsInput]);
 
   const staffingStatus = !capacity.hasHeadcountInput
     ? 'Headcount not entered'
@@ -126,7 +155,15 @@ export default function ProductionCapacity() {
         ? 'Staffed to capacity'
         : 'Enough staff to run the plan';
 
+  const overallStaffingStatus = capacity.hasHeadcountInput && capacity.supportInputsEntered
+    ? capacity.headcountDifference < 0 || capacity.supportShortage > 0
+      ? 'Short staffed'
+      : 'Fully staffed'
+    : 'Enter all available staffing';
+  const hasAnyStaffingShortage = capacity.headcountDifference < 0 || capacity.supportShortage > 0;
+
   const saveHistorySnapshot = () => {
+    const existing = JSON.parse(localStorage.getItem(CAPACITY_HISTORY_KEY) || '[]') as CapacityHistoryEntry[];
     const entry: CapacityHistoryEntry = {
       id: `${Date.now()}`,
       savedAt: new Date().toISOString(),
@@ -135,19 +172,17 @@ export default function ProductionCapacity() {
       rg1Cases: capacity.rg1Cases,
       rg2Cases: capacity.rg2Cases,
       availableHeadcount: capacity.availableHeadcount,
+      availableTaggers: capacity.availableTaggers,
+      availableForkliftDrivers: capacity.availableForkliftDrivers,
+      availableCompactorOperators: capacity.availableCompactorOperators,
+      availableStrapperOperators: capacity.availableStrapperOperators,
       activeLines: capacity.activeLines.length,
       requiredHeadcount: capacity.requiredHeadcount,
-      staffingStatus,
+      staffingStatus: overallStaffingStatus,
+      requiredManHours: capacity.requiredManHours,
+      completionHoursWithStaff: capacity.completionHoursWithStaff,
     };
-    const nextHistory = [entry, ...history].slice(0, 20);
-    setHistory(nextHistory);
-    localStorage.setItem(CAPACITY_HISTORY_KEY, JSON.stringify(nextHistory));
-    setShowHistory(true);
-  };
-
-  const clearHistory = () => {
-    setHistory([]);
-    localStorage.removeItem(CAPACITY_HISTORY_KEY);
+    localStorage.setItem(CAPACITY_HISTORY_KEY, JSON.stringify([entry, ...existing].slice(0, 50)));
   };
 
   return (
@@ -170,9 +205,7 @@ export default function ProductionCapacity() {
         </div>
         <div className="production-capacity__header-actions">
           <button type="button" onClick={saveHistorySnapshot}>Save Snapshot</button>
-          <button type="button" onClick={() => setShowHistory((current) => !current)}>
-            {showHistory ? 'Hide History' : `History (${history.length})`}
-          </button>
+          <button type="button" onClick={() => navigate('/production-capacity-history')}>History</button>
         </div>
       </header>
 
@@ -229,6 +262,33 @@ export default function ProductionCapacity() {
         </label>
       </section>
 
+      <section className="production-capacity__support-controls" aria-label="Support staffing inputs">
+        {[
+          ['Taggers', availableTaggersInput, setAvailableTaggersInput, capacity.requiredTaggers],
+          ['Forklift drivers', availableForkliftDriversInput, setAvailableForkliftDriversInput, capacity.requiredForkliftDrivers],
+          ['Compactor operators', availableCompactorOperatorsInput, setAvailableCompactorOperatorsInput, REQUIRED_COMPACTOR_OPERATORS],
+          ['Strapper operators', availableStrapperOperatorsInput, setAvailableStrapperOperatorsInput, REQUIRED_STRAPPER_OPERATORS],
+        ].map(([label, value, setter, required]) => {
+          const shortage = Math.max(0, Number(required) - Number(value || 0));
+          return (
+          <label key={String(label)} className={shortage > 0 ? 'is-short' : 'is-covered'}>
+            <span>{label} available ({required} required)</span>
+            <input
+              className="production-capacity__support-input"
+              type="number"
+              min={0}
+              inputMode="numeric"
+              placeholder="0"
+              aria-label={`${label} available`}
+              value={String(value)}
+              onChange={(event) => (setter as (next: string) => void)(event.target.value)}
+            />
+            <small>{shortage > 0 ? `Need ${shortage} more` : 'Covered'}</small>
+          </label>
+          );
+        })}
+      </section>
+
       <section className="production-capacity__staffing" aria-label="Staffing results">
         <div>
           <span>Staffing status</span>
@@ -245,6 +305,21 @@ export default function ProductionCapacity() {
           <span>Lines supported by available staff</span>
           <strong>{capacity.staffSupportedLines}</strong>
           <small>of {PRODUCTION_LINES.length} available</small>
+        </div>
+        <div>
+          <span>Required man-hours</span>
+          <strong>{capacity.requiredManHours.toFixed(1)}</strong>
+          <small>total labor effort</small>
+        </div>
+        <div>
+          <span>Completion with available staff</span>
+          <strong>{capacity.hasHeadcountInput ? `${capacity.completionHoursWithStaff.toFixed(2)} h` : '--'}</strong>
+          <small>clock hours at entered headcount</small>
+        </div>
+        <div>
+          <span>Overall staffing</span>
+          <strong className={hasAnyStaffingShortage ? 'is-short' : 'is-ready'}>{overallStaffingStatus}</strong>
+          <small>includes production and support roles</small>
         </div>
       </section>
 
@@ -308,31 +383,6 @@ export default function ProductionCapacity() {
         Model: Giro Lines 1-6, HP7, RG1, and RG2 each require {PEOPLE_PER_LINE} people. Giro Lines 1-6 produce {formatNumber(GIRO_CASES_PER_SHIFT)} cases per {SHIFT_HOURS}-hour shift. HP7 produces {formatNumber(HP_CASES_PER_HOUR)} cases per hour. RG1 and RG2 produce {formatNumber(RG_CASES_PER_SHIFT)} cases per {SHIFT_HOURS}-hour shift.
       </p>
 
-      {showHistory && (
-        <section className="production-capacity__history" aria-label="Production capacity history">
-          <div className="production-capacity__section-heading">
-            <div>
-              <p className="production-capacity__eyebrow">Saved calculations</p>
-              <h2>Capacity History</h2>
-            </div>
-            {history.length > 0 && <button type="button" onClick={clearHistory}>Clear History</button>}
-          </div>
-          {history.length === 0 ? (
-            <p className="production-capacity__history-empty">No saved capacity snapshots yet.</p>
-          ) : (
-            <div className="production-capacity__history-list">
-              {history.map((entry) => (
-                <article key={entry.id} className="production-capacity__history-item">
-                  <strong>{new Date(entry.savedAt).toLocaleString()}</strong>
-                  <span>Giro {formatNumber(entry.giroCases)} | HP7 {formatNumber(entry.hpCases)} | RG1 {formatNumber(entry.rg1Cases)} | RG2 {formatNumber(entry.rg2Cases)}</span>
-                  <span>Staff: {formatNumber(entry.availableHeadcount)} | Required: {entry.requiredHeadcount} | Lines: {entry.activeLines}</span>
-                  <b>{entry.staffingStatus}</b>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
     </main>
   );
 }

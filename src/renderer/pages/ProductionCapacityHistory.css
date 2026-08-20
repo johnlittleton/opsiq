@@ -1,0 +1,282 @@
+.production-capacity-history {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 28px clamp(20px, 4vw, 64px);
+  background: #0b1220;
+  color: #e5eef8;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+
+.production-capacity-history__header,
+.production-capacity-history__list,
+.production-capacity-history__empty {
+  width: min(1380px, 100%);
+  margin: 0 auto;
+}
+
+.production-capacity-history__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+}
+
+.production-capacity-history__eyebrow {
+  margin: 0 0 5px;
+  color: #38bdf8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.production-capacity-history h1,
+.production-capacity-history h2,
+.production-capacity-history h3,
+.production-capacity-history p {
+  margin-top: 0;
+}
+
+.production-capacity-history h1 {
+  margin-bottom: 7px;
+  color: #f8fafc;
+  font-size: clamp(28px, 4vw, 46px);
+  line-height: 1;
+}
+
+.production-capacity-history__header p:last-child {
+  margin-bottom: 0;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.production-capacity-history__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.production-capacity-history button {
+  border: 1px solid rgba(56, 189, 248, 0.48);
+  border-radius: 5px;
+  padding: 8px 11px;
+  color: #bae6fd;
+  background: rgba(15, 23, 42, 0.78);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.production-capacity-history button:hover {
+  border-color: #38bdf8;
+  color: #f8fafc;
+  background: rgba(14, 116, 144, 0.32);
+}
+
+.production-capacity-history button.is-danger {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+}
+
+.production-capacity-history__list {
+  box-sizing: border-box;
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 0 10px 12px 0;
+  scrollbar-color: #38bdf8 #111827;
+  scrollbar-width: thin;
+}
+
+.production-capacity-history__list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.production-capacity-history__list::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: #111827;
+}
+
+.production-capacity-history__list::-webkit-scrollbar-thumb {
+  border: 2px solid #111827;
+  border-radius: 999px;
+  background: #38bdf8;
+}
+
+.production-capacity-history__filters {
+  width: min(1380px, 100%);
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) minmax(180px, 1fr) 1fr;
+  align-items: end;
+  gap: 10px;
+  margin: 16px auto 0;
+}
+
+.production-capacity-history__filters label {
+  display: grid;
+  gap: 5px;
+}
+
+.production-capacity-history__filters label span {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.production-capacity-history__filters input {
+  width: 100%;
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 5px;
+  padding: 8px 10px;
+  outline: 0;
+  color: #f8fafc;
+  background: #111827;
+  font: inherit;
+  font-size: 12px;
+}
+
+.production-capacity-history__filters input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
+}
+
+.production-capacity-history__filter-count {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  color: #7dd3fc;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.production-capacity-history__record,
+.production-capacity-history__empty {
+  padding: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: #101a2a;
+}
+
+.production-capacity-history__record-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.production-capacity-history__record-header h2 {
+  margin-bottom: 0;
+  color: #f8fafc;
+  font-size: 18px;
+}
+
+.production-capacity-history__record-header strong,
+.production-capacity-history__grid strong,
+.production-capacity-history__support strong {
+  color: #f8fafc;
+}
+
+.production-capacity-history__record-header strong.is-short {
+  color: #fca5a5;
+}
+
+.production-capacity-history__record-header strong.is-ready {
+  color: #86efac;
+}
+
+.production-capacity-history__grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.production-capacity-history__grid > div,
+.production-capacity-history__support > div {
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 5px;
+  background: #172235;
+}
+
+.production-capacity-history__grid span,
+.production-capacity-history__support span {
+  display: block;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.production-capacity-history__grid strong,
+.production-capacity-history__support strong {
+  display: block;
+  margin-top: 5px;
+  font-size: 18px;
+}
+
+.production-capacity-history__support {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.production-capacity-history__support h3 {
+  grid-column: 1 / -1;
+  margin-bottom: -2px;
+  color: #7dd3fc;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.production-capacity-history__empty {
+  margin-top: 18px;
+}
+
+.production-capacity-history__empty h2 {
+  color: #f8fafc;
+}
+
+.production-capacity-history__empty p {
+  color: #94a3b8;
+}
+
+@media (max-width: 800px) {
+  .production-capacity-history {
+    padding: 18px 14px;
+  }
+
+  .production-capacity-history__header,
+  .production-capacity-history__record-header {
+    flex-direction: column;
+  }
+
+  .production-capacity-history__actions {
+    justify-content: flex-start;
+  }
+
+  .production-capacity-history__grid,
+  .production-capacity-history__support {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .production-capacity-history__list {
+    max-height: calc(100vh - 260px);
+  }
+
+  .production-capacity-history__filters {
+    grid-template-columns: 1fr;
+  }
+}
