@@ -134,6 +134,12 @@ export const HomePage: React.FC = () => {
       onClick: () => navigate('/production-dashboard'),
     },
     {
+      icon: '🎛️',
+      title: 'Line Controller',
+      description: 'Update headcount and completed cases for one production line',
+      onClick: () => navigate('/production-line-controller'),
+    },
+    {
       icon: '🧮',
       title: 'Production Capacity',
       description: 'Calculate room capacity, lines, people, and production time',

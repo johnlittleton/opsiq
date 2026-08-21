@@ -173,6 +173,7 @@ export const DockBoardPage: React.FC = () => {
       doorNumber: doorNum,
       status: mappedStatus,
       timer: doorData?.checkin?.statusStartTime ? getElapsedTime(doorData.checkin.statusStartTime) : undefined,
+      overdue: Boolean(doorData?.checkin?.statusStartTime && (Date.now() - new Date(doorData.checkin.statusStartTime).getTime()) >= 60 * 60 * 1000),
       pulsing: mappedStatus !== 'open',
       checkin: doorData?.checkin || null,
     };
@@ -407,6 +408,7 @@ export const DockBoardPage: React.FC = () => {
               status={door.status}
               timer={door.timer}
               pulsing={door.pulsing}
+              overdue={door.overdue}
               checkin={door.checkin}
               onClick={() => handleDoorClick(door.doorNumber)}
               onEdit={door.checkin ? () => handleEditCheckin(door.checkin) : undefined}

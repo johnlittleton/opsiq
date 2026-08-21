@@ -15,6 +15,7 @@ interface DockTileProps {
   onEdit?: () => void;
   onOpenForm?: () => void;
   hasFormOnFile?: boolean;
+  overdue?: boolean;
 }
 
 export const DockTile: React.FC<DockTileProps> = ({
@@ -28,6 +29,7 @@ export const DockTile: React.FC<DockTileProps> = ({
   onEdit,
   onOpenForm,
   hasFormOnFile = false,
+  overdue = false,
 }) => {
   const statusLabels: Record<DockStatus, string> = {
     open: 'OPEN',
@@ -56,11 +58,12 @@ export const DockTile: React.FC<DockTileProps> = ({
 
   return (
     <div
-      className={`dock-tile ${compact ? 'compact' : ''} ${pulsing ? 'pulsing' : ''}`}
+      className={`dock-tile ${compact ? 'compact' : ''} ${pulsing ? 'pulsing' : ''} ${overdue ? 'overdue' : ''}`}
       data-status={status}
       onClick={onClick}
     >
       <div className="dock-tile__label">D{doorNumber}</div>
+      {overdue && <div className="dock-tile__overdue-alert">OVER 60 MIN</div>}
       {checkin && onOpenForm && (
         <button
           className={`dock-tile__verify-btn ${hasFormOnFile ? 'has-form' : ''}`}

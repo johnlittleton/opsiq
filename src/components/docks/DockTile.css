@@ -98,6 +98,30 @@
   filter: brightness(1.1);
 }
 
+.dock-tile.overdue {
+  border-color: #ef4444;
+  animation: dock-tile-overdue-pulse 1s ease-in-out infinite;
+}
+
+.dock-tile__overdue-alert {
+  position: absolute;
+  top: 34px;
+  z-index: 5;
+  padding: 3px 6px;
+  border-radius: 3px;
+  color: #fff;
+  background: #dc2626;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  animation: dock-tile-overdue-pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes dock-tile-overdue-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.65); }
+  50% { box-shadow: 0 0 24px rgba(239, 68, 68, 1); }
+}
+
 /* Tile Content */
 .dock-tile__label {
   font-size: 22px;

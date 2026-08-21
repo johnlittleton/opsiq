@@ -1062,6 +1062,7 @@ const CombinedLiveOperationsDashboard: React.FC = () => {
                     status={mapDoorStatus(door.status)}
                     timer={formatElapsedTimer(door.checkin?.statusStartTime || door.statusStartTime)}
                     pulsing={door.status !== 'Open'}
+                    overdue={Boolean((door.checkin?.statusStartTime || door.statusStartTime) && (Date.now() - new Date(door.checkin?.statusStartTime || door.statusStartTime).getTime()) >= 60 * 60 * 1000)}
                     checkin={door.checkin || null}
                     onClick={() => setSelectedDock(door)}
                     compact

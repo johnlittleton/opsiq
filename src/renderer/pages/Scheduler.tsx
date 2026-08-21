@@ -36,7 +36,11 @@ const Scheduler: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [view, setView] = useState<'list' | 'calendar' | 'timeslot'>('list');
   const [selectedTimeslotDate, setSelectedTimeslotDate] = useState(new Date());
+  const [manualTimeslotTime, setManualTimeslotTime] = useState('08:00');
+  const [manualDoor, setManualDoor] = useState('1');
+  const [manualTime, setManualTime] = useState('08:00');
   const [hoveredSlot, setHoveredSlot] = useState<{ door: number; time: string; appointment: Appointment } | null>(null);
+  const [hoveredAppointment, setHoveredAppointment] = useState<{ door: number; appointment: Appointment } | null>(null);
 
   const [formData, setFormData] = useState({
     appointmentDate: '',
@@ -153,7 +157,7 @@ const Scheduler: React.FC = () => {
     setSelectedDate(date);
   };
 
-  const openModal = (date?: Date, appointment?: Appointment) => {
+  const openModal = (date?: Date, appointment?: Appointment, initialTime = '08:00') => {
     if (appointment) {
       setEditingAppointment(appointment);
       setFormData({
@@ -175,7 +179,7 @@ const Scheduler: React.FC = () => {
       setEditingAppointment(null);
       setFormData({
         appointmentDate: date ? format(date, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
-        appointmentTime: '08:00',
+        appointmentTime: initialTime,
         company: '',
         contactName: '',
         contactPhone: '',
@@ -256,11 +260,10 @@ const Scheduler: React.FC = () => {
   };
 
   // Time slot grid helpers
-  const TIME_SLOTS = [
-    '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-    '18:00', '18:30', '19:00'
-  ];
+  const TIME_SLOTS = Array.from({ length: 24 }, (_, index) => {
+    const totalMinutes = 7 * 60 + 30 + index * 30;
+    return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`;
+  });
   
   const DOORS = Array.from({ length: 39 }, (_, i) => i + 1);
 
@@ -273,9 +276,23 @@ const Scheduler: React.FC = () => {
     );
   };
 
+  const getDoorAppointmentCount = (doorId: number) => {
+    const dateStr = format(selectedTimeslotDate, 'yyyy-MM-dd');
+    return appointments.filter((appointment) => appointment.doorId === doorId && appointment.appointmentDate === dateStr).length;
+  };
+
+  const getDoorAppointments = (doorId: number) => {
+    const dateStr = format(selectedTimeslotDate, 'yyyy-MM-dd');
+    return appointments
+      .filter((appointment) => appointment.doorId === doorId && appointment.appointmentDate === dateStr)
+      .sort((left, right) => left.appointmentTime.localeCompare(right.appointmentTime));
+  };
+
   const handleTimeslotClick = (doorId: number, timeSlot: string, appointment?: Appointment) => {
     if (appointment) {
       openModal(selectedTimeslotDate, appointment);
+    } else if (getDoorAppointmentCount(doorId) >= 8) {
+      window.alert(`Door D${doorId} is at capacity with 8 appointments for this day.`);
     } else {
       setFormData({
         appointmentDate: format(selectedTimeslotDate, 'yyyy-MM-dd'),
@@ -321,50 +338,6 @@ const Scheduler: React.FC = () => {
             </button>
           </div>
           
-          {view === 'timeslot' && (
-            <>
-              <label className="scheduler__date-picker-label">
-                Select Date:
-                <input
-                  type="date"
-                  value={format(selectedTimeslotDate, 'yyyy-MM-dd')}
-                  onChange={(e) => {
-                    const newDate = new Date(e.target.value + 'T00:00:00');
-                    setSelectedTimeslotDate(newDate);
-                  }}
-                  className="scheduler__date-picker"
-                />
-              </label>
-              <button 
-                onClick={() => setSelectedTimeslotDate(new Date())}
-                className="scheduler__today-btn"
-              >
-                Today
-              </button>
-              <h2 className="scheduler__timeslot-date">
-                {format(selectedTimeslotDate, 'EEEE, MMMM d, yyyy')}
-              </h2>
-              
-              <div className="scheduler__timeslot-legend">
-                <span className="scheduler__legend-title">STATUS LEGEND</span>
-                <div className="scheduler__legend-items">
-                  <div className="scheduler__legend-item">
-                    <div className="scheduler__legend-dot scheduler__legend-dot--available"></div>
-                    <span className="scheduler__legend-label">Available</span>
-                  </div>
-                  <div className="scheduler__legend-item">
-                    <div className="scheduler__legend-dot scheduler__legend-dot--inbound"></div>
-                    <span className="scheduler__legend-label">Inbound</span>
-                  </div>
-                  <div className="scheduler__legend-item">
-                    <div className="scheduler__legend-dot scheduler__legend-dot--outbound"></div>
-                    <span className="scheduler__legend-label">Outbound</span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-          
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -383,102 +356,79 @@ const Scheduler: React.FC = () => {
       
       <div className="scheduler__content">        {view === 'timeslot' ? (
           <div className="scheduler__timeslot-view">
+            <aside className="scheduler__timeslot-sidebar">
+              <p className="scheduler__eyebrow">Daily dock capacity</p>
+              <h2>{format(selectedTimeslotDate, 'MMM d, yyyy')}</h2>
+              <label>Select date
+                <input type="date" value={format(selectedTimeslotDate, 'yyyy-MM-dd')} onChange={(event) => setSelectedTimeslotDate(new Date(`${event.target.value}T00:00:00`))} />
+              </label>
+              <button type="button" onClick={() => setSelectedTimeslotDate(new Date())}>Today</button>
+              <p>Each dock can hold up to 8 appointments per day.</p>
+              <label>Door
+                <select value={manualDoor} onChange={(event) => setManualDoor(event.target.value)}>
+                  {DOORS.map((door) => <option key={door} value={door}>D{door}</option>)}
+                </select>
+              </label>
+              <label>Exact time
+                <input type="time" step={300} value={manualTime} onChange={(event) => setManualTime(event.target.value)} />
+              </label>
+              <button type="button" onClick={() => handleTimeslotClick(Number(manualDoor), manualTime)}>Add Appointment</button>
+              <div className={`scheduler__selected-door-capacity ${getDoorAppointmentCount(Number(manualDoor)) >= 8 ? 'is-full' : ''}`}>
+                <span>D{manualDoor}</span>
+                <strong>{getDoorAppointmentCount(Number(manualDoor))} / 8</strong>
+                <small>{getDoorAppointmentCount(Number(manualDoor)) >= 8 ? 'At capacity' : `${8 - getDoorAppointmentCount(Number(manualDoor))} spots remaining`}</small>
+              </div>
+            </aside>
+
+            <div className="scheduler__timeslot-grid-panel">
             <div className="scheduler__timeslot-grid">
               {DOORS.map(door => {
+                const doorAppointments = getDoorAppointments(door);
+                const appointmentCount = doorAppointments.length;
+                const atCapacity = appointmentCount >= 8;
                 return (
-                  <div key={door} className="scheduler__door-tile">
-                    <div className="scheduler__door-tile-label">D{door}</div>
-                    <div className="scheduler__door-tile-slots">
-                      {TIME_SLOTS.map(timeSlot => {
-                        const appointment = getAppointmentForSlot(door, timeSlot);
-                        const isBooked = !!appointment;
-                        
-                        let className = 'scheduler__time-text';
-                        if (isBooked && appointment.type === 'Inbound') {
-                          className += ' scheduler__time-text--inbound';
-                        } else if (isBooked && appointment.type === 'Outbound') {
-                          className += ' scheduler__time-text--outbound';
-                        } else if (!isBooked) {
-                          className += ' scheduler__time-text--open';
-                        }
-                        
-                        return (
-                          <span
-                            key={timeSlot}
-                            className={className}
-                            onClick={() => handleTimeslotClick(door, timeSlot, appointment)}
-                            onMouseEnter={() => isBooked && appointment && setHoveredSlot({ door, time: timeSlot, appointment })}
-                            onMouseLeave={() => setHoveredSlot(null)}
-                          >
-                            {timeSlot}
-                          </span>
-                        );
-                      })}
+                  <div
+                    key={door}
+                    className={`scheduler__door-tile ${atCapacity ? 'is-at-capacity' : ''}`}
+                  >
+                    <div className="scheduler__door-tile-label"><span>D{door}</span><small>{appointmentCount}/8</small></div>
+                    <div className="scheduler__door-appointments">
+                      {doorAppointments.length > 0 ? doorAppointments.map((appointment) => (
+                        <button
+                          type="button"
+                          key={appointment.id}
+                          className={`scheduler__door-appointment scheduler__door-appointment--${appointment.type.toLowerCase()}`}
+                          onClick={() => openModal(selectedTimeslotDate, appointment)}
+                          onMouseEnter={() => setHoveredAppointment({ door, appointment })}
+                          onMouseLeave={() => setHoveredAppointment(null)}
+                        >
+                          <b>{appointment.appointmentTime}</b>
+                          <span>{appointment.carrier || 'No carrier'}</span>
+                          <span>{appointment.customer || 'No customer'}</span>
+                          <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.pickupNumber || 'N/A'}</span>
+                        </button>
+                      )) : <span className="scheduler__door-empty">Available</span>}
                     </div>
+                    {hoveredAppointment?.door === door && (
+                      <div className="scheduler__door-hover-card">
+                        <strong>D{door} appointment</strong>
+                        <b>{hoveredAppointment.appointment.appointmentTime} · {hoveredAppointment.appointment.type}</b>
+                        <span>Carrier: {hoveredAppointment.appointment.carrier || 'N/A'}</span>
+                        <span>Customer: {hoveredAppointment.appointment.customer || 'N/A'}</span>
+                        <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.pickupNumber || 'N/A'}</span>
+                        <span>Company: {hoveredAppointment.appointment.company || 'N/A'}</span>
+                        <span>Contact: {hoveredAppointment.appointment.contactName || 'N/A'}</span>
+                        <span>Phone: {hoveredAppointment.appointment.contactPhone || 'N/A'}</span>
+                        <span>Commodity: {hoveredAppointment.appointment.commodity || 'N/A'}</span>
+                        <span>Pallets: {hoveredAppointment.appointment.pallets || 'N/A'}</span>
+                        <span>Notes: {hoveredAppointment.appointment.notes || 'N/A'}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
-            
-            {hoveredSlot && (
-              <div className="scheduler__tooltip">
-                <div className="scheduler__tooltip-header">
-                  <strong>{hoveredSlot.appointment.company}</strong>
-                </div>
-                {hoveredSlot.appointment.customer && (
-                  <div className="scheduler__tooltip-row">
-                    <span className="scheduler__tooltip-label">Customer:</span>
-                    <span>{hoveredSlot.appointment.customer}</span>
-                  </div>
-                )}
-                {hoveredSlot.appointment.carrier && (
-                  <div className="scheduler__tooltip-row">
-                    <span className="scheduler__tooltip-label">Carrier:</span>
-                    <span>{hoveredSlot.appointment.carrier}</span>
-                  </div>
-                )}
-                <div className="scheduler__tooltip-row">
-                  <span className="scheduler__tooltip-label">
-                    {hoveredSlot.appointment.type === 'Inbound' ? 'P/U #:' : 'S/O #:'}
-                  </span>
-                  <span>{hoveredSlot.appointment.pickupNumber || 'N/A'}</span>
-                </div>
-                <div className="scheduler__tooltip-row">
-                  <span className="scheduler__tooltip-label">Commodity:</span>
-                  <span>{hoveredSlot.appointment.commodity || 'Not specified'}</span>
-                </div>
-                <div className="scheduler__tooltip-row">
-                  <span className="scheduler__tooltip-label">Type:</span>
-                  <span className={`scheduler__tooltip-badge scheduler__tooltip-badge--${hoveredSlot.appointment.type.toLowerCase()}`}>
-                    {hoveredSlot.appointment.type}
-                  </span>
-                </div>
-                {hoveredSlot.appointment.pallets && (
-                  <div className="scheduler__tooltip-row">
-                    <span className="scheduler__tooltip-label">Pallets:</span>
-                    <span>{hoveredSlot.appointment.pallets}</span>
-                  </div>
-                )}
-                {hoveredSlot.appointment.contactName && (
-                  <div className="scheduler__tooltip-row">
-                    <span className="scheduler__tooltip-label">Contact:</span>
-                    <span>{hoveredSlot.appointment.contactName}</span>
-                  </div>
-                )}
-                {hoveredSlot.appointment.contactPhone && (
-                  <div className="scheduler__tooltip-row">
-                    <span className="scheduler__tooltip-label">Phone:</span>
-                    <span>{hoveredSlot.appointment.contactPhone}</span>
-                  </div>
-                )}
-                {hoveredSlot.appointment.notes && (
-                  <div className="scheduler__tooltip-row">
-                    <span className="scheduler__tooltip-label">Notes:</span>
-                    <span className="scheduler__tooltip-notes">{hoveredSlot.appointment.notes}</span>
-                  </div>
-                )}
-              </div>
-            )}
+          </div>
           </div>
         ) : view === 'list' ? (
           <div className="scheduler__list">

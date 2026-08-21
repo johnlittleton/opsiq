@@ -33,6 +33,7 @@ import ProductionScheduler from './pages/ProductionScheduler';
 import ProductionDashboard from './pages/ProductionDashboard';
 import ProductionCapacity from './pages/ProductionCapacity';
 import ProductionCapacityHistory from './pages/ProductionCapacityHistory';
+import ProductionLineController from './pages/ProductionLineController';
 import CombinedLiveOperationsDashboard from './pages/CombinedLiveOperationsDashboard';
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
@@ -123,6 +124,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/production-dashboard" element={<ProductionDashboard />} />
       <Route path="/production-capacity" element={<ProductionCapacity />} />
       <Route path="/production-capacity-history" element={<ProductionCapacityHistory />} />
+      <Route path="/production-line-controller" element={<ProductionLineController />} />
       <Route path="/dashboard" element={<ProductionDashboard />} />
       <Route path="/pallet-tracker" element={<PalletTracker />} />
       <Route path="/work-order-history" element={<WorkOrderHistory />} />

@@ -285,7 +285,25 @@
 
 .wo-table-wrap {
   width: 100%;
-  overflow-x: hidden;
+  max-height: 280px;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-color: #16a085 #232837;
+  scrollbar-width: thin;
+}
+
+.wo-table-wrap::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.wo-table-wrap::-webkit-scrollbar-track {
+  background: #232837;
+}
+
+.wo-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #16a085;
 }
 
 .section-title {
@@ -1626,4 +1644,11 @@
   color: #7fffb0;
   font-size: 0.7rem;
   font-weight: 700;
+}
+
+.work-order-sections {
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+  scrollbar-color: #16a085 #232837;
+  scrollbar-width: thin;
 }
