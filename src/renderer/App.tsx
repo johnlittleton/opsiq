@@ -47,6 +47,7 @@ import InboundDockCheckerForm from './pages/InboundDockCheckerForm';
 import DockCheckerHistory from './pages/DockCheckerHistory';
 import InventoryAuditor from './pages/InventoryAuditor';
 import LoadBalancer from './pages/LoadBalancer';
+import CustomerPortal from './pages/CustomerPortal';
 import { hasRestrictedFeatureAccess } from './utils/restrictedAccess';
 
 type UpdaterStatus = {
@@ -69,7 +70,8 @@ const PUBLIC_ROUTES = [
   '/production',
   '/shipping',
   '/labor-kiosk',
-  '/labor-kiosk-admin'
+  '/labor-kiosk-admin',
+  '/customer-portal'
 ];
 
 const AppRoutes: React.FC = () => {
@@ -91,6 +93,7 @@ const AppRoutes: React.FC = () => {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/home" element={<HomePage />} />
+      <Route path="/customer-portal" element={<CustomerPortal />} />
       <Route path="/dockboard" element={<DockBoardPage />} />
       <Route path="/dockboard-old" element={<LiveDockBoard />} />
       <Route path="/checkin" element={<DriverCheckIn />} />

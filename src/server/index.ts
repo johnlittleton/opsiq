@@ -2036,6 +2036,58 @@ app.get('/api/appointments', async (req, res) => {
   }
 });
 
+const normalizePortalCustomer = (value: unknown): string => String(value || '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]/g, '');
+
+app.get('/api/customer-portal/schedule', async (req, res) => {
+  try {
+    const code = String(req.headers['x-customer-code'] || '').trim();
+    const customer = await db.authenticateCustomerPortalCode(code);
+    if (!customer) {
+      return res.status(401).json({ error: 'Invalid customer access code.' });
+    }
+
+    const date = String(req.query.date || '').trim();
+    const appointments = await db.getAppointments({
+      startDate: date ? `${date}T00:00:00` : undefined,
+      endDate: date ? `${date}T23:59:59` : undefined,
+    });
+    const customerKey = normalizePortalCustomer(customer);
+    const customerAppointments = appointments
+      .filter((appointment: any) => normalizePortalCustomer(appointment.customer) === customerKey)
+      .map((appointment: any) => ({
+        appointmentDate: appointment.appointmentDate,
+        appointmentTime: appointment.appointmentTime,
+        type: appointment.type,
+        doorId: appointment.doorId,
+        pickupNumber: appointment.pickupNumber,
+        company: appointment.company,
+        pallets: appointment.pallets,
+        commodity: appointment.commodity,
+        status: appointment.status,
+      }));
+
+    const doorCounts = new Map<number, number>();
+    appointments.forEach((appointment: any) => {
+      const doorId = Number(appointment.doorId || 0);
+      if (doorId > 0) doorCounts.set(doorId, (doorCounts.get(doorId) || 0) + 1);
+    });
+
+    res.json({
+      customer,
+      appointments: customerAppointments,
+      dailyDockCapacity: Array.from({ length: 39 }, (_, index) => {
+        const doorId = index + 1;
+        const count = doorCounts.get(doorId) || 0;
+        return { doorId, appointments: count, remaining: Math.max(0, 8 - count), atCapacity: count >= 8 };
+      }),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load customer schedule.' });
+  }
+});
+
 // Create appointment
 app.post('/api/appointments', async (req, res) => {
   try {

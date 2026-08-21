@@ -1661,6 +1661,22 @@ export class DatabaseService implements IDatabaseService {
     return this.db.prepare(query).all(...params);
   }
 
+  authenticateCustomerPortalCode(code: string): string | null {
+    const accounts: Record<string, string> = {
+      '482731': 'Kings River',
+      '593842': 'ESU',
+      '614953': 'Vanguard',
+      '725164': 'Sunkist',
+      '836275': 'Fresh Taste',
+      '947386': 'SAFCO',
+      '158497': 'Four Star',
+      '269518': 'SlingShot',
+      '371629': 'Produce Depot',
+      '483710': 'Buffalo Repack',
+    };
+    return accounts[String(code || '').trim()] || null;
+  }
+
   updateAppointment(id: number, data: {
     appointmentDate?: string;
     appointmentTime?: string;
