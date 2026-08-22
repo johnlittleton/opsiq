@@ -2049,9 +2049,15 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
     }
 
     const date = String(req.query.date || '').trim();
+    const month = String(req.query.month || '').trim();
+    const scheduleStart = date || (/^\d{4}-\d{2}$/.test(month) ? `${month}-01` : undefined);
+    const scheduleEnd = date
+      || (/^\d{4}-\d{2}$/.test(month)
+        ? `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, '0')}`
+        : undefined);
     const appointments = await db.getAppointments({
-      startDate: date ? `${date}T00:00:00` : undefined,
-      endDate: date ? `${date}T23:59:59` : undefined,
+      startDate: scheduleStart ? `${scheduleStart}T00:00:00` : undefined,
+      endDate: scheduleEnd ? `${scheduleEnd}T23:59:59` : undefined,
     });
     const customerKey = normalizePortalCustomer(customer);
     const customerAppointments = appointments
@@ -2061,11 +2067,23 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
         appointmentTime: appointment.appointmentTime,
         type: appointment.type,
         doorId: appointment.doorId,
-        pickupNumber: appointment.pickupNumber,
-        company: appointment.company,
-        pallets: appointment.pallets,
+        orderNumber: appointment.pickupNumber,
         commodity: appointment.commodity,
+        customer: appointment.customer,
+        quantity: appointment.pallets,
         status: appointment.status,
+      }));
+
+    const workOrders = await db.getWorkOrders(undefined, scheduleStart, scheduleEnd);
+    const customerWorkOrders = workOrders
+      .filter((workOrder: any) => normalizePortalCustomer(workOrder.customer) === customerKey)
+      .map((workOrder: any) => ({
+        date: workOrder.date,
+        orderNumber: workOrder.id,
+        commodity: workOrder.product || workOrder.commodity,
+        customer: workOrder.customer,
+        quantity: workOrder.targetCases,
+        status: workOrder.status,
       }));
 
     const doorCounts = new Map<number, number>();
@@ -2077,6 +2095,7 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
     res.json({
       customer,
       appointments: customerAppointments,
+      workOrders: customerWorkOrders,
       dailyDockCapacity: Array.from({ length: 39 }, (_, index) => {
         const doorId = index + 1;
         const count = doorCounts.get(doorId) || 0;
@@ -2085,6 +2104,81 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error?.message || 'Failed to load customer schedule.' });
+  }
+});
+
+app.post('/api/customer-portal/requests', async (req, res) => {
+  try {
+    const code = String(req.headers['x-customer-code'] || '').trim();
+    const customer = await db.authenticateCustomerPortalCode(code);
+    if (!customer) return res.status(401).json({ error: 'Invalid customer access code.' });
+
+    const requestedDate = String(req.body?.requestedDate || '').trim();
+    const orderNumber = String(req.body?.orderNumber || '').trim();
+    const commodity = String(req.body?.commodity || '').trim();
+    const quantity = Number(req.body?.quantity);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || !orderNumber || !commodity || !Number.isInteger(quantity) || quantity <= 0) {
+      return res.status(400).json({ error: 'Date, order number, commodity, and a positive whole-number quantity are required.' });
+    }
+
+    const request = await db.createCustomerScheduleRequest({
+      customer,
+      requestedDate,
+      orderNumber,
+      commodity,
+      quantity,
+      contactName: String(req.body?.contactName || '').trim().slice(0, 120),
+      contactEmail: String(req.body?.contactEmail || '').trim().slice(0, 160),
+      notes: String(req.body?.notes || '').trim().slice(0, 1000),
+    });
+    res.status(201).json({ requestNumber: request.id, status: request.status });
+  } catch (error: any) {
+    console.error('Error creating customer schedule request:', error);
+    res.status(400).json({ error: 'Unable to submit schedule request.' });
+  }
+});
+
+const requireJohnCustomerPortalAdmin = async (req: any, res: any): Promise<boolean> => {
+  const sessionToken = req.headers.authorization?.replace('Bearer ', '');
+  const currentUser = sessionToken ? await db.validateSession(sessionToken) : null;
+  const name = String(currentUser?.name || '').trim().toLowerCase();
+  if (!currentUser || (name !== 'john littleton' && name !== 'john')) {
+    res.status(403).json({ error: 'Only John Littleton can manage customer portal access.' });
+    return false;
+  }
+  return true;
+};
+
+app.get('/api/customer-portal/accounts', async (req, res) => {
+  try {
+    if (!await requireJohnCustomerPortalAdmin(req, res)) return;
+    res.json(await db.getCustomerPortalAccounts());
+  } catch (error: any) {
+    res.status(500).json({ error: 'Unable to load customer portal accounts.' });
+  }
+});
+
+app.post('/api/customer-portal/accounts', async (req, res) => {
+  try {
+    if (!await requireJohnCustomerPortalAdmin(req, res)) return;
+    const customer = String(req.body?.customer || '').trim();
+    const pin = String(req.body?.pin || '').trim();
+    if (!customer || !/^\d{5}$/.test(pin)) return res.status(400).json({ error: 'Customer name and a unique five-digit PIN are required.' });
+    res.status(201).json(await db.createCustomerPortalAccount(customer, pin));
+  } catch (error: any) {
+    res.status(400).json({ error: error.code === '23505' ? 'That customer or PIN is already in use.' : 'Unable to create customer portal account.' });
+  }
+});
+
+app.put('/api/customer-portal/accounts/:customer', async (req, res) => {
+  try {
+    if (!await requireJohnCustomerPortalAdmin(req, res)) return;
+    const pin = req.body?.pin === undefined ? undefined : String(req.body.pin).trim();
+    const active = req.body?.active === undefined ? undefined : Boolean(req.body.active);
+    if (pin !== undefined && !/^\d{5}$/.test(pin)) return res.status(400).json({ error: 'PIN must be exactly five digits.' });
+    res.json(await db.updateCustomerPortalAccount(decodeURIComponent(req.params.customer), { pin, active }));
+  } catch (error: any) {
+    res.status(400).json({ error: error.code === '23505' ? 'That PIN is already in use.' : 'Unable to update customer portal account.' });
   }
 });
 

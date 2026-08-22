@@ -1,0 +1,28 @@
+.customer-portal-admin {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 34px clamp(18px, 5vw, 72px);
+  color: #e5eef8;
+  background: #0b1220;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+}
+
+.customer-portal-admin section,
+.customer-portal-admin article {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.23);
+  background: #101a2a;
+}
+
+.customer-portal-admin section { margin: 20px 0; }
+.customer-portal-admin input,
+.customer-portal-admin button { min-height: 38px; padding: 7px 10px; font: inherit; }
+.customer-portal-admin input { color: #f8fafc; background: #111827; border: 1px solid rgba(148, 163, 184, 0.3); }
+.customer-portal-admin button { color: #e0f2fe; background: #164e63; border: 1px solid #38bdf8; cursor: pointer; font-weight: 800; }
+.customer-portal-admin__list { display: grid; gap: 8px; }
+.customer-portal-admin article strong { min-width: 150px; }
+.customer-portal-admin article span { min-width: 80px; color: #bae6fd; }
+@media (max-width: 700px) { .customer-portal-admin section, .customer-portal-admin article { align-items: stretch; flex-direction: column; } }

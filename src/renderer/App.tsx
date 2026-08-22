@@ -48,6 +48,7 @@ import DockCheckerHistory from './pages/DockCheckerHistory';
 import InventoryAuditor from './pages/InventoryAuditor';
 import LoadBalancer from './pages/LoadBalancer';
 import CustomerPortal from './pages/CustomerPortal';
+import CustomerPortalAdmin from './pages/CustomerPortalAdmin';
 import { hasRestrictedFeatureAccess } from './utils/restrictedAccess';
 
 type UpdaterStatus = {
@@ -74,6 +75,8 @@ const PUBLIC_ROUTES = [
   '/customer-portal'
 ];
 
+const CUSTOMER_PORTAL_ONLY = import.meta.env.VITE_CUSTOMER_PORTAL_ONLY === 'true';
+
 const AppRoutes: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, login, executiveName } = useAuth();
@@ -94,6 +97,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={<HomePage />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/customer-portal" element={<CustomerPortal />} />
+      <Route path="/customer-portal-admin" element={<CustomerPortalAdmin />} />
       <Route path="/dockboard" element={<DockBoardPage />} />
       <Route path="/dockboard-old" element={<LiveDockBoard />} />
       <Route path="/checkin" element={<DriverCheckIn />} />
@@ -236,7 +240,7 @@ const AppContent: React.FC = () => {
           v7_relativeSplatPath: true,
         }}
       >
-        <AppRoutes />
+        {CUSTOMER_PORTAL_ONLY ? <CustomerPortal /> : <AppRoutes />}
       </Router>
 
       {formToasts.length > 0 && !formToastsMinimized && (

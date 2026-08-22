@@ -676,6 +676,29 @@ export class DatabaseService implements IDatabaseService {
         FOREIGN KEY (userId) REFERENCES executives(id)
       );
 
+      CREATE TABLE IF NOT EXISTS customer_portal_accounts (
+        customer TEXT PRIMARY KEY,
+        pin TEXT NOT NULL UNIQUE,
+        active INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS customer_schedule_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer TEXT NOT NULL,
+        requestedDate TEXT NOT NULL,
+        orderNumber TEXT NOT NULL,
+        commodity TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        contactName TEXT,
+        contactEmail TEXT,
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'Pending Review',
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_labor_timestamp ON labor_snapshots(timestamp);
       CREATE INDEX IF NOT EXISTS idx_labor_shift ON labor_snapshots(shift);
       CREATE INDEX IF NOT EXISTS idx_work_orders_line_date ON work_orders(line, date);
@@ -1662,19 +1685,41 @@ export class DatabaseService implements IDatabaseService {
   }
 
   authenticateCustomerPortalCode(code: string): string | null {
-    const accounts: Record<string, string> = {
-      '482731': 'Kings River',
-      '593842': 'ESU',
-      '614953': 'Vanguard',
-      '725164': 'Sunkist',
-      '836275': 'Fresh Taste',
-      '947386': 'SAFCO',
-      '158497': 'Four Star',
-      '269518': 'SlingShot',
-      '371629': 'Produce Depot',
-      '483710': 'Buffalo Repack',
+    const account = this.db.prepare('SELECT customer FROM customer_portal_accounts WHERE pin = ? AND active = 1').get(String(code || '').trim()) as { customer?: string } | undefined;
+    if (account?.customer) return account.customer;
+    const starterAccounts: Record<string, string> = {
+      '48273': 'Kings River', '59384': 'ESU', '61495': 'Vanguard', '72516': 'Sunkist', '83627': 'Fresh Taste',
+      '94738': 'SAFCO', '15849': 'Four Star', '26951': 'SlingShot', '37162': 'Produce Depot', '48371': 'Buffalo Repack',
     };
-    return accounts[String(code || '').trim()] || null;
+    return starterAccounts[String(code || '').trim()] || null;
+  }
+
+  createCustomerScheduleRequest(request: { customer: string; requestedDate: string; orderNumber: string; commodity: string; quantity: number; contactName?: string; contactEmail?: string; notes?: string }) {
+    const now = new Date().toISOString();
+    const result = this.db.prepare(`INSERT INTO customer_schedule_requests (customer, requestedDate, orderNumber, commodity, quantity, contactName, contactEmail, notes, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(request.customer, request.requestedDate, request.orderNumber, request.commodity, request.quantity, request.contactName || null, request.contactEmail || null, request.notes || null, now, now);
+    return { id: result.lastInsertRowid, status: 'Pending Review' };
+  }
+
+  getCustomerPortalAccounts() {
+    return this.db.prepare('SELECT customer, pin, active, createdAt, updatedAt FROM customer_portal_accounts ORDER BY customer').all();
+  }
+
+  createCustomerPortalAccount(customer: string, pin: string) {
+    const now = new Date().toISOString();
+    this.db.prepare('INSERT INTO customer_portal_accounts (customer, pin, createdAt, updatedAt) VALUES (?, ?, ?, ?)').run(customer.trim(), pin.trim(), now, now);
+    return { customer: customer.trim(), pin: pin.trim(), active: true };
+  }
+
+  updateCustomerPortalAccount(customer: string, data: { pin?: string; active?: boolean }) {
+    const fields: string[] = [];
+    const params: any[] = [];
+    if (data.pin !== undefined) { fields.push('pin = ?'); params.push(data.pin.trim()); }
+    if (data.active !== undefined) { fields.push('active = ?'); params.push(data.active ? 1 : 0); }
+    if (!fields.length) throw new Error('No account changes supplied.');
+    fields.push('updatedAt = ?'); params.push(new Date().toISOString(), customer.trim());
+    this.db.prepare(`UPDATE customer_portal_accounts SET ${fields.join(', ')} WHERE customer = ?`).run(...params);
+    return this.db.prepare('SELECT customer, pin, active, createdAt, updatedAt FROM customer_portal_accounts WHERE customer = ?').get(customer.trim());
   }
 
   updateAppointment(id: number, data: {

@@ -233,6 +233,29 @@ export class DatabaseService implements IDatabaseService {
           FOREIGN KEY (door_id) REFERENCES dock_doors(door_id)
         );
 
+        CREATE TABLE IF NOT EXISTS customer_schedule_requests (
+          id SERIAL PRIMARY KEY,
+          customer TEXT NOT NULL,
+          requested_date TEXT NOT NULL,
+          order_number TEXT NOT NULL,
+          commodity TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          contact_name TEXT,
+          contact_email TEXT,
+          notes TEXT,
+          status TEXT NOT NULL DEFAULT 'Pending Review',
+          created_at TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS customer_portal_accounts (
+          customer TEXT PRIMARY KEY,
+          pin TEXT NOT NULL UNIQUE,
+          active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP NOT NULL,
+          updated_at TIMESTAMP NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS labor_snapshots (
           id SERIAL PRIMARY KEY,
           timestamp TIMESTAMP NOT NULL,
@@ -684,6 +707,17 @@ export class DatabaseService implements IDatabaseService {
         ON shift_sessions(date, shift_number) WHERE status = 'active';
       `);
 
+
+      await client.query(`
+        INSERT INTO customer_portal_accounts (customer, pin, created_at, updated_at)
+        VALUES
+          ('Kings River', '48273', NOW(), NOW()), ('ESU', '59384', NOW(), NOW()),
+          ('Vanguard', '61495', NOW(), NOW()), ('Sunkist', '72516', NOW(), NOW()),
+          ('Fresh Taste', '83627', NOW(), NOW()), ('SAFCO', '94738', NOW(), NOW()),
+          ('Four Star', '15849', NOW(), NOW()), ('SlingShot', '26951', NOW(), NOW()),
+          ('Produce Depot', '37162', NOW(), NOW()), ('Buffalo Repack', '48371', NOW(), NOW())
+        ON CONFLICT (customer) DO NOTHING
+      `);
       // Migration: Drop old shift_sessions unique constraint (allows multiple sessions per day/shift)
       try {
         await client.query(`
@@ -1777,19 +1811,74 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async authenticateCustomerPortalCode(code: string): Promise<string | null> {
-    const accounts: Record<string, string> = {
-      '482731': 'Kings River',
-      '593842': 'ESU',
-      '614953': 'Vanguard',
-      '725164': 'Sunkist',
-      '836275': 'Fresh Taste',
-      '947386': 'SAFCO',
-      '158497': 'Four Star',
-      '269518': 'SlingShot',
-      '371629': 'Produce Depot',
-      '483710': 'Buffalo Repack',
-    };
-    return accounts[String(code || '').trim()] || null;
+    const result = await this.pool.query(
+      'SELECT customer FROM customer_portal_accounts WHERE pin = $1 AND active = TRUE',
+      [String(code || '').trim()]
+    );
+    return result.rows[0]?.customer || null;
+  }
+
+  async getCustomerPortalAccounts() {
+    const result = await this.pool.query('SELECT customer, pin, active, created_at, updated_at FROM customer_portal_accounts ORDER BY customer');
+    return this.toCamelCase(result.rows);
+  }
+
+  async createCustomerPortalAccount(customer: string, pin: string) {
+    const now = getLocalISOString();
+    const result = await this.pool.query(`
+      INSERT INTO customer_portal_accounts (customer, pin, created_at, updated_at)
+      VALUES ($1, $2, $3, $3)
+      RETURNING customer, pin, active, created_at, updated_at
+    `, [customer.trim(), pin.trim(), now]);
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async updateCustomerPortalAccount(customer: string, data: { pin?: string; active?: boolean }) {
+    const fields: string[] = [];
+    const params: any[] = [];
+    if (data.pin !== undefined) { fields.push(`pin = $${params.length + 1}`); params.push(data.pin.trim()); }
+    if (data.active !== undefined) { fields.push(`active = $${params.length + 1}`); params.push(data.active); }
+    if (fields.length === 0) throw new Error('No account changes supplied.');
+    fields.push(`updated_at = $${params.length + 1}`);
+    params.push(getLocalISOString());
+    params.push(customer.trim());
+    const result = await this.pool.query(
+      `UPDATE customer_portal_accounts SET ${fields.join(', ')} WHERE customer = $${params.length} RETURNING customer, pin, active, created_at, updated_at`,
+      params
+    );
+    if (!result.rows[0]) throw new Error('Customer portal account not found.');
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async createCustomerScheduleRequest(request: {
+    customer: string;
+    requestedDate: string;
+    orderNumber: string;
+    commodity: string;
+    quantity: number;
+    contactName?: string;
+    contactEmail?: string;
+    notes?: string;
+  }) {
+    const now = getLocalISOString();
+    const result = await this.pool.query(`
+      INSERT INTO customer_schedule_requests (
+        customer, requested_date, order_number, commodity, quantity,
+        contact_name, contact_email, notes, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)
+      RETURNING *
+    `, [
+      request.customer,
+      request.requestedDate,
+      request.orderNumber,
+      request.commodity,
+      request.quantity,
+      request.contactName || null,
+      request.contactEmail || null,
+      request.notes || null,
+      now,
+    ]);
+    return this.toCamelCase(result.rows[0]);
   }
 
   async updateAppointment(id: number, data: {
