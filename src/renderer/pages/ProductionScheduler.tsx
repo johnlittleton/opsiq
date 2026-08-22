@@ -238,14 +238,14 @@ export default function ProductionScheduler() {
           ...splitOrderTypeFromNotes(wo.notes),
           plannedRunRate: wo.plannedRunRate ?? wo.planned_run_rate,
         }));
+        const previousWorkOrders = workOrders;
         setWorkOrders(data);
         void refreshProductionVerificationStatuses(data);
-        // Only initialize casesInputs for NEW work orders, preserve existing user input
         setCasesInputs(prev => {
           const newInputs = { ...prev };
           data.forEach((wo: WorkOrder) => {
-            // Only set if this work order doesn't have an input yet
-            if (newInputs[wo.id] === undefined) {
+            const previousWorkOrder = previousWorkOrders.find((previous) => previous.id === wo.id);
+            if (newInputs[wo.id] === undefined || newInputs[wo.id] === previousWorkOrder?.completedCases) {
               newInputs[wo.id] = wo.completedCases || 0;
             }
           });
@@ -306,8 +306,7 @@ export default function ProductionScheduler() {
         setCurrentShift(null);
         return;
       }
-      const data = await response.json();
-      setCurrentShift(data);
+      setCurrentShift(await response.json());
     } catch (error) {
       console.error('Failed to fetch current shift:', error);
       setCurrentShift(null);
