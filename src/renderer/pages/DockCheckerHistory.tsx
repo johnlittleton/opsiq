@@ -86,12 +86,15 @@ export default function DockCheckerHistory() {
       return [trimmed];
     }
 
-    const remote = `${API_BASE}${trimmed}`;
-    const local = `http://localhost:3000${trimmed}`;
+    const normalizedPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    const configuredApi = String(API_BASE || '').replace(/\/$/, '');
+    const remote = configuredApi ? `${configuredApi}${normalizedPath}` : normalizedPath;
+    const hostedApi = 'https://opsiq-production.up.railway.app';
+    const local = `http://localhost:3000${normalizedPath}`;
 
-    if (trimmed.includes('/uploads/dock-checker/')) {
-      // Prefer hosted API in packaged app; use localhost only if image fails to load.
-      return [remote, local];
+    if (normalizedPath.includes('/uploads/dock-checker/')) {
+      // Stored uploads live on the hosted API volume in packaged deployments.
+      return Array.from(new Set([remote, `${hostedApi}${normalizedPath}`, local]));
     }
 
     return [remote];
