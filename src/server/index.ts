@@ -83,18 +83,8 @@ dockCheckerStaticDirs.forEach((dirPath) => {
   app.use('/uploads/dock-checker', express.static(dirPath));
 });
 
-const dockCheckerUploadStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, dockCheckerPrimaryUploadsDir),
-  filename: (_req, file, cb) => {
-    const safeOriginal = String(file.originalname || 'upload')
-      .replace(/[^a-zA-Z0-9._-]/g, '_')
-      .slice(-120);
-    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeOriginal}`);
-  },
-});
-
 const dockCheckerUpload = multer({
-  storage: dockCheckerUploadStorage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
   },
@@ -2240,9 +2230,14 @@ app.post('/api/dock-checker/upload-image', dockCheckerUpload.single('image'), as
       return res.status(400).json({ error: 'No image uploaded.' });
     }
 
-    const imageUrl = `/uploads/dock-checker/${req.file.filename}`;
+    const safeOriginal = String(req.file.originalname || 'upload')
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(-120);
+    const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeOriginal}`;
+    await db.saveDockCheckerUpload(filename, req.file.buffer, req.file.mimetype);
+    const imageUrl = `/api/dock-checker/images/${encodeURIComponent(filename)}`;
     res.json({
-      filename: req.file.filename,
+      filename,
       url: imageUrl,
       size: req.file.size,
       mimeType: req.file.mimetype,
@@ -2250,6 +2245,18 @@ app.post('/api/dock-checker/upload-image', dockCheckerUpload.single('image'), as
     });
   } catch (error: any) {
     res.status(400).json({ error: error?.message || 'Failed to upload image' });
+  }
+});
+
+app.get('/api/dock-checker/images/:filename', async (req, res) => {
+  try {
+    const upload = await db.getDockCheckerUpload(req.params.filename);
+    if (!upload) return res.status(404).send('Image not found');
+    res.setHeader('Content-Type', upload.mimeType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.send(upload.data);
+  } catch {
+    res.status(404).send('Image not found');
   }
 });
 

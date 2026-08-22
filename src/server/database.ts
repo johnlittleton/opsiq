@@ -676,6 +676,13 @@ export class DatabaseService implements IDatabaseService {
         FOREIGN KEY (userId) REFERENCES executives(id)
       );
 
+      CREATE TABLE IF NOT EXISTS dock_checker_uploads (
+        filename TEXT PRIMARY KEY,
+        data BLOB NOT NULL,
+        mimeType TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS customer_portal_accounts (
         customer TEXT PRIMARY KEY,
         pin TEXT NOT NULL UNIQUE,
@@ -1692,6 +1699,19 @@ export class DatabaseService implements IDatabaseService {
       '94738': 'SAFCO', '15849': 'Four Star', '26951': 'SlingShot', '37162': 'Produce Depot', '48371': 'Buffalo Repack',
     };
     return starterAccounts[String(code || '').trim()] || null;
+  }
+
+  async saveDockCheckerUpload(filename: string, data: Buffer, mimeType: string) {
+    this.db.prepare(
+      'INSERT INTO dock_checker_uploads (filename, data, mimeType, createdAt) VALUES (?, ?, ?, ?)'
+    ).run(filename, data, mimeType, new Date().toISOString());
+  }
+
+  async getDockCheckerUpload(filename: string) {
+    const row = this.db.prepare(
+      'SELECT data, mimeType FROM dock_checker_uploads WHERE filename = ?'
+    ).get(filename) as { data?: Buffer; mimeType?: string } | undefined;
+    return row?.data ? { data: row.data, mimeType: row.mimeType || 'application/octet-stream' } : null;
   }
 
   createCustomerScheduleRequest(request: { customer: string; requestedDate: string; orderNumber: string; commodity: string; quantity: number; contactName?: string; contactEmail?: string; notes?: string }) {

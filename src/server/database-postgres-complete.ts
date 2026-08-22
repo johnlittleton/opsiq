@@ -233,6 +233,13 @@ export class DatabaseService implements IDatabaseService {
           FOREIGN KEY (door_id) REFERENCES dock_doors(door_id)
         );
 
+        CREATE TABLE IF NOT EXISTS dock_checker_uploads (
+          filename TEXT PRIMARY KEY,
+          data BYTEA NOT NULL,
+          mime_type TEXT NOT NULL,
+          created_at TIMESTAMP NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS customer_schedule_requests (
           id SERIAL PRIMARY KEY,
           customer TEXT NOT NULL,
@@ -1816,6 +1823,22 @@ export class DatabaseService implements IDatabaseService {
       [String(code || '').trim()]
     );
     return result.rows[0]?.customer || null;
+  }
+
+  async saveDockCheckerUpload(filename: string, data: Buffer, mimeType: string) {
+    await this.pool.query(
+      'INSERT INTO dock_checker_uploads (filename, data, mime_type, created_at) VALUES ($1, $2, $3, $4)',
+      [filename, data, mimeType, getLocalISOString()]
+    );
+  }
+
+  async getDockCheckerUpload(filename: string) {
+    const result = await this.pool.query(
+      'SELECT data, mime_type FROM dock_checker_uploads WHERE filename = $1',
+      [filename]
+    );
+    const row = result.rows[0];
+    return row ? { data: row.data, mimeType: row.mime_type } : null;
   }
 
   async getCustomerPortalAccounts() {
