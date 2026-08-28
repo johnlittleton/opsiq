@@ -232,6 +232,22 @@
   background: rgba(146, 64, 14, 0.9);
 }
 
+.line-rate-alert__dismiss {
+  min-height: 36px;
+  padding: 5px 9px;
+  border: 1px solid rgba(254, 243, 199, 0.7);
+  border-radius: 6px;
+  background: transparent;
+  color: #fef3c7;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.line-rate-alert__dismiss:hover {
+  background: rgba(254, 243, 199, 0.18);
+}
+
 .line-rate-alert__item {
   color: #fef3c7;
   font-size: 0.82rem;
@@ -1184,6 +1200,9 @@
     padding: env(safe-area-inset-top, 0px) 10px 8px;
     background: rgba(17, 24, 39, 0.96);
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    background: #181c24;
+    overscroll-behavior: none;
+    touch-action: none;
   }
 
   .dashboard-header h1 {

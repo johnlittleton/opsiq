@@ -275,4 +275,79 @@
     padding: 7px 10px;
     min-height: 40px;
   }
+
+  .title-bar--with-legend {
+    position: sticky;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 36px auto;
+    gap: 3px;
+    padding: env(safe-area-inset-top, 0px) 8px 5px;
+  }
+
+  .title-bar--with-legend .title-bar__drag-region {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    grid-template-rows: 34px auto;
+    align-items: center;
+    gap: 2px 8px;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .title-bar--with-legend .title-bar__title,
+  .title-bar--with-legend .title-bar__menu,
+  .title-bar--with-legend .title-bar__content {
+    grid-row: 1;
+  }
+
+  .title-bar--with-legend .title-bar__content {
+    position: absolute;
+    top: 2px;
+    right: 112px;
+    width: max-content;
+    max-width: none;
+    margin-left: 0;
+    overflow: visible;
+  }
+
+  .title-bar--with-legend .title-bar__drag-region .legend {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    padding-bottom: 0;
+  }
+
+  .title-bar--with-legend .title-bar__actions {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+    width: max-content;
+    min-height: 36px;
+    z-index: 3;
+  }
+
+  .title-bar--with-legend .title-bar__home-btn {
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+
+  .title-bar--with-legend {
+    grid-template-rows: auto;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .title-bar--with-legend .title-bar__drag-region {
+    height: auto;
+    min-height: 0;
+    grid-template-rows: 36px auto;
+  }
+
+  .title-bar--with-legend .title-bar__drag-region .legend {
+    min-height: 34px;
+    align-content: start;
+    overflow: visible;
+  }
 }

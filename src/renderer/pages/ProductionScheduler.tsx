@@ -1307,8 +1307,7 @@ export default function ProductionScheduler() {
               <span className="message-badge">{unreadCount}</span>
             )}
           </button>
-          {!isMobileRuntime && (
-            <div className="scheduler-nav-buttons">
+          <div className="scheduler-nav-buttons">
               <button className="dashboard-btn" onClick={() => navigate('/production-dashboard')}>
                 📊 Dashboard
               </button>
@@ -1327,8 +1326,7 @@ export default function ProductionScheduler() {
               <button className="downtime-history-btn" onClick={() => navigate('/downtime-history')}>
                 ⏱️ Downtime
               </button>
-            </div>
-          )}
+          </div>
           <button className="add-wo-btn" onClick={() => openModal(1, 0)}>
             ➕ Add Work Order
           </button>

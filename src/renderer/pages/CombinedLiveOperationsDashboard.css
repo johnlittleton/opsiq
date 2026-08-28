@@ -755,3 +755,66 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+@media (max-width: 900px) {
+  .combined-live-dashboard__content {
+    height: auto;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .combined-live-dashboard__main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    gap: 10px;
+  }
+
+  .combined-live-dashboard__main > .panel-shell {
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .combined-live-dashboard__production-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-auto-rows: auto;
+    gap: 10px;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+    touch-action: pan-y;
+  }
+
+  .combined-live-dashboard__line-card {
+    width: 100%;
+    height: auto;
+    min-height: 220px;
+    max-height: none;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .combined-live-dashboard__line-header,
+  .combined-live-dashboard__line-footer {
+    flex-shrink: 0;
+  }
+
+  .combined-live-dashboard__line-header p {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .combined-live-dashboard__department-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
