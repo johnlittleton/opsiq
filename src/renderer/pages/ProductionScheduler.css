@@ -292,6 +292,90 @@
   scrollbar-width: thin;
 }
 
+@media (max-width: 900px) {
+  .production-scheduler {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .header-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    gap: 8px 10px;
+    align-items: center;
+    padding: env(safe-area-inset-top, 0px) 10px 8px;
+    background: rgba(17, 24, 39, 0.97);
+  }
+
+  .header-bar h1 {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    font-size: 1.15rem;
+    line-height: 1.15;
+  }
+
+  .back-btn {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .header-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .header-controls::-webkit-scrollbar,
+  .mobile-scheduler-tools {
+    display: none;
+  }
+
+  .header-controls > *,
+  .header-controls button,
+  .header-controls input,
+  .header-controls select {
+    flex: 0 0 auto;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .scheduler-nav-buttons {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    order: 10;
+    overflow: visible;
+  }
+
+  .scheduler-nav-buttons button {
+    flex: 0 0 auto;
+  }
+
+  .work-order-sections,
+  .calendar-view {
+    max-height: none;
+    overflow: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 .wo-table-wrap::-webkit-scrollbar {
   width: 9px;
   height: 9px;
@@ -1646,9 +1730,134 @@
   font-weight: 700;
 }
 
+@media (max-width: 900px) {
+  .production-scheduler .header-bar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 8px 10px;
+    width: 100%;
+    padding: env(safe-area-inset-top, 0px) 10px 8px;
+    background: #232837;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  .production-scheduler .header-bar h1 {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    margin: 0;
+    font-size: 1.15rem;
+    line-height: 1.15;
+  }
+
+  .production-scheduler .header-bar > .back-btn {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .production-scheduler .header-bar > .header-controls {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 2px 0;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .production-scheduler .header-controls::-webkit-scrollbar {
+    display: none;
+  }
+
+  .production-scheduler .header-controls > * {
+    flex: 0 0 auto;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .production-scheduler .header-controls {
+    touch-action: pan-x;
+    scrollbar-width: none;
+  }
+
+  .production-scheduler .header-controls::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .production-scheduler .mobile-scheduler-tools {
+    display: none;
+  }
+}
+
 .work-order-sections {
   max-height: calc(100vh - 150px);
   overflow-y: auto;
   scrollbar-color: #16a085 #232837;
   scrollbar-width: thin;
+}
+
+@media (max-width: 900px) {
+  .production-scheduler .work-order-sections {
+    max-height: none;
+    overflow: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .production-scheduler .work-order-sections::-webkit-scrollbar {
+    display: none;
+  }
+
+  .production-scheduler .wo-table-wrap {
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    touch-action: pan-x pan-y;
+  }
+
+  .production-scheduler .wo-table-wrap::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .production-scheduler .wo-table {
+    min-width: 980px;
+    table-layout: auto;
+  }
+
+  .production-scheduler .wo-table th,
+  .production-scheduler .wo-table td {
+    white-space: nowrap;
+    word-break: normal;
+    overflow-wrap: normal;
+  }
+
+  .production-scheduler,
+  .production-scheduler .header-bar,
+  .production-scheduler .wo-table,
+  .production-scheduler .wo-table thead,
+  .production-scheduler .wo-table tbody {
+    background-color: #181c24;
+  }
+
+  .production-scheduler .header-bar {
+    background-color: #181c24;
+  }
 }

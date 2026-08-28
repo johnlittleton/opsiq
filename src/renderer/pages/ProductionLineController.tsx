@@ -48,6 +48,7 @@ export default function ProductionLineController() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [dismissedAlertKey, setDismissedAlertKey] = useState('');
 
   const loadWorkOrders = async () => {
     setLoading(true);
@@ -235,6 +236,8 @@ export default function ProductionLineController() {
   const currentBagsPerMinute = currentCasesPerMinute !== null ? currentCasesPerMinute * bagsPerCase : null;
   const missedBags = plannedRunRate !== null && currentBagsPerMinute !== null && currentBagsPerMinute < plannedRunRate;
   const missedCases = plannedCasesPerMinute !== null && currentCasesPerMinute !== null && currentCasesPerMinute < plannedCasesPerMinute;
+  const alertKey = `${activeWorkOrder?.id || 'none'}-${missedCases ? 'missed-cases' : missedBags ? 'missed-bags' : 'on-target'}`;
+  const alertDismissed = dismissedAlertKey === alertKey;
 
   const formatEtaMinutes = (minutes: number | null): string => {
     if (minutes === null || !Number.isFinite(minutes) || minutes < 0) return '--';
@@ -275,11 +278,12 @@ export default function ProductionLineController() {
       </header>
 
       <div className="production-line-controller__body">
-        {activeWorkOrder && String(activeWorkOrder.status || '').toLowerCase() === 'active' && (missedCases || missedBags) && (
+        {activeWorkOrder && String(activeWorkOrder.status || '').toLowerCase() === 'active' && (missedCases || missedBags) && !alertDismissed && (
           <aside className="production-line-controller__alert-rail">
             <div className="line-rate-alert" role="alert" aria-live="assertive">
               <div className="line-rate-alert__header">
                 <span className="line-rate-alert__title">⚠ Planned Rate Miss</span>
+                <button type="button" className="line-rate-alert__dismiss" onClick={() => setDismissedAlertKey(alertKey)}>Dismiss</button>
               </div>
               <div className="line-rate-alert__item">
                 {selectedLine.name} below planned {missedCases && missedBags ? 'cases/min and bags/min' : missedCases ? 'cases/min' : 'bags/min'}.
@@ -287,11 +291,12 @@ export default function ProductionLineController() {
             </div>
           </aside>
         )}
-        {activeWorkOrder && String(activeWorkOrder.status || '').toLowerCase() === 'active' && !missedCases && !missedBags && currentCasesPerMinute !== null && (
+        {activeWorkOrder && String(activeWorkOrder.status || '').toLowerCase() === 'active' && !missedCases && !missedBags && currentCasesPerMinute !== null && !alertDismissed && (
           <aside className="production-line-controller__alert-rail">
             <div className="line-rate-ok" role="status" aria-live="polite">
               <div className="line-rate-ok__header">
                 <span className="line-rate-ok__title">✅ On Target</span>
+                <button type="button" className="line-rate-alert__dismiss" onClick={() => setDismissedAlertKey(alertKey)}>Dismiss</button>
               </div>
               <div className="line-rate-ok__item">
                 ✅ {selectedLine.name} is hitting planned cases/min and bags/min.

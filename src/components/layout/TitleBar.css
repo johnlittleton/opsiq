@@ -170,6 +170,17 @@
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
+    background: #181c24;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    z-index: 100;
+  }
+
+  .title-bar--with-legend,
+  .title-bar--compact {
+    position: sticky;
+    top: 0;
   }
 
   .title-bar__drag-region {
