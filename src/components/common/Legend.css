@@ -72,3 +72,31 @@
   font-weight: 500;
   color: var(--text);
 }
+
+@media (max-width: 900px) {
+  .legend {
+    align-items: flex-start;
+    gap: 3px 10px;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding-bottom: 4px;
+  }
+
+  .legend__title {
+    flex: 0 0 100%;
+  }
+
+  .legend__items {
+    flex: 0 0 100%;
+    gap: 5px 10px;
+    flex-wrap: wrap;
+  }
+
+  .legend__item {
+    gap: 5px;
+  }
+
+  .legend__label {
+    font-size: 11px;
+  }
+}

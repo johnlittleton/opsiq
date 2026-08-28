@@ -133,6 +133,10 @@
   -webkit-app-region: no-drag;
 }
 
+.title-bar__actions {
+  display: contents;
+}
+
 .title-bar__button {
   width: 46px;
   height: 100%;
@@ -154,4 +158,76 @@
 .title-bar__button--close:hover {
   background: #e81123;
   color: white;
+}
+
+@media (max-width: 900px) {
+  .title-bar {
+    position: relative;
+    min-height: 0;
+    padding: env(safe-area-inset-top, 0px) 8px 6px;
+    gap: 4px;
+    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .title-bar__drag-region {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    gap: 4px 8px;
+    flex-wrap: wrap;
+    overflow: visible;
+    padding-right: 104px;
+  }
+
+  .title-bar__title {
+    font-size: 12px;
+  }
+
+  .title-bar__menu-button {
+    padding: 6px 8px;
+  }
+
+  .title-bar__drag-region .legend {
+    flex: 1 1 100%;
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
+  .title-bar__content {
+    min-width: 0;
+    margin-left: auto;
+    max-width: 100%;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+
+  .title-bar__home-btn {
+    flex-shrink: 0;
+    margin-right: 0;
+    padding: 9px 12px;
+    font-size: 12px;
+  }
+
+  .title-bar__actions {
+    position: absolute;
+    top: env(safe-area-inset-top, 0px);
+    right: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: auto;
+    min-height: 38px;
+    padding: 0;
+    z-index: 2;
+  }
+
+  .title-bar__controls {
+    display: none;
+  }
 }

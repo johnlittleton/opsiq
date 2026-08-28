@@ -87,6 +87,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 20px;
+  -webkit-app-region: no-drag;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -112,12 +113,31 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  -webkit-app-region: no-drag;
+}
+
+.message-banner__close {
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .message-banner__dismiss:hover,
 .message-banner__close:hover {
   background: rgba(255, 255, 255, 0.2);
   transform: scale(1.1);
+}
+
+.message-banner__close:hover {
+  background: rgba(239, 68, 68, 0.28);
+  border-color: rgba(248, 113, 113, 0.9);
+  color: #fff;
+}
+
+.message-banner__close:active {
+  background: rgba(239, 68, 68, 0.5);
+  transform: scale(0.96);
 }
 
 .message-banner__dismiss {
@@ -432,4 +452,84 @@
 
 .message-banner__messages::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 900px) {
+  .message-banner {
+    top: max(8px, env(safe-area-inset-top, 0px)) !important;
+    right: 8px;
+    left: 8px !important;
+    width: min(520px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
+    margin: 0 auto;
+    max-height: calc(100dvh - 16px);
+  }
+
+  .message-banner__header {
+    padding: 12px;
+  }
+
+  .message-banner__header > div {
+    flex-shrink: 0;
+  }
+
+  .message-banner__complete,
+  .message-banner__dismiss,
+  .message-banner__close {
+    width: 44px;
+    height: 44px;
+    touch-action: manipulation;
+    pointer-events: auto;
+  }
+
+  .message-banner__close {
+    position: relative;
+    z-index: 10;
+    touch-action: manipulation;
+  }
+
+  .message-banner__channels {
+    padding: 10px 12px;
+    overflow-x: auto;
+  }
+
+  .channel-tab {
+    min-width: 150px;
+    padding: 10px 8px;
+  }
+
+  .message-banner__messages {
+    min-height: 120px;
+    max-height: none;
+    padding: 12px;
+  }
+
+  .message-banner__input {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px;
+  }
+
+  .channel-send-notice,
+  .message-input-text,
+  .message-send-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .message-input-name,
+  .message-input-priority {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .message-input-text {
+    min-height: 44px;
+  }
+
+  .message-send-btn {
+    min-height: 44px;
+  }
 }

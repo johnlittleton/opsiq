@@ -373,6 +373,18 @@
 @media (max-width: 1200px) {
   .dock-tile__label {
     font-size: 18px;
+    order: 0;
+  }
+
+  .dock-tile__overdue-alert {
+    position: static;
+    order: 1;
+    align-self: center;
+    max-width: 100%;
+    padding: 2px 4px;
+    font-size: 7px;
+    line-height: 1.2;
+    white-space: nowrap;
   }
   .dock-tile__time {
     font-size: 13px;
@@ -394,6 +406,12 @@
   }
   .dock-tile__status {
     font-size: 9px;
+    font-weight: 700;
+  }
+
+  .dock-tile__footer {
+    order: 2;
+    flex-shrink: 0;
   }
 }
 
@@ -412,6 +430,7 @@
   }
   .dock-tile__company {
     font-size: 7px;
+    font-weight: 700;
   }
   .dock-tile__pickup, .dock-tile__pallets {
     font-size: 6px;
@@ -430,5 +449,86 @@
   }
   .dock-tile__timer {
     font-size: 9px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dock-tile {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    max-width: none;
+    max-height: none;
+    padding: 6px 5px;
+    justify-content: flex-start;
+    gap: 2px;
+  }
+
+  .dock-tile__label {
+    font-size: 19px;
+  }
+
+  .dock-tile__time {
+    font-size: 12px;
+  }
+
+  .dock-tile__status {
+    font-size: 9px;
+  }
+
+  .dock-tile__footer {
+    position: static;
+    padding-bottom: 0;
+    flex-shrink: 0;
+    gap: 1px;
+  }
+
+  .dock-tile__company {
+    font-size: 7px;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .dock-tile__pickup,
+  .dock-tile__pallets {
+    font-size: 6px;
+    font-weight: 700;
+  }
+
+  .dock-tile__staff {
+    flex-wrap: wrap;
+    gap: 1px 3px;
+    font-size: 6px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+
+  .dock-tile__staff > div {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .dock-tile__timer {
+    font-size: 8px;
+    font-weight: 700;
+    display: block;
+    visibility: visible;
+    line-height: 1;
+  }
+
+  .dock-tile__edit-btn {
+    top: 6px;
+    right: 6px;
+    padding: 3px 6px;
+  }
+
+  .dock-tile__verify-btn {
+    top: 6px;
+    left: 6px;
   }
 }

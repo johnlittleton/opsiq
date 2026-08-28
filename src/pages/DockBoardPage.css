@@ -284,7 +284,7 @@
 
 @media (max-width: 1200px) {
   .dock-board-page__grid {
-    gap: 8px;
+    gap: 6px;
     padding: 0 8px;
   }
   .dock-tile {
@@ -328,6 +328,55 @@
   .dock-tile {
     max-width: 90px;
     max-height: 90px;
+  }
+}
+
+@media (max-width: 900px) {
+  .dock-board-page {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .dock-board-page__content {
+    height: auto;
+    min-height: 0;
+    padding: 5px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-items: flex-start;
+  }
+
+  .dock-board-page__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    gap: 4px;
+    width: 100%;
+    height: auto;
+    padding: 0;
+    align-content: start;
+  }
+
+  .dock-board-alert {
+    top: 72px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100dvh - 88px);
+    overflow-y: auto;
+  }
+
+  .dock-board-alert__minimize {
+    position: relative;
+    z-index: 2;
+    min-width: 88px;
+    min-height: 44px;
+    touch-action: manipulation;
+    pointer-events: auto;
+  }
+
+  .dock-board-alert-minimized {
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom, 0px));
   }
 }
 

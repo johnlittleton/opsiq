@@ -27,6 +27,7 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
   const [priority, setPriority] = useState<MessagePriority>('normal');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('opsiq-chat-sound') !== 'false');
   
   // Per-channel state
   const [channelStates, setChannelStates] = useState<Record<MessageChannel, ChannelState>>({
@@ -51,6 +52,7 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const lastCloseAtRef = useRef(0);
   const bannerRef = useRef<HTMLDivElement>(null);
 
   // Auto-fill sender name from authenticated user
@@ -149,9 +151,26 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
 
   // Play notification sound
   const playNotificationSound = () => {
-    if (audioRef.current) {
+    if (soundEnabled && audioRef.current) {
       audioRef.current.play().catch(err => console.log('Audio play failed:', err));
     }
+  };
+
+  const toggleSound = () => {
+    setSoundEnabled(current => {
+      const next = !current;
+      localStorage.setItem('opsiq-chat-sound', String(next));
+      return next;
+    });
+  };
+
+  const closeChat = (event: React.SyntheticEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (now - lastCloseAtRef.current < 500) return;
+    lastCloseAtRef.current = now;
+    onToggle?.();
   };
 
   // Send message
@@ -473,22 +492,36 @@ export function MessageBanner({ isOpen = false, onToggle, onUnreadCountChange }:
         >
           <div 
             className="message-banner__header"
-            onMouseDown={handleMouseDown}
-            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           >
-            <h3 className="message-banner__title">💬 Team Chat</h3>
+            <h3
+              className="message-banner__title"
+              onMouseDown={handleMouseDown}
+              style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            >💬 Team Chat</h3>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button 
+                type="button"
                 className="message-banner__complete" 
-                onClick={handleCompleteChat} 
+                onClick={(event) => { event.stopPropagation(); void handleCompleteChat(); }}
+                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
                 title="Complete and archive this chat"
               >
                 ✅
               </button>
-              <button className="message-banner__dismiss" onClick={handleDismissAll} title="Dismiss all messages">
-                🔕
+              <button type="button" className="message-banner__dismiss" onClick={(event) => { event.stopPropagation(); toggleSound(); }} onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} title={soundEnabled ? 'Mute notification sound' : 'Enable notification sound'} aria-label={soundEnabled ? 'Mute notification sound' : 'Enable notification sound'}>
+                {soundEnabled ? '🔔' : '🔕'}
               </button>
-              <button className="message-banner__close" onClick={onToggle}>
+              <button
+                type="button"
+                className="message-banner__close"
+                onClick={closeChat}
+                onTouchEnd={closeChat}
+                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+                aria-label="Close Team Chat"
+                title="Close Team Chat"
+              >
                 ✕
               </button>
             </div>

@@ -479,3 +479,80 @@
     font-size: 11px;
   }
 }
+
+@media (max-width: 600px) {
+  .home-page {
+    min-height: 100dvh;
+    padding: 56px 14px 24px;
+    align-items: stretch;
+  }
+
+  .home-page__controls {
+    position: fixed;
+    top: 0;
+    height: auto;
+    min-height: 44px;
+    padding: env(safe-area-inset-top, 0px) 10px 0;
+  }
+
+  .home-page__controls-left,
+  .home-page__controls-right {
+    gap: 4px;
+  }
+
+  .home-page__user-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .home-page__active-users-banner {
+    position: relative;
+    top: auto;
+    margin-top: 0;
+    padding: 6px 10px;
+  }
+
+  .home-page__active-users-label {
+    font-size: 9px;
+  }
+
+  .home-page__header {
+    margin-top: 14px;
+    margin-bottom: 18px;
+  }
+
+  .home-page__title {
+    font-size: 26px;
+  }
+
+  .home-page__subtitle {
+    font-size: 12px;
+  }
+
+  .home-page__section {
+    margin-bottom: 18px;
+  }
+
+  .home-page__quick-access--compact,
+  .home-page__quick-access--grid,
+  .home-page__status {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-page__card {
+    min-width: 0;
+    min-height: 64px;
+    padding: 12px;
+  }
+
+  .home-page__card-title-row {
+    align-items: flex-start;
+  }
+
+  .home-page__card-title,
+  .home-page__card-desc {
+    overflow-wrap: anywhere;
+  }
+}

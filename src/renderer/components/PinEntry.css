@@ -181,6 +181,40 @@
   font-weight: 500;
 }
 
+@media (max-width: 600px) {
+  .pin-entry-overlay {
+    padding: env(safe-area-inset-top, 0px) 16px env(safe-area-inset-bottom, 0px);
+  }
+
+  .pin-entry-splash {
+    width: 100%;
+    height: auto;
+    min-height: 100dvh;
+    gap: 24px;
+    padding: 24px 0;
+  }
+
+  .splash-logo-container {
+    margin-bottom: 0;
+  }
+
+  .opsiq-logo-image {
+    width: min(68vw, 240px);
+    height: auto;
+  }
+
+  .splash-logo-text {
+    font-size: clamp(2.5rem, 13vw, 4rem);
+  }
+
+  .splash-pin-section {
+    width: min(100%, 360px);
+    min-width: 0;
+    padding: 18px 16px;
+  }
+
+}
+
 /* Powered By Section - Bottom Right Corner */
 .splash-powered-by {
   position: absolute;
@@ -219,4 +253,23 @@
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
   20%, 40%, 60%, 80% { transform: translateX(8px); }
+}
+
+@media (max-width: 600px) {
+  .splash-powered-by {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    gap: 8px;
+  }
+
+  .powered-by-text {
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+  }
+
+  .atlas-logo {
+    width: min(42vw, 150px);
+    height: auto;
+  }
 }

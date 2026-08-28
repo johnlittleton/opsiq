@@ -74,17 +74,19 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children
         {showLegend && <Legend />}
         {children && <div className="title-bar__content">{children}</div>}
       </div>
-      <button className="title-bar__home-btn" onClick={() => navigate('/')}>← Home</button>
-      <div className="title-bar__controls">
-        <button className="title-bar__button" onClick={handleMinimize}>
-          −
-        </button>
-        <button className="title-bar__button" onClick={handleMaximize}>
-          □
-        </button>
-        <button className="title-bar__button title-bar__button--close" onClick={handleClose}>
-          ×
-        </button>
+      <div className="title-bar__actions">
+        <button className="title-bar__home-btn" onClick={() => navigate('/')}>← Home</button>
+        <div className="title-bar__controls">
+          <button className="title-bar__button" onClick={handleMinimize}>
+            −
+          </button>
+          <button className="title-bar__button" onClick={handleMaximize}>
+            □
+          </button>
+          <button className="title-bar__button title-bar__button--close" onClick={handleClose}>
+            ×
+          </button>
+        </div>
       </div>
     </div>
   );
