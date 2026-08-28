@@ -229,4 +229,39 @@
   .title-bar__controls {
     display: none;
   }
+
+  .title-bar--compact {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: nowrap;
+    min-height: 48px;
+    padding: env(safe-area-inset-top, 0px) 10px 4px;
+  }
+
+  .title-bar--compact .title-bar__drag-region {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 40px;
+    align-items: center;
+    flex-wrap: nowrap;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .title-bar--compact .title-bar__content {
+    flex: 0 1 auto;
+    margin-left: auto;
+    overflow-x: auto;
+  }
+
+  .title-bar--compact .title-bar__actions {
+    width: auto;
+    min-height: 40px;
+    order: initial;
+  }
+
+  .title-bar--compact .title-bar__home-btn {
+    padding: 7px 10px;
+    min-height: 40px;
+  }
 }

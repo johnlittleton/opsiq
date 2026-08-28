@@ -45,7 +45,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children
   };
 
   return (
-    <div className="title-bar">
+    <div className={`title-bar ${showLegend ? 'title-bar--with-legend' : 'title-bar--compact'}`}>
       <div className="title-bar__drag-region">
         <div className="title-bar__title">
           <img src="../../assets/OpsIQ.ico" alt="OpsIQ" className="title-bar__logo" />
