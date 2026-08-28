@@ -14,7 +14,7 @@ workflows:
       vars:
         XCODE_WORKSPACE: ios/App/App.xcworkspace
         XCODE_SCHEME: App
-        IOS_APP_VERSION: 1.0.83
+        IOS_APP_VERSION: 1.0.84
       node: 20
       xcode: latest
 

@@ -361,8 +361,33 @@
     right: 8px;
     left: 8px;
     width: auto;
-    max-height: calc(100dvh - 88px);
+    max-height: 150px;
     overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .dock-board-alert::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dock-board-alert__header {
+    position: sticky;
+    top: -10px;
+    z-index: 1;
+    padding: 2px 0 6px;
+    background: rgba(69, 10, 10, 0.98);
+  }
+
+  .dock-board-alert__item {
+    font-size: 0.72rem;
+    line-height: 1.2;
+    margin-bottom: 3px;
+  }
+
+  .dock-board-alert__group-title {
+    font-size: 0.68rem;
   }
 
   .dock-board-alert__minimize {
