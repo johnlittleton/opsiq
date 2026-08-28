@@ -182,7 +182,7 @@
     gap: 4px 8px;
     flex-wrap: wrap;
     overflow: visible;
-    padding-right: 104px;
+    padding-right: 0;
   }
 
   .title-bar__title {
@@ -215,16 +215,15 @@
   }
 
   .title-bar__actions {
-    position: absolute;
-    top: env(safe-area-inset-top, 0px);
-    right: 8px;
+    position: static;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    width: auto;
+    justify-content: flex-end;
+    width: 100%;
     min-height: 38px;
-    padding: 0;
+    padding: 0 2px;
     z-index: 2;
+    order: 2;
   }
 
   .title-bar__controls {

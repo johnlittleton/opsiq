@@ -248,6 +248,10 @@ a:hover {
     touch-action: manipulation;
   }
 
+  button {
+    min-height: 40px;
+  }
+
   .update-banner {
     left: 10px;
     right: 10px;
