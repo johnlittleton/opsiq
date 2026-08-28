@@ -522,13 +522,26 @@
   }
 
   .dock-tile__edit-btn {
-    top: 6px;
-    right: 6px;
-    padding: 3px 6px;
+    top: 4px;
+    right: 4px;
+    bottom: auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-width: 1px;
+    font-size: 10px;
+    line-height: 1;
   }
 
   .dock-tile__verify-btn {
-    top: 6px;
-    left: 6px;
+    top: 4px;
+    left: 4px;
+    bottom: auto;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-width: 1px;
+    font-size: 11px;
+    line-height: 1;
   }
 }

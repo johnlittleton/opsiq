@@ -818,3 +818,53 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+@media (max-width: 900px) {
+  .combined-live-dashboard__main {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+
+  .combined-live-dashboard__main > .panel-shell,
+  .combined-live-dashboard__sidebar,
+  .combined-live-dashboard__departments,
+  .combined-live-dashboard__docks {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .combined-live-dashboard__production-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .combined-live-dashboard__line-card {
+    min-height: 190px;
+    height: auto;
+  }
+
+  .combined-live-dashboard__department-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(86px, auto);
+  }
+
+  .combined-live-dashboard__dock-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(150px, auto);
+    height: auto;
+    overflow: visible;
+    align-content: start;
+  }
+
+  .combined-live-dashboard__dock-grid .dock-tile.compact {
+    width: 100%;
+    max-width: none;
+    height: 150px;
+    max-height: none;
+  }
+}
