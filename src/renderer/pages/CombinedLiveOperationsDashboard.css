@@ -867,4 +867,36 @@
     height: 150px;
     max-height: none;
   }
+
+  .combined-live-dashboard__hero {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .combined-live-dashboard__hero-badge {
+    flex-wrap: wrap;
+  }
+
+  .combined-live-dashboard__hero-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .combined-live-dashboard__hero-card {
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .combined-live-dashboard__hero-card .label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .combined-live-dashboard__hero-card strong {
+    font-size: 15px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
