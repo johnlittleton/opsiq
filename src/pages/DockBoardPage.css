@@ -337,6 +337,11 @@
     overflow: hidden;
   }
 
+  .dock-board-alert,
+  .dock-board-alert-minimized {
+    display: none;
+  }
+
   .dock-board-page__content {
     height: auto;
     min-height: 0;
