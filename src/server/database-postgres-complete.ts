@@ -1763,7 +1763,7 @@ export class DatabaseService implements IDatabaseService {
       INSERT INTO appointments (
         appointment_date, appointment_time, company, contact_name, contact_phone,
         pickup_number, customer, carrier, type, door_id, pallets, commodity, notes, confirmation_number, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `, [
       data.appointmentDate,
