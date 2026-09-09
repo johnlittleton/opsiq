@@ -1779,6 +1779,7 @@ export class DatabaseService implements IDatabaseService {
       data.pallets || null,
       data.commodity || null,
       data.notes || null,
+      null,
       data.status || 'Scheduled',
       now,
       now
