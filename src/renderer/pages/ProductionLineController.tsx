@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
+import { apiClient } from '../services/api';
 import './ProductionLineController.css';
 import './ProductionDashboard.css';
 
@@ -68,7 +69,11 @@ export default function ProductionLineController() {
   useEffect(() => {
     void loadWorkOrders();
     const intervalId = window.setInterval(() => void loadWorkOrders(), 15000);
-    return () => window.clearInterval(intervalId);
+    const removeWorkOrderListener = apiClient.onWorkOrderUpdated(() => void loadWorkOrders());
+    return () => {
+      window.clearInterval(intervalId);
+      removeWorkOrderListener?.();
+    };
   }, [productionDate]);
 
   const plannedWorkOrders = useMemo(

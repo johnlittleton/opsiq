@@ -1,10 +1,10 @@
 {
   "name": "opsiq",
-  "version": "1.0.83",
+  "version": "1.0.86",
   "description": "OpsIQ - Production-ready dock and production management system",
   "main": "dist/electron/main.js",
   "scripts": {
-    "dev": "npm run build:electron && concurrently \"npm run dev:server\" \"npm run dev:react\" \"npm run dev:electron\"",
+    "dev": "npm run build:electron && cross-env VITE_FORCE_LOCAL_DEV_API=true concurrently \"npm run dev:server\" \"npm run dev:react\" \"npm run dev:electron\"",
     "dev:cloud": "npm run build:electron && concurrently \"npm run dev:react\" \"npm run dev:electron\"",
     "dev:server": "tsx watch src/server/index.ts",
     "dual-entry:runner:register": "tsx src/server/dual-entry-runner-agent.ts register",

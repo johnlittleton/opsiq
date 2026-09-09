@@ -238,6 +238,7 @@ export class DatabaseService implements IDatabaseService {
         pallets INTEGER,
         commodity TEXT,
         notes TEXT,
+        confirmationNumber TEXT,
         status TEXT NOT NULL DEFAULT 'Scheduled',
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL,
@@ -763,6 +764,16 @@ export class DatabaseService implements IDatabaseService {
         console.log('Adding carrier column to appointments...');
         this.db.exec('ALTER TABLE appointments ADD COLUMN carrier TEXT');
       }
+      if (!appointmentColumnNames.includes('confirmationNumber')) {
+        console.log('Adding confirmationNumber column to appointments...');
+        this.db.exec('ALTER TABLE appointments ADD COLUMN confirmationNumber TEXT');
+      }
+      this.db.exec(`
+        UPDATE appointments
+        SET confirmationNumber = 'APPT-' || replace(appointmentDate, '-', '') || '-' || printf('%06d', id)
+        WHERE confirmationNumber IS NULL OR confirmationNumber = ''
+      `);
+      this.db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_confirmation ON appointments(confirmationNumber) WHERE confirmationNumber IS NOT NULL');
       
       // Migration: Add overtime tracking columns to labor_snapshots
       const laborColumns = this.db.pragma('table_info(labor_snapshots)') as any[];
@@ -1633,8 +1644,8 @@ export class DatabaseService implements IDatabaseService {
     const result = this.db.prepare(`
       INSERT INTO appointments (
         appointmentDate, appointmentTime, company, contactName, contactPhone,
-        pickupNumber, customer, carrier, type, doorId, pallets, commodity, notes, status, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        pickupNumber, customer, carrier, type, doorId, pallets, commodity, notes, confirmationNumber, status, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.appointmentDate,
       data.appointmentTime,
@@ -1649,10 +1660,14 @@ export class DatabaseService implements IDatabaseService {
       data.pallets || null,
       data.commodity || null,
       data.notes || null,
+      null,
       data.status || 'Scheduled',
       now,
       now
     );
+
+    const confirmationNumber = `APPT-${data.appointmentDate.replace(/-/g, '')}-${String(result.lastInsertRowid).padStart(6, '0')}`;
+    this.db.prepare('UPDATE appointments SET confirmationNumber = ? WHERE id = ?').run(confirmationNumber, result.lastInsertRowid);
 
     return this.db.prepare('SELECT * FROM appointments WHERE id = ?').get(result.lastInsertRowid);
   }

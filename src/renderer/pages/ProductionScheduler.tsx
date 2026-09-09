@@ -192,7 +192,13 @@ export default function ProductionScheduler() {
       if (typeof document !== 'undefined' && document.hidden) return;
       fetchWorkOrders();
     }, 5000);
-    return () => clearInterval(interval);
+    const removeWorkOrderListener = apiClient.onWorkOrderUpdated(() => void fetchWorkOrders());
+    const removeWorkOrderDeletedListener = apiClient.onWorkOrderDeleted(() => void fetchWorkOrders());
+    return () => {
+      clearInterval(interval);
+      removeWorkOrderListener?.();
+      removeWorkOrderDeletedListener?.();
+    };
   }, [selectedDate]);
 
   useEffect(() => {

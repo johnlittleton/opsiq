@@ -2030,6 +2030,8 @@ const normalizePortalCustomer = (value: unknown): string => String(value || '')
   .toLowerCase()
   .replace(/[^a-z0-9]/g, '');
 
+const PRODUCE_DEPOT_PORTAL_CUSTOMER = 'producedepot';
+
 app.get('/api/customer-portal/schedule', async (req, res) => {
   try {
     const code = String(req.headers['x-customer-code'] || '').trim();
@@ -2050,8 +2052,9 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
       endDate: scheduleEnd ? `${scheduleEnd}T23:59:59` : undefined,
     });
     const customerKey = normalizePortalCustomer(customer);
+    const canViewAllCustomerSchedules = customerKey === PRODUCE_DEPOT_PORTAL_CUSTOMER;
     const customerAppointments = appointments
-      .filter((appointment: any) => normalizePortalCustomer(appointment.customer) === customerKey)
+      .filter((appointment: any) => canViewAllCustomerSchedules || normalizePortalCustomer(appointment.customer) === customerKey)
       .map((appointment: any) => ({
         appointmentDate: appointment.appointmentDate,
         appointmentTime: appointment.appointmentTime,
@@ -2066,7 +2069,7 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
 
     const workOrders = await db.getWorkOrders(undefined, scheduleStart, scheduleEnd);
     const customerWorkOrders = workOrders
-      .filter((workOrder: any) => normalizePortalCustomer(workOrder.customer) === customerKey)
+      .filter((workOrder: any) => canViewAllCustomerSchedules || normalizePortalCustomer(workOrder.customer) === customerKey)
       .map((workOrder: any) => ({
         date: workOrder.date,
         orderNumber: workOrder.id,
@@ -2176,7 +2179,7 @@ app.put('/api/customer-portal/accounts/:customer', async (req, res) => {
 app.post('/api/appointments', async (req, res) => {
   try {
     console.log('📅 Creating appointment with data:', req.body);
-    const appointment = db.createAppointment(req.body);
+    const appointment = await db.createAppointment(req.body);
     console.log('✅ Appointment created:', appointment);
     
     // Broadcast update to all clients

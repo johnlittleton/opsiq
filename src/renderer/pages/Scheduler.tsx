@@ -16,6 +16,7 @@ interface Appointment {
   company: string;
   contactName: string;
   contactPhone: string;
+  confirmationNumber?: string;
   pickupNumber?: string;
   customer?: string;
   carrier?: string;
@@ -224,6 +225,7 @@ const Scheduler: React.FC = () => {
         console.log('➕ Creating new appointment - calling API');
         const result = await apiClient.createAppointment(data);
         console.log('✅ API returned created appointment:', result);
+        alert(`Appointment created successfully.\nConfirmation number: ${result.confirmationNumber}`);
       }
       
       closeModal();
@@ -439,6 +441,7 @@ const Scheduler: React.FC = () => {
                   <th>Time</th>
                   <th>Type</th>
                   <th>Company</th>
+                  <th>Confirmation #</th>
                   <th>P/U # / S/O #</th>
                   <th>Contact</th>
                   <th>Phone</th>
@@ -451,7 +454,7 @@ const Scheduler: React.FC = () => {
               <tbody>
                 {appointments.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="scheduler__table-empty">
+                    <td colSpan={12} className="scheduler__table-empty">
                       No appointments scheduled
                     </td>
                   </tr>
@@ -468,6 +471,7 @@ const Scheduler: React.FC = () => {
                           </span>
                         </td>
                         <td>{apt.company || '-'}</td>
+                        <td>{apt.confirmationNumber || '-'}</td>
                         <td>{apt.pickupNumber || '-'}</td>
                         <td>{apt.contactName || '-'}</td>
                         <td>{apt.contactPhone || '-'}</td>

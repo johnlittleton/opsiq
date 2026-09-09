@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { API_BASE } from '../services/config';
+import { apiClient } from '../services/api';
 import './ProductionDashboard.css';
 import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { MessageBanner } from '../components/MessageBanner';
@@ -78,7 +79,14 @@ export default function ProductionDashboard() {
       fetchActiveDowntimes();
       checkDriverAlerts();
     }, 5000); // Refresh every 5 seconds to reduce backend load
-    return () => clearInterval(interval);
+    const removeWorkOrderListener = apiClient.onWorkOrderUpdated(() => {
+      void fetchWorkOrders();
+      void fetchCostingData();
+    });
+    return () => {
+      clearInterval(interval);
+      removeWorkOrderListener?.();
+    };
   }, [selectedDate]); // Re-run if date changes
 
   useEffect(() => {

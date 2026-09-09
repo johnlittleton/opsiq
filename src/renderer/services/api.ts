@@ -73,6 +73,16 @@ class ApiClient {
     this.socket?.on('production:updated', callback);
   }
 
+  onWorkOrderUpdated(callback: (workOrder: any) => void) {
+    this.socket?.on('workorder:updated', callback);
+    return () => this.socket?.off('workorder:updated', callback);
+  }
+
+  onWorkOrderDeleted(callback: (workOrderId: string) => void) {
+    this.socket?.on('workorder:deleted', callback);
+    return () => this.socket?.off('workorder:deleted', callback);
+  }
+
   onFormCompleted(callback: (event: {
     formType: 'production' | 'outbound';
     referenceId: string | number;

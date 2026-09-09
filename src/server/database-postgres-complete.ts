@@ -227,6 +227,7 @@ export class DatabaseService implements IDatabaseService {
           pallets INTEGER,
           commodity TEXT,
           notes TEXT,
+          confirmation_number TEXT,
           status TEXT NOT NULL DEFAULT 'Scheduled',
           created_at TIMESTAMP NOT NULL,
           updated_at TIMESTAMP NOT NULL,
@@ -791,6 +792,14 @@ export class DatabaseService implements IDatabaseService {
       `);
       await client.query(`
         ALTER TABLE appointments ADD COLUMN IF NOT EXISTS carrier TEXT;
+      `);
+      await client.query(`
+        ALTER TABLE appointments ADD COLUMN IF NOT EXISTS confirmation_number TEXT;
+        UPDATE appointments
+        SET confirmation_number = 'APPT-' || replace(appointment_date, '-', '') || '-' || lpad(id::text, 6, '0')
+        WHERE confirmation_number IS NULL OR confirmation_number = '';
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_appointments_confirmation ON appointments(confirmation_number)
+        WHERE confirmation_number IS NOT NULL;
       `);
 
       // Migration: Add role column to executives
@@ -1753,8 +1762,8 @@ export class DatabaseService implements IDatabaseService {
     const result = await this.pool.query(`
       INSERT INTO appointments (
         appointment_date, appointment_time, company, contact_name, contact_phone,
-        pickup_number, customer, carrier, type, door_id, pallets, commodity, notes, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        pickup_number, customer, carrier, type, door_id, pallets, commodity, notes, confirmation_number, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NULL)
       RETURNING *
     `, [
       data.appointmentDate,
@@ -1775,7 +1784,13 @@ export class DatabaseService implements IDatabaseService {
       now
     ]);
 
-    return this.toCamelCase(result.rows[0]);
+    const appointment = result.rows[0];
+    const confirmationNumber = `APPT-${data.appointmentDate.replace(/-/g, '')}-${String(appointment.id).padStart(6, '0')}`;
+    const updated = await this.pool.query(
+      'UPDATE appointments SET confirmation_number = $1 WHERE id = $2 RETURNING *',
+      [confirmationNumber, appointment.id]
+    );
+    return this.toCamelCase(updated.rows[0]);
   }
 
   async getAppointments(filters?: {
