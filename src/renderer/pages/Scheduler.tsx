@@ -500,6 +500,7 @@ const Scheduler: React.FC = () => {
                           <span>{appointment.carrier || 'No carrier'}</span>
                           <span>{appointment.customer || 'No customer'}</span>
                           <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.pickupNumber || 'N/A'}</span>
+                          <span>Conf: {appointment.confirmationNumber || 'N/A'}</span>
                         </button>
                       )) : <span className="scheduler__door-empty">Available</span>}
                     </div>
@@ -664,6 +665,7 @@ const Scheduler: React.FC = () => {
                           >
                             <div className="scheduler__appointment-time">{apt.appointmentTime || '-'}</div>
                             <div className="scheduler__appointment-company">{apt.company || 'N/A'}</div>
+                            <div className="scheduler__appointment-confirmation">{apt.confirmationNumber || 'N/A'}</div>
                           </div>
                         ))}
                       </div>

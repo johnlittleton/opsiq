@@ -681,6 +681,15 @@
   color: var(--text);
 }
 
+.scheduler__appointment-confirmation {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent-primary, #16a085);
+}
+
 /* Modal */
 .scheduler__modal-overlay {
   position: fixed;
@@ -940,7 +949,8 @@
 .scheduler__timeslot-grid-panel {
   min-width: 0;
   height: calc(100vh - 110px);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .scheduler__timeslot-grid {
@@ -1643,4 +1653,13 @@
     max-width: 90px;
     max-height: 90px;
   }
+}
+
+/* Let door tiles grow to fit all appointments instead of clipping/scrolling
+   internally - overrides the fixed max-height set per breakpoint above. */
+.scheduler__timeslot-view .scheduler__door-tile {
+  height: auto;
+  min-height: 142px;
+  max-height: none;
+  overflow: visible;
 }
