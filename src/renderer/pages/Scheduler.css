@@ -798,6 +798,38 @@
   background: #fff;
 }
 
+.scheduler__commodity-select {
+  color: #fff !important;
+  background: #000 !important;
+}
+
+.scheduler__commodity-select option {
+  color: #fff;
+  background: #000;
+}
+
+.scheduler__confirmation-number {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-primary, #16a085);
+}
+
+.scheduler__toast {
+  position: fixed;
+  top: 72px;
+  right: 24px;
+  z-index: 1100;
+  background: #16a085;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  max-width: 360px;
+}
+
 .scheduler__form-actions {
   display: flex;
   justify-content: space-between;

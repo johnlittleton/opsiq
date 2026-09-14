@@ -2048,8 +2048,8 @@ app.get('/api/customer-portal/schedule', async (req, res) => {
         ? `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, '0')}`
         : undefined);
     const appointments = await db.getAppointments({
-      startDate: scheduleStart ? `${scheduleStart}T00:00:00` : undefined,
-      endDate: scheduleEnd ? `${scheduleEnd}T23:59:59` : undefined,
+      startDate: scheduleStart,
+      endDate: scheduleEnd,
     });
     const customerKey = normalizePortalCustomer(customer);
     const canViewAllCustomerSchedules = customerKey === PRODUCE_DEPOT_PORTAL_CUSTOMER;

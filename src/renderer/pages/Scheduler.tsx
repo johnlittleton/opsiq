@@ -42,6 +42,12 @@ const Scheduler: React.FC = () => {
   const [manualTime, setManualTime] = useState('08:00');
   const [hoveredSlot, setHoveredSlot] = useState<{ door: number; time: string; appointment: Appointment } | null>(null);
   const [hoveredAppointment, setHoveredAppointment] = useState<{ door: number; appointment: Appointment } | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage((current) => (current === message ? null : current)), 5000);
+  };
 
   const [formData, setFormData] = useState({
     appointmentDate: '',
@@ -204,6 +210,83 @@ const Scheduler: React.FC = () => {
     setSelectedDate(null);
   };
 
+  const printAppointment = (apt: Appointment) => {
+    const date = new Date(apt.appointmentDate);
+    const dateLabel = !isNaN(date.getTime()) ? format(date, 'MMM d, yyyy') : apt.appointmentDate;
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Appointment ${apt.confirmationNumber || apt.id}</title>
+        <style>
+          @page { margin: 0.5in; }
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          .apt-header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 20px; }
+          .apt-header h1 { margin: 0; font-size: 28px; }
+          .apt-header .conf-number { font-size: 20px; color: #333; margin-top: 10px; }
+          .apt-section { margin-bottom: 20px; }
+          .apt-section-title { font-size: 18px; font-weight: bold; border-bottom: 2px solid #333; padding-bottom: 5px; margin-bottom: 10px; }
+          .apt-row { display: flex; padding: 8px 0; border-bottom: 1px solid #ddd; }
+          .apt-label { font-weight: bold; width: 160px; }
+          .apt-value { flex: 1; }
+          .type-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-weight: bold; ${apt.type === 'Inbound' ? 'background: #efe; color: #060;' : 'background: #fee7d6; color: #a64e00;'} }
+        </style>
+      </head>
+      <body>
+        <div class="apt-header">
+          <h1>📅 DOCK APPOINTMENT</h1>
+          <div class="conf-number">Confirmation #: ${apt.confirmationNumber || 'N/A'}</div>
+        </div>
+
+        <div class="apt-section">
+          <div class="apt-section-title">Appointment Details</div>
+          <div class="apt-row"><div class="apt-label">Date:</div><div class="apt-value">${dateLabel}</div></div>
+          <div class="apt-row"><div class="apt-label">Time:</div><div class="apt-value">${apt.appointmentTime || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Type:</div><div class="apt-value"><span class="type-badge">${apt.type}</span></div></div>
+          <div class="apt-row"><div class="apt-label">Door:</div><div class="apt-value">${apt.doorId ? `D${apt.doorId}` : 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Status:</div><div class="apt-value">${apt.status || 'Scheduled'}</div></div>
+        </div>
+
+        <div class="apt-section">
+          <div class="apt-section-title">Company &amp; Contact</div>
+          <div class="apt-row"><div class="apt-label">Company:</div><div class="apt-value">${apt.company || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Customer:</div><div class="apt-value">${apt.customer || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Carrier:</div><div class="apt-value">${apt.carrier || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Contact Name:</div><div class="apt-value">${apt.contactName || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Contact Phone:</div><div class="apt-value">${apt.contactPhone || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">${apt.type === 'Inbound' ? 'P/U Number' : 'S/O Number'}:</div><div class="apt-value">${apt.pickupNumber || 'N/A'}</div></div>
+        </div>
+
+        <div class="apt-section">
+          <div class="apt-section-title">Load Details</div>
+          <div class="apt-row"><div class="apt-label">Commodity:</div><div class="apt-value">${apt.commodity || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">Pallets:</div><div class="apt-value">${apt.pallets || 'N/A'}</div></div>
+        </div>
+
+        <div class="apt-section">
+          <div class="apt-section-title">Notes</div>
+          <div style="padding: 10px; background: #f9f9f9; min-height: 60px;">${apt.notes || 'No notes'}</div>
+        </div>
+
+        <div style="margin-top: 40px; text-align: center; color: #666; font-size: 12px;">
+          Generated: ${new Date().toLocaleString()}
+        </div>
+      </body>
+      </html>
+    `;
+
+    if (window.electron?.printHTML) {
+      window.electron.printHTML(htmlContent);
+    } else {
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!printWindow) return;
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => printWindow.print(), 250);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -225,7 +308,8 @@ const Scheduler: React.FC = () => {
         console.log('➕ Creating new appointment - calling API');
         const result = await apiClient.createAppointment(data);
         console.log('✅ API returned created appointment:', result);
-        alert(`Appointment created successfully.\nConfirmation number: ${result.confirmationNumber}`);
+        // window.alert() freezes input focus in this kiosk window, so use a toast instead
+        showToast(`Appointment created. Confirmation #: ${result.confirmationNumber}`);
       }
       
       closeModal();
@@ -294,7 +378,7 @@ const Scheduler: React.FC = () => {
     if (appointment) {
       openModal(selectedTimeslotDate, appointment);
     } else if (getDoorAppointmentCount(doorId) >= 8) {
-      window.alert(`Door D${doorId} is at capacity with 8 appointments for this day.`);
+      showToast(`Door D${doorId} is at capacity with 8 appointments for this day.`);
     } else {
       setFormData({
         appointmentDate: format(selectedTimeslotDate, 'yyyy-MM-dd'),
@@ -355,7 +439,13 @@ const Scheduler: React.FC = () => {
           </button>
         </div>
       </TitleBar>
-      
+
+      {toastMessage && (
+        <div className="scheduler__toast" role="status" aria-live="polite">
+          {toastMessage}
+        </div>
+      )}
+
       <div className="scheduler__content">        {view === 'timeslot' ? (
           <div className="scheduler__timeslot-view">
             <aside className="scheduler__timeslot-sidebar">
@@ -384,7 +474,9 @@ const Scheduler: React.FC = () => {
 
             <div className="scheduler__timeslot-grid-panel">
             <div className="scheduler__timeslot-grid">
-              {DOORS.map(door => {
+              {DOORS.filter(door => getDoorAppointmentCount(door) > 0).length === 0 ? (
+                <div className="scheduler__door-empty">No doors have appointments for this day.</div>
+              ) : DOORS.filter(door => getDoorAppointmentCount(door) > 0).map(door => {
                 const doorAppointments = getDoorAppointments(door);
                 const appointmentCount = doorAppointments.length;
                 const atCapacity = appointmentCount >= 8;
@@ -418,6 +510,7 @@ const Scheduler: React.FC = () => {
                         <span>Carrier: {hoveredAppointment.appointment.carrier || 'N/A'}</span>
                         <span>Customer: {hoveredAppointment.appointment.customer || 'N/A'}</span>
                         <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.pickupNumber || 'N/A'}</span>
+                        <span>Confirmation #: {hoveredAppointment.appointment.confirmationNumber || 'N/A'}</span>
                         <span>Company: {hoveredAppointment.appointment.company || 'N/A'}</span>
                         <span>Contact: {hoveredAppointment.appointment.contactName || 'N/A'}</span>
                         <span>Phone: {hoveredAppointment.appointment.contactPhone || 'N/A'}</span>
@@ -487,6 +580,13 @@ const Scheduler: React.FC = () => {
                             className="scheduler__action-btn scheduler__action-btn--edit"
                           >
                             ✏️
+                          </button>
+                          <button
+                            onClick={() => printAppointment(apt)}
+                            className="scheduler__action-btn scheduler__action-btn--print"
+                            title="Print appointment"
+                          >
+                            🖨️
                           </button>
                           <button
                             onClick={() => handleDelete(apt.id)}
@@ -579,7 +679,12 @@ const Scheduler: React.FC = () => {
           <div className="scheduler__modal-overlay" onClick={closeModal}>
             <div className="scheduler__modal" onClick={(e) => e.stopPropagation()}>
               <div className="scheduler__modal-header">
-                <h2>{editingAppointment ? 'Edit Appointment' : 'New Appointment'}</h2>
+                <div>
+                  <h2>{editingAppointment ? 'Edit Appointment' : 'New Appointment'}</h2>
+                  {editingAppointment?.confirmationNumber && (
+                    <div className="scheduler__confirmation-number">Confirmation #: {editingAppointment.confirmationNumber}</div>
+                  )}
+                </div>
                 <button onClick={closeModal} className="scheduler__modal-close">×</button>
               </div>
 
@@ -726,6 +831,7 @@ const Scheduler: React.FC = () => {
                     <select
                       value={formData.commodity}
                       onChange={(e) => setFormData({ ...formData, commodity: e.target.value })}
+                      className="scheduler__commodity-select"
                     >
                       <option value="">Select commodity...</option>
                       {COMMODITIES.map(commodity => (
@@ -755,6 +861,29 @@ const Scheduler: React.FC = () => {
                       Delete
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => printAppointment(editingAppointment || {
+                      id: 0,
+                      appointmentDate: formData.appointmentDate,
+                      appointmentTime: formData.appointmentTime,
+                      company: formData.company,
+                      contactName: formData.contactName,
+                      contactPhone: formData.contactPhone,
+                      pickupNumber: formData.pickupNumber,
+                      customer: formData.customer,
+                      carrier: formData.carrier,
+                      type: formData.type,
+                      doorId: formData.doorId ? parseInt(formData.doorId) : undefined,
+                      pallets: formData.pallets ? parseInt(formData.pallets) : undefined,
+                      commodity: formData.commodity,
+                      notes: formData.notes,
+                      status: 'Scheduled',
+                    })}
+                    className="scheduler__btn"
+                  >
+                    🖨️ Print
+                  </button>
                   <div className="scheduler__form-actions-right">
                     <button type="button" onClick={closeModal} className="scheduler__btn">
                       Cancel

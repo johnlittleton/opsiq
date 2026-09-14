@@ -49,9 +49,13 @@ const AppointmentHistory: React.FC = () => {
   const loadAppointments = async () => {
     setLoading(true);
     try {
+      // appointmentDate is stored as a plain YYYY-MM-DD string, so filters must match
+      // that format exactly. Appending a time suffix breaks the >= / <= comparison
+      // when startDate and endDate are the same day (the plain date sorts before
+      // its own "T00:00:00" variant), which caused same-day searches to return 0 rows.
       const filterParams: any = {
-        startDate: `${filters.startDate}T00:00:00`,
-        endDate: `${filters.endDate}T23:59:59`,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
       };
       
       if (filters.type) filterParams.type = filters.type;
