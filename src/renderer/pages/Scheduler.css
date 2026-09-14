@@ -824,6 +824,13 @@
   color: var(--accent-primary, #16a085);
 }
 
+.scheduler__confirmation-field {
+  font-weight: 700;
+  color: var(--accent-primary, #16a085) !important;
+  background: rgba(22, 160, 133, 0.1) !important;
+  border-color: var(--accent-primary, #16a085) !important;
+}
+
 .scheduler__toast {
   position: fixed;
   top: 72px;
@@ -1115,6 +1122,8 @@
 .scheduler__door-tile:hover {
   transform: translateY(-2px);
   filter: brightness(1.1);
+  /* Raise above sibling tiles so the hover card isn't painted over by the next grid tile */
+  z-index: 200;
 }
 
 .scheduler__door-tile-label {

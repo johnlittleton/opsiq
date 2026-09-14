@@ -304,15 +304,17 @@ const Scheduler: React.FC = () => {
       if (editingAppointment) {
         console.log('✏️ Updating appointment:', editingAppointment.id);
         await apiClient.updateAppointment(editingAppointment.id, data);
+        closeModal();
       } else {
         console.log('➕ Creating new appointment - calling API');
         const result = await apiClient.createAppointment(data);
         console.log('✅ API returned created appointment:', result);
         // window.alert() freezes input focus in this kiosk window, so use a toast instead
         showToast(`Appointment created. Confirmation #: ${result.confirmationNumber}`);
+        // Keep the modal open so the clerk can see the confirmation number field populate
+        setEditingAppointment(result);
       }
-      
-      closeModal();
+
       // Reload appointments to ensure the new appointment shows in the grid
       await loadAppointments();
     } catch (error: any) {
@@ -691,6 +693,14 @@ const Scheduler: React.FC = () => {
               </div>
 
               <form onSubmit={handleSubmit} className="scheduler__form">
+                {editingAppointment?.confirmationNumber && (
+                  <div className="scheduler__form-row">
+                    <div className="scheduler__form-field scheduler__form-field--full">
+                      <label>Confirmation #</label>
+                      <input type="text" value={editingAppointment.confirmationNumber} readOnly className="scheduler__confirmation-field" />
+                    </div>
+                  </div>
+                )}
                 <div className="scheduler__form-row">
                   <div className="scheduler__form-field">
                     <label>Date *</label>
