@@ -391,6 +391,16 @@ const Scheduler: React.FC = () => {
       .sort((left, right) => left.appointmentTime.localeCompare(right.appointmentTime));
   };
 
+  const getUnassignedAppointments = () => {
+    const dateStr = format(selectedTimeslotDate, 'yyyy-MM-dd');
+    return appointments
+      .filter((appointment) => {
+        const doorId = Number(appointment.doorId);
+        return appointment.appointmentDate === dateStr && (!Number.isInteger(doorId) || doorId < 1 || doorId > 39);
+      })
+      .sort((left, right) => left.appointmentTime.localeCompare(right.appointmentTime));
+  };
+
   const handleTimeslotClick = (doorId: number, timeSlot: string, appointment?: Appointment) => {
     if (appointment) {
       openModal(selectedTimeslotDate, appointment);
@@ -488,8 +498,47 @@ const Scheduler: React.FC = () => {
 
             <div className="scheduler__timeslot-grid-panel">
             <div className="scheduler__timeslot-grid">
-              {DOORS.filter(door => getDoorAppointmentCount(door) > 0).length === 0 ? (
-                <div className="scheduler__door-empty">No doors have appointments for this day.</div>
+              {getUnassignedAppointments().length > 0 && (
+                <div className="scheduler__door-tile scheduler__door-tile--unassigned">
+                  <div className="scheduler__door-tile-label"><span>UNASSIGNED</span><small>{getUnassignedAppointments().length}</small></div>
+                  <div className="scheduler__door-appointments">
+                    {getUnassignedAppointments().map((appointment) => (
+                      <button
+                        type="button"
+                        key={appointment.id}
+                        className={`scheduler__door-appointment scheduler__door-appointment--${appointment.type.toLowerCase()}`}
+                        onClick={() => openModal(selectedTimeslotDate, appointment)}
+                        onMouseEnter={() => setHoveredAppointment({ door: 0, appointment })}
+                        onMouseLeave={() => setHoveredAppointment(null)}
+                      >
+                        <b>{appointment.appointmentTime}</b>
+                        <span>{appointment.carrier || appointment.company || 'No carrier'}</span>
+                        <span>{appointment.customer || 'No customer'}</span>
+                        <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.pickupNumber || 'N/A'}</span>
+                        <span>Conf: {appointment.confirmationNumber || 'N/A'}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {hoveredAppointment?.door === 0 && (
+                    <div className="scheduler__door-hover-card">
+                      <strong>Unassigned appointment</strong>
+                      <b>{hoveredAppointment.appointment.appointmentTime} · {hoveredAppointment.appointment.type}</b>
+                      <span>Carrier: {hoveredAppointment.appointment.carrier || 'N/A'}</span>
+                      <span>Customer: {hoveredAppointment.appointment.customer || 'N/A'}</span>
+                      <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.pickupNumber || 'N/A'}</span>
+                      <span>Confirmation #: {hoveredAppointment.appointment.confirmationNumber || 'N/A'}</span>
+                      <span>Company: {hoveredAppointment.appointment.company || 'N/A'}</span>
+                      <span>Contact: {hoveredAppointment.appointment.contactName || 'N/A'}</span>
+                      <span>Phone: {hoveredAppointment.appointment.contactPhone || 'N/A'}</span>
+                      <span>Commodity: {hoveredAppointment.appointment.commodity || 'N/A'}</span>
+                      <span>Pallets: {hoveredAppointment.appointment.pallets || 'N/A'}</span>
+                      <span>Notes: {hoveredAppointment.appointment.notes || 'N/A'}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {DOORS.filter(door => getDoorAppointmentCount(door) > 0).length === 0 && getUnassignedAppointments().length === 0 ? (
+                <div className="scheduler__door-empty">No appointments for this day.</div>
               ) : DOORS.filter(door => getDoorAppointmentCount(door) > 0).map(door => {
                 const doorAppointments = getDoorAppointments(door);
                 const appointmentCount = doorAppointments.length;

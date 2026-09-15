@@ -194,6 +194,15 @@
   color: #fca5a5;
 }
 
+.scheduler__door-tile--unassigned {
+  border-color: #f59e0b;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.35);
+}
+
+.scheduler__door-tile--unassigned .scheduler__door-tile-label {
+  color: #fbbf24;
+}
+
 .scheduler__manual-slot-entry {
   display: inline-flex;
   align-items: flex-end;
