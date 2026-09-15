@@ -145,7 +145,11 @@ const Scheduler: React.FC = () => {
 
   const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
   const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-  const handleToday = () => setCurrentMonth(new Date());
+  const handleToday = () => {
+    const today = new Date();
+    setCurrentMonth(today);
+    setSelectedDate(today);
+  };
 
   const handleMonthJump = (value: string) => {
     if (!value) return;
@@ -162,6 +166,17 @@ const Scheduler: React.FC = () => {
     if (Number.isNaN(date.getTime())) return;
     setCurrentMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     setSelectedDate(date);
+  };
+
+  const openTimeslotView = () => {
+    setSelectedTimeslotDate(selectedDate || new Date());
+    setView('timeslot');
+  };
+
+  const openCalendarView = () => {
+    setSelectedDate(selectedTimeslotDate);
+    setCurrentMonth(new Date(selectedTimeslotDate.getFullYear(), selectedTimeslotDate.getMonth(), 1));
+    setView('calendar');
   };
 
   const openModal = (date?: Date, appointment?: Appointment, initialTime = '08:00') => {
@@ -366,13 +381,13 @@ const Scheduler: React.FC = () => {
 
   const getDoorAppointmentCount = (doorId: number) => {
     const dateStr = format(selectedTimeslotDate, 'yyyy-MM-dd');
-    return appointments.filter((appointment) => appointment.doorId === doorId && appointment.appointmentDate === dateStr).length;
+    return appointments.filter((appointment) => Number(appointment.doorId) === doorId && appointment.appointmentDate === dateStr).length;
   };
 
   const getDoorAppointments = (doorId: number) => {
     const dateStr = format(selectedTimeslotDate, 'yyyy-MM-dd');
     return appointments
-      .filter((appointment) => appointment.doorId === doorId && appointment.appointmentDate === dateStr)
+      .filter((appointment) => Number(appointment.doorId) === doorId && appointment.appointmentDate === dateStr)
       .sort((left, right) => left.appointmentTime.localeCompare(right.appointmentTime));
   };
 
@@ -414,13 +429,13 @@ const Scheduler: React.FC = () => {
             </button>
             <button
               className={`scheduler__view-btn ${view === 'calendar' ? 'scheduler__view-btn--active' : ''}`}
-              onClick={() => setView('calendar')}
+              onClick={openCalendarView}
             >
               📅 Calendar View
             </button>
             <button
               className={`scheduler__view-btn ${view === 'timeslot' ? 'scheduler__view-btn--active' : ''}`}
-              onClick={() => setView('timeslot')}
+              onClick={openTimeslotView}
             >
               🕐 Time Slot Grid
             </button>
@@ -436,9 +451,6 @@ const Scheduler: React.FC = () => {
             <option value="Outbound">Outbound</option>
           </select>
           
-          <button onClick={() => openModal(new Date())} className="scheduler__btn scheduler__btn--primary">
-            + New Appointment
-          </button>
         </div>
       </TitleBar>
 
@@ -647,12 +659,13 @@ const Scheduler: React.FC = () => {
                   const dayAppointments = getAppointmentsForDay(day);
                   const isCurrentMonth = isSameMonth(day, currentMonth);
                   const isToday = isSameDay(day, new Date());
+                  const isSelected = Boolean(selectedDate && isSameDay(day, selectedDate));
 
                   return (
                     <div
                       key={day.toString()}
-                      className={`scheduler__day ${!isCurrentMonth ? 'scheduler__day--other' : ''} ${isToday ? 'scheduler__day--today' : ''}`}
-                      onClick={() => openModal(day)}
+                      className={`scheduler__day ${!isCurrentMonth ? 'scheduler__day--other' : ''} ${isToday ? 'scheduler__day--today' : ''} ${isSelected ? 'scheduler__day--selected' : ''}`}
+                      onClick={() => setSelectedDate(day)}
                     >
                       <div className="scheduler__day-number">{format(day, 'd')}</div>
                       <div className="scheduler__day-appointments">
@@ -660,10 +673,6 @@ const Scheduler: React.FC = () => {
                           <div
                             key={apt.id}
                             className={`scheduler__appointment scheduler__appointment--${(apt.type || 'inbound').toLowerCase()}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openModal(day, apt);
-                            }}
                           >
                             <div className="scheduler__appointment-time">{apt.appointmentTime || '-'}</div>
                             <div className="scheduler__appointment-company">{apt.company || 'N/A'}</div>
