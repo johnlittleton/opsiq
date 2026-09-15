@@ -883,6 +883,7 @@
 .scheduler__timeslot-grid {
   display: grid;
   grid-template-columns: repeat(8, 1fr);
+  align-items: start;
   gap: var(--tile-gap);
   width: 100%;
   max-width: 100%;
