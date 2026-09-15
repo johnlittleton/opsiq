@@ -36,6 +36,9 @@ const Scheduler: React.FC = () => {
   const [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [view, setView] = useState<'list' | 'calendar' | 'timeslot'>('list');
+  const [listStartDate, setListStartDate] = useState(format(startOfMonth(subMonths(new Date(), 1)), 'yyyy-MM-dd'));
+  const [listEndDate, setListEndDate] = useState(format(endOfMonth(addMonths(new Date(), 2)), 'yyyy-MM-dd'));
+  const [listSearch, setListSearch] = useState('');
   const [selectedTimeslotDate, setSelectedTimeslotDate] = useState(new Date());
   const [manualTimeslotTime, setManualTimeslotTime] = useState('08:00');
   const [manualDoor, setManualDoor] = useState('1');
@@ -67,28 +70,23 @@ const Scheduler: React.FC = () => {
 
   const loadAppointments = useCallback(async () => {
     try {
-      let start: Date;
-      let end: Date;
-      
+      let startDate: string;
+      let endDate: string;
+
       if (view === 'list') {
-        // In list view, load appointments for 3 months (past, current, and future)
-        start = startOfMonth(subMonths(new Date(), 1));
-        end = endOfMonth(addMonths(new Date(), 2));
+        startDate = listStartDate;
+        endDate = listEndDate;
       } else if (view === 'timeslot') {
-        // In timeslot view, load appointments for the selected date only
-        start = new Date(selectedTimeslotDate);
-        start.setHours(0, 0, 0, 0);
-        end = new Date(selectedTimeslotDate);
-        end.setHours(23, 59, 59, 999);
+        startDate = format(selectedTimeslotDate, 'yyyy-MM-dd');
+        endDate = startDate;
       } else {
-        // In calendar view, load appointments for the current month only
-        start = startOfMonth(currentMonth);
-        end = endOfMonth(currentMonth);
+        startDate = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        endDate = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
       }
-      
+
       const filters: any = {
-        startDate: format(start, 'yyyy-MM-dd'),
-        endDate: format(end, 'yyyy-MM-dd'),
+        startDate,
+        endDate,
       };
       
       if (typeFilter) filters.type = typeFilter;
@@ -100,7 +98,7 @@ const Scheduler: React.FC = () => {
     } catch (error) {
       console.error('Failed to load appointments:', error);
     }
-  }, [view, currentMonth, selectedTimeslotDate, typeFilter]);
+  }, [view, currentMonth, selectedTimeslotDate, listStartDate, listEndDate, typeFilter]);
 
   // Subscribe to real-time updates (only once)
   useEffect(() => {
@@ -426,6 +424,29 @@ const Scheduler: React.FC = () => {
     }
   };
 
+  const normalizedListSearch = listSearch.trim().toLowerCase();
+  const filteredListAppointments = appointments.filter((appointment) => {
+    if (!normalizedListSearch) return true;
+
+    return [
+      appointment.appointmentDate,
+      appointment.appointmentTime,
+      appointment.type,
+      appointment.company,
+      appointment.confirmationNumber,
+      appointment.pickupNumber,
+      appointment.customer,
+      appointment.carrier,
+      appointment.contactName,
+      appointment.contactPhone,
+      appointment.doorId ? `D${appointment.doorId}` : 'Unassigned',
+      appointment.pallets,
+      appointment.commodity,
+      appointment.status,
+      appointment.notes,
+    ].some((value) => String(value ?? '').toLowerCase().includes(normalizedListSearch));
+  });
+
   return (
     <div className="scheduler">
       <TitleBar showLegend={false}>
@@ -591,6 +612,36 @@ const Scheduler: React.FC = () => {
           </div>
         ) : view === 'list' ? (
           <div className="scheduler__list">
+            <div className="scheduler__list-filters">
+              <label>
+                Start Date
+                <input
+                  type="date"
+                  value={listStartDate}
+                  max={listEndDate}
+                  onChange={(event) => setListStartDate(event.target.value)}
+                />
+              </label>
+              <label>
+                End Date
+                <input
+                  type="date"
+                  value={listEndDate}
+                  min={listStartDate}
+                  onChange={(event) => setListEndDate(event.target.value)}
+                />
+              </label>
+              <label className="scheduler__list-search">
+                Search
+                <input
+                  type="search"
+                  value={listSearch}
+                  onChange={(event) => setListSearch(event.target.value)}
+                  placeholder="Confirmation, company, customer, carrier, order, contact, door..."
+                />
+              </label>
+              <span className="scheduler__list-count">{filteredListAppointments.length} appointments</span>
+            </div>
             <table className="scheduler__table">
               <thead>
                 <tr>
@@ -609,14 +660,15 @@ const Scheduler: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {appointments.length === 0 ? (
+                {filteredListAppointments.length === 0 ? (
                   <tr>
                     <td colSpan={12} className="scheduler__table-empty">
-                      No appointments scheduled
+                      No appointments match the selected dates and search
                     </td>
                   </tr>
                 ) : (
-                  appointments.map(apt => {                    console.log('Rendering appointment:', JSON.stringify(apt, null, 2));                    const date = new Date(apt.appointmentDate);
+                  filteredListAppointments.map(apt => {
+                    const date = new Date(apt.appointmentDate);
                     const isValidDate = !isNaN(date.getTime());
                     return (
                       <tr key={apt.id} className="scheduler__table-row">
