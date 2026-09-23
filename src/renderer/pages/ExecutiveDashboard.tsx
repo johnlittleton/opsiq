@@ -494,6 +494,7 @@ const ExecutiveDashboard: React.FC = () => {
             >🌐 All Time</button>
             <button className="analytics-btn" onClick={() => navigate('/executive-analytics')}>📊 Analytics</button>
             <button className="costing-btn" onClick={() => navigate('/production-costing')}>💰 Production Costing</button>
+            <button className="costing-btn" onClick={() => navigate('/wo-labor-cost')}>📋 WO LABOR COST</button>
             <button className="costing-btn" onClick={() => navigate('/all-in-production-kpi')}>📈 All-In Prod KPI</button>
             <button className="analytics-btn" onClick={() => navigate('/combined-live-operations')}>🖥 Combined Live</button>
             <button className="analytics-btn" onClick={() => navigate('/john-dashboard')}>🏢 John's Dashboard</button>

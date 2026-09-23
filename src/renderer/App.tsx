@@ -19,6 +19,7 @@ import ShippingReceivingKPI from './pages/ShippingReceivingKPI';
 import ExecutiveDashboard from './pages/ExecutiveDashboard';
 import ExecutiveAnalytics from './pages/ExecutiveAnalytics';
 import ProductionCosting from './pages/ProductionCosting';
+import WOLaborCostHistory from './pages/WOLaborCostHistory';
 import AllInProductionKPIDashboard from './pages/AllInProductionKPIDashboard';
 import JohnDashboard from './pages/JohnDashboard';
 import Settings from './pages/Settings';
@@ -118,6 +119,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/executive" element={<ExecutiveDashboard />} />
       <Route path="/executive-analytics" element={<ExecutiveAnalytics />} />
       <Route path="/production-costing" element={<ProductionCosting />} />
+      <Route path="/wo-labor-cost" element={<WOLaborCostHistory />} />
       <Route path="/all-in-production-kpi" element={<AllInProductionKPIDashboard />} />
       <Route path="/john-dashboard" element={<JohnDashboard />} />
       <Route path="/labor-tracker" element={<LaborTracker />} />

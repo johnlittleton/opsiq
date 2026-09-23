@@ -1,0 +1,76 @@
+.wo-labor-cost-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: white;
+}
+
+.wo-labor-cost-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.wo-labor-cost-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.wo-labor-cost-eyebrow {
+  display: none;
+}
+
+.wo-labor-cost-header h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+.wo-labor-cost-header p:last-child { margin: 4px 0 0; color: rgba(255, 255, 255, 0.7); font-size: 11px; }
+.wo-labor-cost-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.wo-labor-cost-actions button { background: none; color: #16a085; border: 3px solid #16a085; padding: 6px 12px; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 0.75rem; transition: all 0.2s; }
+.wo-labor-cost-actions button:last-child { color: #e74c3c; border-color: #e74c3c; }
+.wo-labor-cost-actions button:hover { background: #16a085; color: #000; transform: translateY(-1px); }
+.wo-labor-cost-actions button:last-child:hover { background: #e74c3c; }
+
+.wo-labor-cost-controls {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.wo-labor-cost-controls label { display: flex; flex-direction: column; gap: 4px; color: rgba(255, 255, 255, 0.8); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.wo-labor-cost-controls input { min-width: 160px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; background: rgba(0, 0, 0, 0.3); color: white; padding: 6px 8px; font-size: 11px; }
+.wo-labor-cost-search { flex: 1; min-width: 260px; }
+.wo-labor-cost-search input { width: 100%; box-sizing: border-box; }
+
+.wo-labor-cost-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.wo-labor-cost-summary div { padding: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; }
+.wo-labor-cost-summary span { display: block; color: rgba(255, 255, 255, 0.7); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.wo-labor-cost-summary strong { display: block; margin-top: 5px; font-size: 18px; }
+
+.wo-labor-cost-error { margin-bottom: 12px; padding: 12px; color: #fecaca; background: rgba(127, 29, 29, 0.45); border: 1px solid #b91c1c; border-radius: 6px; }
+.wo-labor-cost-table-panel { padding: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; }
+.wo-labor-cost-table-scroll { max-height: 60vh; overflow: auto; border-radius: 6px; background: rgba(0, 0, 0, 0.2); }
+.wo-labor-cost-table-scroll table { width: 100%; min-width: 980px; border-collapse: collapse; }
+.wo-labor-cost-table-scroll th, .wo-labor-cost-table-scroll td { padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); text-align: left; white-space: nowrap; font-size: 11px; }
+.wo-labor-cost-table-scroll th { position: sticky; top: 0; z-index: 1; background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.9); font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; }
+.wo-labor-cost-table-scroll tbody tr:hover { background: rgba(255, 255, 255, 0.05); }
+.wo-labor-cost-table-scroll td { color: rgba(255, 255, 255, 0.85); }
+.wo-labor-cost-table-scroll .numeric, .wo-labor-cost-table-scroll tfoot th:not(:first-child) { text-align: right; }
+.wo-labor-cost-table-scroll tfoot th { position: sticky; bottom: 0; background: #172033; color: #f8fafc; }
+.wo-labor-cost-table-scroll td.numeric, .wo-labor-cost-table-scroll tfoot th:not(:first-child) { font-family: 'Courier New', monospace; }
+.wo-labor-cost-table-scroll td:last-child { color: #4ade80; }
+.wo-labor-cost-message { padding: 28px !important; text-align: center !important; color: rgba(255, 255, 255, 0.6); }
+.wo-labor-cost-empty { padding: 100px 24px; text-align: center; color: #fca5a5; }
+
+@media (max-width: 800px) {
+  .wo-labor-cost-container { padding: 16px; }
+  .wo-labor-cost-header { flex-direction: column; }
+  .wo-labor-cost-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
