@@ -31,6 +31,7 @@ interface LaborCostRow {
   headcount: number;
   actualHours: number;
   laborCost: number;
+  costPerCase: number;
 }
 
 const getLocalDateString = (date: Date) => {
@@ -109,8 +110,13 @@ const WOLaborCostHistory: React.FC = () => {
           headcount,
           actualHours,
           laborCost: actualHours * headcount * PRODUCTION_HOURLY_RATE,
+          costPerCase: 0,
         };
       })
+      .map((row) => ({
+        ...row,
+        costPerCase: row.casesProduced > 0 ? row.laborCost / row.casesProduced : 0,
+      }))
       .filter((row) => {
         if (!search) return true;
         return [row.workOrder, row.salesOrder, row.commodity, row.date]
@@ -128,6 +134,8 @@ const WOLaborCostHistory: React.FC = () => {
     }),
     { casesProduced: 0, headcount: 0, actualHours: 0, laborCost: 0 },
   ), [rows]);
+
+  const totalCostPerCase = totals.casesProduced > 0 ? totals.laborCost / totals.casesProduced : 0;
 
   if (userRole !== 'executive') {
     return (
@@ -165,6 +173,7 @@ const WOLaborCostHistory: React.FC = () => {
           <div><span>Cases Produced</span><strong>{totals.casesProduced.toLocaleString()}</strong></div>
           <div><span>Actual Hours</span><strong>{totals.actualHours.toFixed(2)}</strong></div>
           <div><span>Total Labor Cost</span><strong>{formatCurrency(totals.laborCost)}</strong></div>
+          <div><span>Cost Per Case</span><strong>{formatCurrency(totalCostPerCase)}</strong></div>
         </section>
 
         {error && <div className="wo-labor-cost-error">{error}</div>}
@@ -174,26 +183,27 @@ const WOLaborCostHistory: React.FC = () => {
               <thead>
                 <tr>
                   <th>Date</th><th>Work Order</th><th>Sales Order</th><th>Commodity</th>
-                  <th>Cases Produced</th><th>Headcount</th><th>Actual Hours</th><th>Labor Cost</th>
+                  <th>Cases Produced</th><th>Headcount</th><th>Actual Hours</th><th>Labor Cost</th><th>Cost Per Case</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={8} className="wo-labor-cost-message">Loading historical work orders...</td></tr>
+                  <tr><td colSpan={9} className="wo-labor-cost-message">Loading historical work orders...</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={8} className="wo-labor-cost-message">No completed production orders found for this selection.</td></tr>
+                  <tr><td colSpan={9} className="wo-labor-cost-message">No completed production orders found for this selection.</td></tr>
                 ) : rows.map((row) => (
                   <tr key={`${row.date}-${row.workOrder}`}>
                     <td>{formatDate(row.date)}</td><td>{row.workOrder}</td><td>{row.salesOrder}</td><td>{row.commodity}</td>
                     <td className="numeric">{row.casesProduced.toLocaleString()}</td><td className="numeric">{row.headcount.toLocaleString()}</td>
                     <td className="numeric">{row.actualHours.toFixed(2)}</td><td className="numeric">{formatCurrency(row.laborCost)}</td>
+                    <td className="numeric">{formatCurrency(row.costPerCase)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr>
                   <th colSpan={4}>Filtered Totals</th><th>{totals.casesProduced.toLocaleString()}</th><th>{totals.headcount.toLocaleString()}</th>
-                  <th>{totals.actualHours.toFixed(2)}</th><th>{formatCurrency(totals.laborCost)}</th>
+                  <th>{totals.actualHours.toFixed(2)}</th><th>{formatCurrency(totals.laborCost)}</th><th>{formatCurrency(totalCostPerCase)}</th>
                 </tr>
               </tfoot>
             </table>
