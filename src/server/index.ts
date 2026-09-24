@@ -4296,6 +4296,16 @@ async function startServer() {
         console.log(`✓ Database ready`);
       }
 
+      setInterval(() => {
+        void db.autoCloseProductionEmployeeShiftsAtCutoff().then((closedCount: number) => {
+          if (closedCount > 0) {
+            console.log(`✓ Auto-closed ${closedCount} production employee shift(s) at 8 PM Eastern`);
+          }
+        }).catch((error: any) => {
+          console.error('❌ Failed to auto-close production employee shifts:', error);
+        });
+      }, 60 * 1000);
+
       resolve(undefined);
     }).on('error', (error) => {
       console.error('❌ Failed to start HTTP server:', error);

@@ -31,6 +31,25 @@ function getLocalISOString(date: Date = new Date()): string {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}`;
 }
 
+function getEasternClockParts(date: Date = new Date()): { date: string; hour: number } {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date).reduce<Record<string, string>>((values, part) => {
+    values[part.type] = part.value;
+    return values;
+  }, {});
+
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    hour: Number(parts.hour),
+  };
+}
+
 function normalizeAnalyticsDateRange(startDate?: string, endDate?: string): { start: string; end: string } {
   const now = new Date();
 
@@ -2624,6 +2643,26 @@ export class DatabaseService implements IDatabaseService {
     `).all(targetDate) as any[];
   }
 
+  autoCloseProductionEmployeeShiftsAtCutoff(): number {
+    const eastern = getEasternClockParts();
+    if (eastern.hour < 20) return 0;
+
+    const now = getLocalISOString();
+    const result = this.db.prepare(`
+      UPDATE department_employee_shifts
+      SET status = 'completed',
+          endTime = ?,
+          endedBy = 'System (8 PM Eastern auto-close)',
+          notes = CASE
+            WHEN notes IS NULL OR notes = '' THEN 'Automatically closed at 8 PM Eastern.'
+            ELSE notes || ' Automatically closed at 8 PM Eastern.'
+          END
+      WHERE date = ? AND department = 'production' AND status = 'active'
+    `).run(now, eastern.date);
+
+    return result.changes;
+  }
+
   getKioskEmployees(includeInactive: boolean = false): any[] {
     if (includeInactive) {
       return this.db.prepare(`
@@ -5010,6 +5049,7 @@ export class DatabaseService implements IDatabaseService {
       { name: 'Michelle', pin: '57263', role: 'executive' },
       { name: 'Izzy', pin: '69384', role: 'executive' },
       { name: 'John', pin: '78420', role: 'executive' },
+      { name: 'Anthony Palma', pin: '24186', role: 'executive' },
       { name: 'Ryan', pin: '34090', role: 'executive' },
       { name: 'Victor Roman', pin: '86214', role: 'executive' },
       { name: 'Erasmo Sanchez', pin: '97531', role: 'executive' },

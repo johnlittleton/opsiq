@@ -15,6 +15,7 @@ interface WorkOrderRecord {
   labor?: number | null;
   completedCases?: number | null;
   elapsedMs?: number | null;
+  elapsedDisplay?: string | null;
   status?: string | null;
   salesOrder?: string | null;
   salesOrderNumber?: string | null;
@@ -48,6 +49,19 @@ const formatDate = (value: string) => {
 
 const formatCurrency = (value: number) =>
   value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+
+const getCompletedHours = (workOrder: WorkOrderRecord) => {
+  const display = String(workOrder.elapsedDisplay || '').trim();
+  const parts = display.split(':').map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    const [hours, minutes, seconds] = parts;
+    if (hours >= 0 && minutes >= 0 && minutes < 60 && seconds >= 0 && seconds < 60) {
+      return hours + minutes / 60 + seconds / 3600;
+    }
+  }
+
+  return Math.max(0, Number(workOrder.elapsedMs || 0)) / 3600000;
+};
 
 const WOLaborCostHistory: React.FC = () => {
   const navigate = useNavigate();
@@ -99,7 +113,7 @@ const WOLaborCostHistory: React.FC = () => {
         const workOrderNumber = String(workOrder.workOrder || workOrder.workOrderNumber || workOrder.id || '--');
         const salesOrder = String(workOrder.salesOrder || workOrder.salesOrderNumber || workOrder.id || '--');
         const headcount = Number(workOrder.labor || 0);
-        const actualHours = Math.max(0, Number(workOrder.elapsedMs || 0)) / 3600000;
+        const actualHours = getCompletedHours(workOrder);
 
         return {
           date: workOrder.date,
