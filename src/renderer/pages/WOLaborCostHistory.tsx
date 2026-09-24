@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import './WOLaborCostHistory.css';
 
 const PRODUCTION_HOURLY_RATE = 24.5;
+const MAX_REASONABLE_COMPLETED_HOURS = 24;
 
 interface WorkOrderRecord {
   id: string;
@@ -127,6 +128,7 @@ const WOLaborCostHistory: React.FC = () => {
           costPerCase: 0,
         };
       })
+      .filter((row) => row.actualHours <= MAX_REASONABLE_COMPLETED_HOURS)
       .map((row) => ({
         ...row,
         costPerCase: row.casesProduced > 0 ? row.laborCost / row.casesProduced : 0,
