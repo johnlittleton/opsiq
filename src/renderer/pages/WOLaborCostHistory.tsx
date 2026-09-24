@@ -7,6 +7,7 @@ import './WOLaborCostHistory.css';
 
 const PRODUCTION_HOURLY_RATE = 24.5;
 const PRODUCTION_WINDOW_HOURS = 11;
+const ESU_MAX_HEADCOUNT = 10;
 const MAX_REASONABLE_COMPLETED_HOURS = 14;
 
 interface WorkOrderRecord {
@@ -155,7 +156,9 @@ const WOLaborCostHistory: React.FC = () => {
       .map((workOrder) => {
         const workOrderNumber = String(workOrder.workOrder || workOrder.workOrderNumber || workOrder.id || '--');
         const salesOrder = String(workOrder.salesOrder || workOrder.salesOrderNumber || workOrder.id || '--');
-        const headcount = Number(workOrder.labor || 0);
+        const headcount = workOrder.id.toUpperCase().startsWith('ESU')
+          ? Math.min(ESU_MAX_HEADCOUNT, Number(workOrder.labor || 0))
+          : Number(workOrder.labor || 0);
           const casesProduced = Number(workOrder.completedCases || 0);
           const dailyCases = casesByDate[workOrder.date] || casesProduced;
           const actualHours = (productionLaborHoursByDate[workOrder.date] || PRODUCTION_WINDOW_HOURS)
