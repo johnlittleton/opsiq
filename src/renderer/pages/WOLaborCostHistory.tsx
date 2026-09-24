@@ -169,7 +169,7 @@ const WOLaborCostHistory: React.FC = () => {
           casesProduced,
           headcount,
           actualHours,
-          laborCost: actualHours * headcount * PRODUCTION_HOURLY_RATE,
+          laborCost: actualHours * PRODUCTION_HOURLY_RATE,
           costPerCase: 0,
         };
       })
