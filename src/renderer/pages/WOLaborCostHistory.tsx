@@ -8,6 +8,17 @@ import './WOLaborCostHistory.css';
 const PRODUCTION_HOURLY_RATE = 24.5;
 const ESU_MAX_HEADCOUNT = 10;
 const MAX_REASONABLE_COMPLETED_HOURS = 11;
+const LINE_NAMES: Record<number, string> = {
+  1: 'Giro Line 1',
+  2: 'Giro Line 2',
+  3: 'Giro Line 3',
+  4: 'Giro Line 4',
+  5: 'Giro Line 5',
+  6: 'Giro Line 6',
+  7: 'HP7',
+  8: 'RG1',
+  9: 'RG2',
+};
 
 interface WorkOrderRecord {
   id: string;
@@ -54,6 +65,8 @@ const formatDate = (value: string) => {
 
 const formatCurrency = (value: number) =>
   value.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+
+const getLineName = (line: number | null) => line === null ? '--' : LINE_NAMES[line] || `Line ${line}`;
 
 const getCompletedHours = (workOrder: WorkOrderRecord) => {
   const display = String(workOrder.elapsedDisplay || '').trim();
@@ -145,7 +158,7 @@ const WOLaborCostHistory: React.FC = () => {
       }))
       .filter((row) => {
         if (!search) return true;
-        return [row.workOrder, row.salesOrder, row.customer, row.commodity, row.line?.toString() || '', row.date]
+        return [row.workOrder, row.salesOrder, row.customer, row.commodity, getLineName(row.line), row.line?.toString() || '', row.date]
           .some((value) => value.toLowerCase().includes(search));
       })
       .sort((a, b) => b.date.localeCompare(a.date) || a.workOrder.localeCompare(b.workOrder));
@@ -219,7 +232,7 @@ const WOLaborCostHistory: React.FC = () => {
                   <tr><td colSpan={11} className="wo-labor-cost-message">No completed production orders found for this selection.</td></tr>
                 ) : rows.map((row) => (
                   <tr key={`${row.date}-${row.workOrder}`}>
-                    <td>{formatDate(row.date)}</td><td>{row.workOrder}</td><td>{row.salesOrder}</td><td>{row.customer}</td><td>Line {row.line ?? '--'}</td><td>{row.commodity}</td>
+                    <td>{formatDate(row.date)}</td><td>{row.workOrder}</td><td>{row.salesOrder}</td><td>{row.customer}</td><td>{getLineName(row.line)}</td><td>{row.commodity}</td>
                     <td className="numeric">{row.casesProduced.toLocaleString()}</td><td className="numeric">{row.headcount.toLocaleString()}</td>
                     <td className="numeric">{row.actualHours.toFixed(2)}</td><td className="numeric">{formatCurrency(row.laborCost)}</td>
                     <td className="numeric">{formatCurrency(row.costPerCase)}</td>
