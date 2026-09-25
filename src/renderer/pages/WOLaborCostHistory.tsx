@@ -6,9 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import './WOLaborCostHistory.css';
 
 const PRODUCTION_HOURLY_RATE = 24.5;
-const PRODUCTION_WINDOW_HOURS = 11;
 const ESU_MAX_HEADCOUNT = 10;
-const MAX_REASONABLE_COMPLETED_HOURS = 14;
+const MAX_REASONABLE_COMPLETED_HOURS = 11;
 
 interface WorkOrderRecord {
   id: string;
@@ -24,18 +23,15 @@ interface WorkOrderRecord {
   salesOrderNumber?: string | null;
   workOrder?: string | null;
   workOrderNumber?: string | null;
-}
-
-interface ProductionShiftRecord {
-  status?: string | null;
-  startTime?: string | null;
-  endTime?: string | null;
+  line?: number | null;
 }
 
 interface LaborCostRow {
   date: string;
   workOrder: string;
   salesOrder: string;
+  customer: string;
+  line: number | null;
   commodity: string;
   casesProduced: number;
   headcount: number;
@@ -81,7 +77,6 @@ const WOLaborCostHistory: React.FC = () => {
     endDate: today,
   });
   const [workOrders, setWorkOrders] = useState<WorkOrderRecord[]>([]);
-  const [productionLaborHoursByDate, setProductionLaborHoursByDate] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,34 +99,6 @@ const WOLaborCostHistory: React.FC = () => {
         const payload = await response.json();
         setWorkOrders(Array.isArray(payload) ? payload : []);
 
-        const dates: string[] = [];
-        const cursor = new Date(`${dateRange.startDate}T00:00:00`);
-        const rangeEnd = new Date(`${dateRange.endDate}T00:00:00`);
-        while (cursor <= rangeEnd) {
-          dates.push(getLocalDateString(cursor));
-          cursor.setDate(cursor.getDate() + 1);
-        }
-
-        const clippedHours = await Promise.all(dates.map(async (date) => {
-          const shiftResponse = await fetch(`${API_BASE}/api/labor/employees/shifts?date=${date}&department=production`);
-          if (!shiftResponse.ok) return [date, 0] as const;
-
-          const shifts = await shiftResponse.json() as ProductionShiftRecord[];
-          const windowStart = new Date(`${date}T07:00:00`).getTime();
-          const windowEnd = new Date(`${date}T18:00:00`).getTime();
-          const hours = shifts
-            .filter((shift) => shift.status === 'completed' && shift.startTime && shift.endTime)
-            .reduce((total, shift) => {
-              const start = Math.max(new Date(shift.startTime as string).getTime(), windowStart);
-              const end = Math.min(new Date(shift.endTime as string).getTime(), windowEnd);
-              return total + Math.max(0, end - start) / 3600000;
-            }, 0);
-
-          return [date, hours] as const;
-        }));
-
-        setProductionLaborHoursByDate(Object.fromEntries(clippedHours));
-
       } catch (loadError: any) {
         setWorkOrders([]);
         setError(loadError.message || 'Unable to load work order history.');
@@ -146,47 +113,43 @@ const WOLaborCostHistory: React.FC = () => {
   const rows = useMemo<LaborCostRow[]>(() => {
     const search = searchTerm.trim().toLowerCase();
 
-    const completedOrders = workOrders.filter((workOrder) => workOrder.status === 'Completed' && Number(workOrder.completedCases || 0) > 0);
-    const casesByDate = completedOrders.reduce<Record<string, number>>((totalsByDate, workOrder) => {
-      totalsByDate[workOrder.date] = (totalsByDate[workOrder.date] || 0) + Number(workOrder.completedCases || 0);
-      return totalsByDate;
-    }, {});
-
-    return completedOrders
+    return workOrders
+      .filter((workOrder) => workOrder.status === 'Completed' && Number(workOrder.completedCases || 0) > 0)
       .map((workOrder) => {
         const workOrderNumber = String(workOrder.workOrder || workOrder.workOrderNumber || workOrder.id || '--');
         const salesOrder = String(workOrder.salesOrder || workOrder.salesOrderNumber || workOrder.id || '--');
         const headcount = workOrder.id.toUpperCase().startsWith('ESU')
           ? Math.min(ESU_MAX_HEADCOUNT, Number(workOrder.labor || 0))
           : Number(workOrder.labor || 0);
-          const casesProduced = Number(workOrder.completedCases || 0);
-          const dailyCases = casesByDate[workOrder.date] || casesProduced;
-          const actualHours = (productionLaborHoursByDate[workOrder.date] || PRODUCTION_WINDOW_HOURS)
-            * (casesProduced / dailyCases);
+        const casesProduced = Number(workOrder.completedCases || 0);
+        const actualHours = getCompletedHours(workOrder);
 
         return {
           date: workOrder.date,
           workOrder: workOrderNumber,
           salesOrder,
+          customer: String(workOrder.customer || '--'),
+          line: Number.isFinite(Number(workOrder.line)) ? Number(workOrder.line) : null,
           commodity: String(workOrder.product || '--'),
           casesProduced,
           headcount,
           actualHours,
-          laborCost: actualHours * PRODUCTION_HOURLY_RATE,
+          laborCost: actualHours * headcount * PRODUCTION_HOURLY_RATE,
           costPerCase: 0,
         };
       })
+      .filter((row) => row.actualHours <= MAX_REASONABLE_COMPLETED_HOURS)
       .map((row) => ({
         ...row,
         costPerCase: row.casesProduced > 0 ? row.laborCost / row.casesProduced : 0,
       }))
       .filter((row) => {
         if (!search) return true;
-        return [row.workOrder, row.salesOrder, row.commodity, row.date]
+        return [row.workOrder, row.salesOrder, row.customer, row.commodity, row.line?.toString() || '', row.date]
           .some((value) => value.toLowerCase().includes(search));
       })
       .sort((a, b) => b.date.localeCompare(a.date) || a.workOrder.localeCompare(b.workOrder));
-  }, [productionLaborHoursByDate, searchTerm, workOrders]);
+  }, [searchTerm, workOrders]);
 
   const totals = useMemo(() => rows.reduce(
     (summary, row) => ({
@@ -228,7 +191,7 @@ const WOLaborCostHistory: React.FC = () => {
         <section className="wo-labor-cost-controls" aria-label="Report filters">
           <label>Start Date<input type="date" value={dateRange.startDate} onChange={(event) => setDateRange({ ...dateRange, startDate: event.target.value })} /></label>
           <label>End Date<input type="date" value={dateRange.endDate} onChange={(event) => setDateRange({ ...dateRange, endDate: event.target.value })} /></label>
-          <label className="wo-labor-cost-search">Search<input type="search" placeholder="WO, sales order, commodity, or date" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></label>
+          <label className="wo-labor-cost-search">Search<input type="search" placeholder="WO, customer, line, commodity, or date" value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} /></label>
         </section>
 
         <section className="wo-labor-cost-summary" aria-label="Report totals">
@@ -245,18 +208,18 @@ const WOLaborCostHistory: React.FC = () => {
             <table>
               <thead>
                 <tr>
-                  <th>Date</th><th>Work Order</th><th>Sales Order</th><th>Commodity</th>
+                  <th>Date</th><th>Work Order</th><th>Sales Order</th><th>Customer</th><th>Line</th><th>Commodity</th>
                   <th>Cases Produced</th><th>Headcount</th><th>Actual Hours</th><th>Labor Cost</th><th>Cost Per Case</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} className="wo-labor-cost-message">Loading historical work orders...</td></tr>
+                  <tr><td colSpan={11} className="wo-labor-cost-message">Loading historical work orders...</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={9} className="wo-labor-cost-message">No completed production orders found for this selection.</td></tr>
+                  <tr><td colSpan={11} className="wo-labor-cost-message">No completed production orders found for this selection.</td></tr>
                 ) : rows.map((row) => (
                   <tr key={`${row.date}-${row.workOrder}`}>
-                    <td>{formatDate(row.date)}</td><td>{row.workOrder}</td><td>{row.salesOrder}</td><td>{row.commodity}</td>
+                    <td>{formatDate(row.date)}</td><td>{row.workOrder}</td><td>{row.salesOrder}</td><td>{row.customer}</td><td>Line {row.line ?? '--'}</td><td>{row.commodity}</td>
                     <td className="numeric">{row.casesProduced.toLocaleString()}</td><td className="numeric">{row.headcount.toLocaleString()}</td>
                     <td className="numeric">{row.actualHours.toFixed(2)}</td><td className="numeric">{formatCurrency(row.laborCost)}</td>
                     <td className="numeric">{formatCurrency(row.costPerCase)}</td>
@@ -265,7 +228,7 @@ const WOLaborCostHistory: React.FC = () => {
               </tbody>
               <tfoot>
                 <tr>
-                  <th colSpan={4}>Filtered Totals</th><th>{totals.casesProduced.toLocaleString()}</th><th>{totals.headcount.toLocaleString()}</th>
+                  <th colSpan={6}>Filtered Totals</th><th>{totals.casesProduced.toLocaleString()}</th><th>{totals.headcount.toLocaleString()}</th>
                   <th>{totals.actualHours.toFixed(2)}</th><th>{formatCurrency(totals.laborCost)}</th><th>{formatCurrency(totalCostPerCase)}</th>
                 </tr>
               </tfoot>

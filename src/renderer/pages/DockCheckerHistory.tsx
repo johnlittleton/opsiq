@@ -100,6 +100,43 @@ export default function DockCheckerHistory() {
     return [remote];
   };
 
+  const downloadImage = async (image: HistoryImage, imageNumber: number, rowKey: string) => {
+    const candidates = getImageCandidates(image.url);
+    const imageKey = `${rowKey}-${image.url}-${imageNumber - 1}`;
+    const source = imageSrcOverrides[imageKey] || candidates[0];
+    if (!source) return;
+
+    const fileName = image.fileName || `dock-photo-${imageNumber}.jpg`;
+    try {
+      const response = await fetch(source);
+      if (!response.ok) throw new Error('Photo download failed');
+      const data = Array.from(new Uint8Array(await response.arrayBuffer()));
+
+      if (window.electronAPI?.saveDockCheckerPhoto) {
+        await window.electronAPI.saveDockCheckerPhoto({ fileName, data });
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(new Blob([new Uint8Array(data)]));
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      console.warn('Photo download failed:', error);
+      window.open(source, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const downloadAllImages = async (images: HistoryImage[], rowKey: string) => {
+    for (let index = 0; index < images.length; index += 1) {
+      await downloadImage(images[index], index + 1, rowKey);
+    }
+  };
+
   const loadHistory = async () => {
     setLoading(true);
     try {
@@ -242,6 +279,13 @@ export default function DockCheckerHistory() {
 
                   {Array.isArray(entry.imagePaths) && entry.imagePaths.length > 0 && (
                     <div className="dock-checker-history__images">
+                      <button
+                        type="button"
+                        className="dock-checker-page__home-btn"
+                        onClick={() => void downloadAllImages(entry.imagePaths, rowKey)}
+                      >
+                        Download All Photos
+                      </button>
                       {entry.imagePaths.map((image: HistoryImage, index: number) => {
                         const imageKey = `${rowKey}-${image.url}-${index}`;
                         const candidates = getImageCandidates(image.url);
@@ -261,6 +305,16 @@ export default function DockCheckerHistory() {
                             />
                             <span className="dock-checker-history__thumb-name">Image {index + 1}</span>
                             <span className="dock-checker-history__thumb-time">{formatThumbUploadTime(image)}</span>
+                            <button
+                              type="button"
+                              className="dock-checker-history__details-btn"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void downloadImage(image, index + 1, rowKey);
+                              }}
+                            >
+                              Download
+                            </button>
                           </div>
                         );
                       })}

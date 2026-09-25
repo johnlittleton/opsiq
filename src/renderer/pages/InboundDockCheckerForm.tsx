@@ -173,6 +173,17 @@ export default function InboundDockCheckerForm() {
     return date.toLocaleString();
   };
 
+  const savePhotoLocally = async (file: File) => {
+    if (!window.electronAPI?.saveDockCheckerPhoto) return;
+
+    try {
+      const data = Array.from(new Uint8Array(await file.arrayBuffer()));
+      await window.electronAPI.saveDockCheckerPhoto({ fileName: file.name, data });
+    } catch (error) {
+      console.warn('Local Dock Checker photo backup failed:', error);
+    }
+  };
+
   const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -181,6 +192,7 @@ export default function InboundDockCheckerForm() {
     try {
       const uploadedItems: UploadedImage[] = [];
       for (const file of files) {
+        await savePhotoLocally(file);
         const uploaded = await apiClient.uploadDockCheckerImage(file);
         const fileName = String(uploaded.filename || uploaded.url.split('/').pop() || 'image');
         uploadedItems.push({
@@ -250,6 +262,7 @@ export default function InboundDockCheckerForm() {
   const handleCameraCapture = async (file: File) => {
     setUploading(true);
     try {
+      await savePhotoLocally(file);
       const uploaded = await apiClient.uploadDockCheckerImage(file);
       const fileName = String(uploaded.filename || uploaded.url.split('/').pop() || 'image');
       setUploadedImages((current) => [

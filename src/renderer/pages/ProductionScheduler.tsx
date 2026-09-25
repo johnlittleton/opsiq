@@ -23,7 +23,8 @@ const LINES = [
 
 const TIME_SLOTS = ['08:00-10:00', '10:00-12:00', '12:00-14:00', '14:00-16:00', '16:00-18:00'];
 
-const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Argentina', 'Dry Inventory'];
+const CONVENTIONAL_COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Argentina', 'Dry Inventory'];
+const ORGANIC_COMMODITIES = CONVENTIONAL_COMMODITIES.map((commodity) => `Organic ${commodity}`);
 const BAG_SIZES = ['4X5', '4X8', '5X6', '5X8', '6X3', '6X5', '7X4', '8CT', '8X5', '9X3', '10X3', '10X4', '12X3', '15X2', '15KG', '17X2', '17KG', '18X2', '18KG'];
 const CUSTOMERS = ['Kings River', 'Sunkist', 'ESU', 'Fresh Taste', 'Four Star', 'SAFCO', 'Vanguard', 'SlingShot', 'Produce Depot', 'Buffalo Repack', 'Burnack'];
 const PRIORITIES = ['High', 'Normal', 'Low'];
@@ -1708,7 +1709,16 @@ export default function ProductionScheduler() {
                     onChange={(e) => setEditingWorkOrder({ ...editingWorkOrder, product: e.target.value })}
                   >
                     <option value="">Select...</option>
-                    {COMMODITIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    <optgroup label="Conventional">
+                      {CONVENTIONAL_COMMODITIES.map((commodity) => (
+                        <option key={commodity} value={commodity}>{commodity}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Organic">
+                      {ORGANIC_COMMODITIES.map((commodity) => (
+                        <option key={commodity} value={commodity}>{commodity}</option>
+                      ))}
+                    </optgroup>
                   </select>
                 </div>
                 <div className="form-group">

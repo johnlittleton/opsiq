@@ -379,6 +379,16 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+ipcMain.handle('save-dock-checker-photo', async (_event, payload: { fileName: string; data: number[] }) => {
+  const safeFileName = String(payload?.fileName || `dock-photo-${Date.now()}.jpg`)
+    .replace(/[^a-zA-Z0-9._-]/g, '_');
+  const folder = path.join(app.getPath('downloads'), 'OpsIQ', 'Dock Checker');
+  await fs.promises.mkdir(folder, { recursive: true });
+  const filePath = path.join(folder, safeFileName);
+  await fs.promises.writeFile(filePath, Buffer.from(payload.data || []));
+  return { success: true, filePath };
+});
+
 ipcMain.handle('get-settings', () => {
   return loadSettings();
 });
