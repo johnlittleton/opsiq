@@ -77,6 +77,7 @@ export default function DockCheckerHistory() {
   const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [imageSrcOverrides, setImageSrcOverrides] = useState<Record<string, string>>({});
+  const [downloadMessage, setDownloadMessage] = useState('');
 
   const getImageCandidates = (rawUrl: string): string[] => {
     const trimmed = String(rawUrl || '').trim();
@@ -100,40 +101,64 @@ export default function DockCheckerHistory() {
     return [remote];
   };
 
-  const downloadImage = async (image: HistoryImage, imageNumber: number, rowKey: string) => {
+  const downloadImage = async (image: HistoryImage, imageNumber: number, rowKey: string, reveal = true): Promise<string | null> => {
     const candidates = getImageCandidates(image.url);
     const imageKey = `${rowKey}-${image.url}-${imageNumber - 1}`;
     const source = imageSrcOverrides[imageKey] || candidates[0];
-    if (!source) return;
+    if (!source) return null;
 
-    const fileName = image.fileName || `dock-photo-${imageNumber}.jpg`;
+    const baseName = image.fileName || image.url.split('/').pop() || `dock-photo-${imageNumber}`;
+    const fileName = /\.(jpe?g|png|webp|gif|heic)$/i.test(baseName) ? baseName : `${baseName}.jpg`;
     try {
       const response = await fetch(source);
-      if (!response.ok) throw new Error('Photo download failed');
-      const data = Array.from(new Uint8Array(await response.arrayBuffer()));
+      if (!response.ok) throw new Error(`Photo download failed (${response.status})`);
+      const buffer = await response.arrayBuffer();
 
       if (window.electronAPI?.saveDockCheckerPhoto) {
-        await window.electronAPI.saveDockCheckerPhoto({ fileName, data });
-        return;
+        const result = await window.electronAPI.saveDockCheckerPhoto({
+          fileName,
+          data: Array.from(new Uint8Array(buffer)),
+          reveal,
+        });
+        return result?.filePath || fileName;
       }
 
-      const objectUrl = URL.createObjectURL(new Blob([new Uint8Array(data)]));
+      const objectUrl = URL.createObjectURL(new Blob([buffer], { type: response.headers.get('content-type') || 'image/jpeg' }));
       const link = document.createElement('a');
       link.href = objectUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(objectUrl);
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      return fileName;
     } catch (error) {
       console.warn('Photo download failed:', error);
-      window.open(source, '_blank', 'noopener,noreferrer');
+      setDownloadMessage(`Download failed for Image ${imageNumber}.`);
+      return null;
     }
   };
 
+  const downloadSingleImage = async (image: HistoryImage, imageNumber: number, rowKey: string) => {
+    setDownloadMessage(`Downloading Image ${imageNumber}...`);
+    const saved = await downloadImage(image, imageNumber, rowKey);
+    if (saved) setDownloadMessage(`Saved Image ${imageNumber} to ${saved}`);
+  };
+
   const downloadAllImages = async (images: HistoryImage[], rowKey: string) => {
+    setDownloadMessage(`Downloading ${images.length} photo(s)...`);
+    let savedCount = 0;
+    let lastSaved: string | null = null;
     for (let index = 0; index < images.length; index += 1) {
-      await downloadImage(images[index], index + 1, rowKey);
+      const saved = await downloadImage(images[index], index + 1, rowKey, index === images.length - 1);
+      if (saved) {
+        savedCount += 1;
+        lastSaved = saved;
+      }
+    }
+    if (savedCount > 0) {
+      const folder = lastSaved && /[\\/]/.test(lastSaved) ? lastSaved.replace(/[\\/][^\\/]*$/, '') : 'Downloads';
+      setDownloadMessage(`Saved ${savedCount} of ${images.length} photo(s) to ${folder}`);
     }
   };
 
@@ -230,6 +255,12 @@ export default function DockCheckerHistory() {
         </button>
       </div>
 
+      {downloadMessage && (
+        <div className="dock-checker-history__download-status" onClick={() => setDownloadMessage('')}>
+          {downloadMessage}
+        </div>
+      )}
+
       <div className="dock-checker-history__list">
         {normalizedRows.length === 0 && !loading && (
           <div className="dock-checker-history__item">No dock checker forms found for this filter.</div>
@@ -282,7 +313,10 @@ export default function DockCheckerHistory() {
                       <button
                         type="button"
                         className="dock-checker-page__home-btn"
-                        onClick={() => void downloadAllImages(entry.imagePaths, rowKey)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void downloadAllImages(entry.imagePaths, rowKey);
+                        }}
                       >
                         Download All Photos
                       </button>
@@ -310,7 +344,7 @@ export default function DockCheckerHistory() {
                               className="dock-checker-history__details-btn"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                void downloadImage(image, index + 1, rowKey);
+                                void downloadSingleImage(image, index + 1, rowKey);
                               }}
                             >
                               Download

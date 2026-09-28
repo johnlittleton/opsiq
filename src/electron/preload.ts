@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('updater-status', listener);
   },
   restartApp: () => ipcRenderer.send('restart-app'),
-  saveDockCheckerPhoto: (payload: { fileName: string; data: number[] }) =>
+  saveDockCheckerPhoto: (payload: { fileName: string; data: number[]; reveal?: boolean }) =>
     ipcRenderer.invoke('save-dock-checker-photo', payload),
 });
 
