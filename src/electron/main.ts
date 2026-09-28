@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, shell, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import path from 'path';
 import fs from 'fs';
@@ -379,9 +379,25 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
-ipcMain.handle('save-dock-checker-photo', async (_event, payload: { fileName: string; data: number[]; reveal?: boolean }) => {
+ipcMain.handle('save-dock-checker-photo', async (event, payload: { fileName: string; data: number[]; reveal?: boolean; saveAs?: boolean }) => {
   const safeFileName = String(payload?.fileName || `dock-photo-${Date.now()}.jpg`)
     .replace(/[^a-zA-Z0-9._-]/g, '_');
+
+  if (payload?.saveAs) {
+    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+    const options = {
+      title: 'Save Dock Checker Photo',
+      defaultPath: path.join(app.getPath('downloads'), safeFileName),
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic'] }],
+    };
+    const result = ownerWindow
+      ? await dialog.showSaveDialog(ownerWindow, options)
+      : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return { success: false, canceled: true };
+    await fs.promises.writeFile(result.filePath, Buffer.from(payload.data || []));
+    return { success: true, filePath: result.filePath };
+  }
+
   const folder = path.join(app.getPath('downloads'), 'OpsIQ', 'Dock Checker');
   await fs.promises.mkdir(folder, { recursive: true });
   const filePath = path.join(folder, safeFileName);

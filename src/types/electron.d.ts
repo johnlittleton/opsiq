@@ -11,7 +11,7 @@ export interface IElectronAPI {
     message?: string;
   }) => void) => (() => void);
   restartApp?: () => void;
-  saveDockCheckerPhoto?: (payload: { fileName: string; data: number[]; reveal?: boolean }) => Promise<{ success: boolean; filePath?: string }>;
+  saveDockCheckerPhoto?: (payload: { fileName: string; data: number[]; reveal?: boolean; saveAs?: boolean }) => Promise<{ success: boolean; filePath?: string; canceled?: boolean }>;
 }
 
 export interface IElectron {

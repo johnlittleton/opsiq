@@ -101,7 +101,12 @@ export default function DockCheckerHistory() {
     return [remote];
   };
 
-  const downloadImage = async (image: HistoryImage, imageNumber: number, rowKey: string, reveal = true): Promise<string | null> => {
+  const downloadImage = async (
+    image: HistoryImage,
+    imageNumber: number,
+    rowKey: string,
+    options: { reveal?: boolean; saveAs?: boolean } = {},
+  ): Promise<string | null> => {
     const candidates = getImageCandidates(image.url);
     const imageKey = `${rowKey}-${image.url}-${imageNumber - 1}`;
     const source = imageSrcOverrides[imageKey] || candidates[0];
@@ -118,8 +123,10 @@ export default function DockCheckerHistory() {
         const result = await window.electronAPI.saveDockCheckerPhoto({
           fileName,
           data: Array.from(new Uint8Array(buffer)),
-          reveal,
+          reveal: options.reveal,
+          saveAs: options.saveAs,
         });
+        if (result?.canceled) return null;
         return result?.filePath || fileName;
       }
 
@@ -141,8 +148,11 @@ export default function DockCheckerHistory() {
 
   const downloadSingleImage = async (image: HistoryImage, imageNumber: number, rowKey: string) => {
     setDownloadMessage(`Downloading Image ${imageNumber}...`);
-    const saved = await downloadImage(image, imageNumber, rowKey);
-    if (saved) setDownloadMessage(`Saved Image ${imageNumber} to ${saved}`);
+    const saved = await downloadImage(image, imageNumber, rowKey, { saveAs: true });
+    setDownloadMessage((current) => {
+      if (saved) return `Saved Image ${imageNumber} to ${saved}`;
+      return current.startsWith('Downloading') ? '' : current;
+    });
   };
 
   const downloadAllImages = async (images: HistoryImage[], rowKey: string) => {
@@ -150,7 +160,7 @@ export default function DockCheckerHistory() {
     let savedCount = 0;
     let lastSaved: string | null = null;
     for (let index = 0; index < images.length; index += 1) {
-      const saved = await downloadImage(images[index], index + 1, rowKey, index === images.length - 1);
+      const saved = await downloadImage(images[index], index + 1, rowKey, { reveal: index === images.length - 1 });
       if (saved) {
         savedCount += 1;
         lastSaved = saved;

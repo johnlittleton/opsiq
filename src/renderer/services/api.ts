@@ -415,10 +415,15 @@ class ApiClient {
     let workersCount = 0;
 
     workOrders.forEach((wo) => {
+      const display = String((wo as any).elapsedDisplay || '').trim().split(':').map(Number);
+      const hours = display.length === 3 && display.every(Number.isFinite) && display[1] < 60 && display[2] < 60
+        ? display[0] + display[1] / 60 + display[2] / 3600
+        : Math.max(0, wo.elapsedMs || 0) / 3600000;
+      // Skip corrupted timers so they don't skew totals
+      if (hours > 11) return;
       const cases = wo.completedCases || 0;
       const bags = cases * this.parseBagsPerCase(wo.bagSize);
-      const minutes = (wo.elapsedMs || 0) / (1000 * 60);
-      const hours = minutes / 60;
+      const minutes = hours * 60;
       const workers = wo.labor || 0;
       const laborHours = workers * hours;
       const laborCost = laborHours * averageProductionWage;

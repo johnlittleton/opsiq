@@ -89,6 +89,18 @@ export class DatabaseService implements IDatabaseService {
   private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
   private static readonly DEFAULT_SR_HOURLY_WAGE = 27;
   private static readonly PROD_COST_KPI_PER_CASE = 1.25;
+  private static readonly MAX_REASONABLE_WORK_ORDER_HOURS = 11;
+
+  private static getWorkOrderCompletedHours(wo: any): number {
+    const parts = String(wo.elapsedDisplay || '').trim().split(':').map(Number);
+    if (parts.length === 3 && parts.every(Number.isFinite)) {
+      const [hours, minutes, seconds] = parts;
+      if (hours >= 0 && minutes >= 0 && minutes < 60 && seconds >= 0 && seconds < 60) {
+        return hours + minutes / 60 + seconds / 3600;
+      }
+    }
+    return Math.max(0, Number(wo.elapsedMs || 0)) / 3600000;
+  }
   private static readonly PACK_MANAGER_ANNUAL_SALARY = 135000;
   private static readonly ASSISTANT_PACK_MANAGER_ANNUAL_SALARY = 75000;
   private static readonly ANNUAL_WORK_HOURS = 2080;
@@ -4328,9 +4340,9 @@ export class DatabaseService implements IDatabaseService {
     }> = {};
 
     workOrders.forEach(wo => {
-      // Calculate labor cost for this work order
-      // labor = number of workers, elapsedMs = time spent
-      const timeHours = (wo.elapsedMs || 0) / (1000 * 60 * 60);
+      // labor = number of workers; skip corrupted timers so they don't skew totals
+      const timeHours = DatabaseService.getWorkOrderCompletedHours(wo);
+      if (timeHours > DatabaseService.MAX_REASONABLE_WORK_ORDER_HOURS) return;
       const directLaborCost = (wo.labor || 0) * timeHours * PROD_HOURLY_WAGE;
       const supportLaborCost =
         supportWorkersPerLine * timeHours * PROD_HOURLY_WAGE +
