@@ -36,11 +36,14 @@ const PalletInventoryHistory: React.FC = () => {
   const [pallets, setPallets] = useState<InventoryPallet[]>([]);
   const [events, setEvents] = useState<InventoryEvent[]>([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [refreshToken, setRefreshToken] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const loadHistory = async () => {
+      if (!updatedAt) setLoading(true);
       try {
         const params = new URLSearchParams();
         if (search.trim()) params.set('search', search.trim());
@@ -56,6 +59,8 @@ const PalletInventoryHistory: React.FC = () => {
         setError('');
       } catch (loadError: any) {
         if (!cancelled) setError(loadError?.message || 'Could not load pallet history');
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -65,7 +70,7 @@ const PalletInventoryHistory: React.FC = () => {
       cancelled = true;
       window.clearInterval(refreshId);
     };
-  }, [search]);
+  }, [search, refreshToken]);
 
   const formatLocation = (pallet: InventoryPallet) => pallet.locationType === 'RECEIVING'
     ? 'Receiving'
@@ -80,17 +85,24 @@ const PalletInventoryHistory: React.FC = () => {
     groups.set(customer, [...(groups.get(customer) || []), pallet]);
     return groups;
   }, new Map<string, InventoryPallet[]>())).sort(([first], [second]) => first.localeCompare(second));
+  const visibleEvents = events.filter((event) => {
+    const query = search.trim().toLowerCase();
+    return !query || [event.customer || 'Unassigned', event.palletTag, event.action, event.fromLocation, event.toLocation, event.referenceNumber, event.scannedBy]
+      .some((value) => String(value || '').toLowerCase().includes(query));
+  });
 
   return (
     <div className="pallet-tracker-page pallet-history-page">
       <TitleBar showLegend={false} />
-      <div className="pallet-tracker-container">
+      <main className="pallet-tracker-container pallet-history-container">
         <header className="pallet-tracker-header">
           <div>
-            <h1>Pallet History</h1>
-            <p>{updatedAt ? `Live inventory updated ${updatedAt.toLocaleTimeString()}` : 'Loading live inventory'}</p>
+            <p className="pallet-history-eyebrow">Inventory Control</p>
+            <h1>Pallet History &amp; Live Inventory</h1>
+            <p>{updatedAt ? `Live feed updated ${updatedAt.toLocaleTimeString()}` : 'Connecting to the live pallet inventory feed'}</p>
           </div>
           <div className="pallet-tracker-header-actions">
+            <button className="summary-btn" onClick={() => setRefreshToken((token) => token + 1)} disabled={loading}>Refresh</button>
             <button className="nav-btn" onClick={() => navigate('/pallet-tracker')}>Pallet Inventory</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
             <button className="logout-btn" onClick={logout}>Logout</button>
@@ -101,17 +113,40 @@ const PalletInventoryHistory: React.FC = () => {
           Search customer, pallet tag, location, sales order, or pick ticket
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search all pallet transactions" />
         </label>
-        {error && <div className="error-message" role="alert">{error}</div>}
+        {error && (
+          <div className="pallet-history-error" role="alert">
+            <div><strong>Inventory feed unavailable</strong><span>{error}</span></div>
+            <button type="button" onClick={() => setRefreshToken((token) => token + 1)}>Retry</button>
+          </div>
+        )}
 
-        <section className="pallet-history-section">
+        {loading && !updatedAt && (
+          <div className="pallet-history-loading" role="status" aria-live="polite">
+            <span className="pallet-history-loading__indicator" />
+            Loading live inventory and pallet transactions…
+          </div>
+        )}
+
+        {!loading && !error && !pallets.length && !events.length && (
+          <div className="pallet-history-empty-state">
+            <span className="pallet-history-empty-state__mark">0</span>
+            <div>
+              <h2>No pallet transactions yet</h2>
+              <p>Received pallets, location moves, and shipments will appear here. Start by recording an inbound pallet.</p>
+            </div>
+            <button type="button" onClick={() => navigate('/pallet-tracker')}>Open Pallet Inventory</button>
+          </div>
+        )}
+
+        <section className={`pallet-history-section ${loading && !updatedAt ? 'is-loading' : ''}`}>
           <div className="pallet-section-heading">
-            <div><h2>Transaction History</h2><span>{events.length} matching records</span></div>
+            <div><h2>Transaction History</h2><span>{visibleEvents.length} matching records</span></div>
           </div>
           <div className="pallet-table-wrap">
             <table className="pallet-inventory-table">
               <thead><tr><th>Time</th><th>Action</th><th>Pallet Tag</th><th>Customer</th><th>From</th><th>To</th><th>Sales Order / Pick Ticket</th><th>Scanned By</th></tr></thead>
               <tbody>
-                {events.map((event) => (
+                {visibleEvents.map((event) => (
                   <tr key={event.id}>
                     <td>{new Date(event.scannedAt).toLocaleString()}</td>
                     <td><span className={`inventory-event-pill ${event.action.toLowerCase()}`}>{event.action.replace('_', ' ')}</span></td>
@@ -123,13 +158,13 @@ const PalletInventoryHistory: React.FC = () => {
                     <td>{event.scannedBy}</td>
                   </tr>
                 ))}
-                {!events.length && <tr><td colSpan={8} className="pallet-empty-cell">No matching transaction history.</td></tr>}
+                {!visibleEvents.length && <tr><td colSpan={8} className="pallet-empty-cell">{loading ? 'Loading transactions…' : error ? 'Transaction feed could not be loaded. Use Retry above.' : search ? 'No transactions match this search.' : 'No transactions have been recorded yet.'}</td></tr>}
               </tbody>
             </table>
           </div>
         </section>
 
-        <section className="pallet-history-section">
+        <section className={`pallet-history-section ${loading && !updatedAt ? 'is-loading' : ''}`}>
           <div className="pallet-section-heading">
             <div><h2>Live Inventory by Customer</h2><span>{customerFeed.length} customers represented</span></div>
           </div>
@@ -142,11 +177,11 @@ const PalletInventoryHistory: React.FC = () => {
                 <span>{customerPallets.filter((pallet) => pallet.locationType === 'COOLER').length} in coolers</span>
               </div>
             ))}
-            {!customerFeed.length && <div className="pallet-empty-cell">No current pallets match this search.</div>}
+            {!customerFeed.length && <div className="pallet-empty-cell">{loading ? 'Loading live customer stock…' : error ? 'Live stock could not be loaded. Use Retry above.' : 'No current pallets match this search.'}</div>}
           </div>
         </section>
 
-        <section className="pallet-history-section">
+        <section className={`pallet-history-section ${loading && !updatedAt ? 'is-loading' : ''}`}>
           <div className="pallet-section-heading">
             <div><h2>Live Inventory</h2><span>{visiblePallets.length} pallets currently in the building</span></div>
           </div>
@@ -163,12 +198,12 @@ const PalletInventoryHistory: React.FC = () => {
                     <td>{new Date(pallet.updatedAt).toLocaleString()}</td>
                   </tr>
                 ))}
-                {!visiblePallets.length && <tr><td colSpan={5} className="pallet-empty-cell">No pallets match this search.</td></tr>}
+                {!visiblePallets.length && <tr><td colSpan={5} className="pallet-empty-cell">{loading ? 'Loading live inventory…' : error ? 'Live inventory could not be loaded. Use Retry above.' : search ? 'No pallets match this search.' : 'No pallets are currently in the building.'}</td></tr>}
               </tbody>
             </table>
           </div>
         </section>
-      </div>
+      </main>
     </div>
   );
 };

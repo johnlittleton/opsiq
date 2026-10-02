@@ -105,6 +105,7 @@ const PalletTracker: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState('Ready to receive pallets');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inventoryUpdatedAt, setInventoryUpdatedAt] = useState<Date | null>(null);
 
   const parseApiResponse = useCallback(async (response: Response) => {
     const contentType = response.headers.get('content-type') || '';
@@ -124,6 +125,7 @@ const PalletTracker: React.FC = () => {
         pallets: Array.isArray(data.pallets) ? data.pallets : [],
         recentEvents: Array.isArray(data.recentEvents) ? data.recentEvents : [],
       });
+      setInventoryUpdatedAt(new Date());
     } catch (error: any) {
       console.error('Failed to load pallet inventory:', error);
       setErrorMessage(error?.message || 'Failed to load pallet inventory');
@@ -133,6 +135,8 @@ const PalletTracker: React.FC = () => {
   useEffect(() => {
     setErrorMessage('');
     void loadInventory();
+    const refreshId = window.setInterval(() => void loadInventory(), 10000);
+    return () => window.clearInterval(refreshId);
   }, [loadInventory]);
 
   useEffect(() => {
@@ -336,6 +340,7 @@ const PalletTracker: React.FC = () => {
     : `Cooler ${pallet.coolerPlacard} / Lane ${pallet.lanePlacard} / Position ${pallet.position}`;
 
   const laneOccupancy = (laneCode: string) => inventory.pallets.filter((pallet) => pallet.lanePlacard === laneCode).length;
+  const receivingQueue = inventory.pallets.filter((pallet) => pallet.locationType === 'RECEIVING');
 
   return (
     <div className="pallet-tracker-page">
@@ -343,10 +348,13 @@ const PalletTracker: React.FC = () => {
       <div className="pallet-tracker-container">
         <div className="pallet-tracker-header">
           <div>
-            <h1>Pallet Inventory</h1>
-            <p>Track pallet tags from receiving through cooler storage and shipment</p>
+            <p className="wms-eyebrow">Warehouse Operations</p>
+            <h1>Pallet Inventory Control</h1>
+            <p>Live pallet positions, receiving queue, customer stock, and outbound activity</p>
           </div>
           <div className="pallet-tracker-header-actions">
+            <span className="wms-live-indicator"><span />Live{inventoryUpdatedAt ? ` · ${inventoryUpdatedAt.toLocaleTimeString()}` : ''}</span>
+            <button className="nav-btn" onClick={() => void loadInventory()}>Refresh</button>
             <button className="summary-btn" onClick={() => navigate('/inventory-pallet-history')}>History / Live Feed</button>
             <button className="nav-btn" onClick={() => navigate('/production-scheduler')}>Scheduler</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
@@ -367,6 +375,75 @@ const PalletTracker: React.FC = () => {
               <div><span>In Coolers</span><strong>{coolerPalletCount}</strong></div>
               <div><span>Configured Lanes</span><strong>{activeLanes.length}</strong></div>
             </div>
+
+            <section className="wms-floor-board" aria-label="Warehouse storage locations">
+              <div className="pallet-section-heading">
+                <div><h2>Cooler Storage Map</h2><span>10 numbered positions per lane · occupied positions show the pallet tag</span></div>
+                <button type="button" className="text-action" onClick={() => setView('setup')}>Manage locations</button>
+              </div>
+              {!activeCoolers.length ? (
+                <div className="wms-map-empty"><strong>No cooler locations configured</strong><span>Add cooler and lane placards in Location Setup to see storage occupancy here.</span></div>
+              ) : (
+                <div className="wms-cooler-grid">
+                  {activeCoolers.map((cooler) => {
+                    const coolerLanes = activeLanes.filter((lane) => lane.coolerPlacard === cooler.placardCode);
+                    const coolerPallets = inventory.pallets.filter((pallet) => pallet.coolerPlacard === cooler.placardCode);
+                    return (
+                      <section className="wms-cooler" key={cooler.placardCode}>
+                        <header><strong>Cooler {cooler.placardCode}</strong><span>{coolerPallets.length} pallets</span></header>
+                        {!coolerLanes.length ? <div className="wms-map-empty">No lanes configured</div> : (
+                          <div className="wms-lane-list">
+                            {coolerLanes.map((lane) => {
+                              const lanePallets = inventory.pallets.filter((pallet) => pallet.lanePlacard === lane.placardCode);
+                              const palletAtPosition = new Map(lanePallets.map((pallet) => [Number(pallet.position), pallet]));
+                              return (
+                                <div className="wms-lane" key={lane.placardCode}>
+                                  <div className="wms-lane-heading"><strong>Lane {lane.placardCode}</strong><span>{lanePallets.length}/10</span></div>
+                                  <div className="wms-lane-slots">
+                                    {Array.from({ length: 10 }, (_, index) => {
+                                      const position = index + 1;
+                                      const pallet = palletAtPosition.get(position);
+                                      return (
+                                        <div className={`wms-slot ${pallet ? 'is-occupied' : ''}`} key={position} title={pallet ? `${pallet.palletTag} · ${pallet.customer || 'Unassigned'}` : `Position ${position} · Open`}>
+                                          <span>{position}</span>
+                                          <strong>{pallet?.palletTag || 'Open'}</strong>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="wms-receiving-queue">
+              <div className="pallet-section-heading">
+                <div><h2>Receiving / Putaway Queue</h2><span>{receivingQueue.length} pallets need a cooler lane position</span></div>
+                <button type="button" className="wms-action-button" onClick={() => setOperation('MOVE')} disabled={!receivingQueue.length}>Start Putaway</button>
+              </div>
+              {receivingQueue.length ? (
+                <div className="pallet-table-wrap">
+                  <table className="pallet-inventory-table">
+                    <thead><tr><th>Pallet Tag</th><th>Customer</th><th>Received</th><th>Next Step</th></tr></thead>
+                    <tbody>{receivingQueue.map((pallet) => (
+                      <tr key={pallet.palletTag}>
+                        <td className="pallet-tag-cell">{pallet.palletTag}</td>
+                        <td>{pallet.customer || 'Unassigned'}</td>
+                        <td>{new Date(pallet.receivedAt).toLocaleString()}</td>
+                        <td><span className="wms-status-pill">Awaiting putaway</span></td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <div className="wms-queue-clear">Receiving queue is clear.</div>}
+            </section>
 
             <div className="pallet-operation-switch" role="group" aria-label="Pallet operation">
               <button type="button" className={operation === 'RECEIVE' ? 'active receive' : ''} onClick={() => { setOperation('RECEIVE'); cancelMove(); }}>Receive</button>
