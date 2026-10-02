@@ -29,6 +29,65 @@
   min-width: 760px;
 }
 
+.pallet-history-table-wrap {
+  max-height: min(36vh, 360px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.pallet-history-table-wrap--transactions {
+  max-height: min(42vh, 460px);
+}
+
+.pallet-history-table-wrap .pallet-inventory-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+@media print {
+  .pallet-history-page,
+  .pallet-history-page .pallet-tracker-container {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    color: #111827 !important;
+    background: #fff !important;
+  }
+
+  .pallet-history-page .pallet-tracker-header-actions,
+  .pallet-history-page .pallet-history-search,
+  .pallet-history-error,
+  .pallet-history-loading,
+  .pallet-history-empty-state,
+  .pallet-history-page .title-bar {
+    display: none !important;
+  }
+
+  .pallet-history-section,
+  .pallet-table-wrap,
+  .pallet-history-table-wrap {
+    max-height: none !important;
+    overflow: visible !important;
+    break-inside: avoid;
+    border-color: #9ca3af !important;
+  }
+
+  .pallet-history-page .pallet-section-heading h2,
+  .pallet-history-page .pallet-section-heading span,
+  .pallet-history-page .pallet-inventory-table th,
+  .pallet-history-page .pallet-inventory-table td {
+    color: #111827 !important;
+    background: #fff !important;
+  }
+
+  .pallet-history-page .pallet-inventory-table th,
+  .pallet-history-page .pallet-inventory-table td {
+    border-color: #9ca3af !important;
+  }
+}
+
 .pallet-history-container {
   width: min(1600px, 100%);
   margin: 0 auto;

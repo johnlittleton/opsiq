@@ -246,6 +246,22 @@
   border-bottom: 1px solid var(--border);
 }
 
+.home-page__section-title--beta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-page__beta-badge {
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  padding: 3px 7px;
+  color: #fde68a;
+  background: rgba(120, 53, 15, 0.22);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
 .home-page__quick-access {
   display: grid;
   gap: 10px;

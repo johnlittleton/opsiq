@@ -157,13 +157,13 @@ export const HomePage: React.FC = () => {
     {
       icon: '🏷️',
       title: 'Pallet Inventory',
-      description: 'Receive, locate, move, and ship customer pallets',
+      description: 'BETA · Development in progress · Receive, locate, move, and ship customer pallets',
       onClick: () => navigate('/pallet-tracker'),
     },
     {
       icon: '📜',
       title: 'Pallet History & Live Feed',
-      description: 'Search pallet transactions and current inventory by customer',
+      description: 'BETA · Development in progress · Search pallet transactions and current inventory by customer',
       onClick: () => navigate('/inventory-pallet-history'),
     },
   ];
@@ -337,7 +337,9 @@ export const HomePage: React.FC = () => {
       </div>
 
       <div className="home-page__section">
-        <h2 className="home-page__section-title">Inventory Control</h2>
+        <h2 className="home-page__section-title home-page__section-title--beta">
+          Inventory Control <span className="home-page__beta-badge">Beta · Development</span>
+        </h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
           {inventoryControlCards.map((card, index) => (
             <div

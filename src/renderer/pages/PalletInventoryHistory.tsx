@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
@@ -39,11 +39,12 @@ const PalletInventoryHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     const loadHistory = async () => {
-      if (!updatedAt) setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       try {
         const params = new URLSearchParams();
         if (search.trim()) params.set('search', search.trim());
@@ -56,6 +57,7 @@ const PalletInventoryHistory: React.FC = () => {
         setPallets(Array.isArray(data.pallets) ? data.pallets : []);
         setEvents(Array.isArray(data.events) ? data.events : []);
         setUpdatedAt(new Date());
+        hasLoadedRef.current = true;
         setError('');
       } catch (loadError: any) {
         if (!cancelled) setError(loadError?.message || 'Could not load pallet history');
@@ -103,6 +105,7 @@ const PalletInventoryHistory: React.FC = () => {
           </div>
           <div className="pallet-tracker-header-actions">
             <button className="summary-btn" onClick={() => setRefreshToken((token) => token + 1)} disabled={loading}>Refresh</button>
+            <button className="nav-btn pallet-history-print" onClick={() => window.print()}>Print</button>
             <button className="nav-btn" onClick={() => navigate('/pallet-tracker')}>Pallet Inventory</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
             <button className="logout-btn" onClick={logout}>Logout</button>
@@ -142,7 +145,7 @@ const PalletInventoryHistory: React.FC = () => {
           <div className="pallet-section-heading">
             <div><h2>Transaction History</h2><span>{visibleEvents.length} matching records</span></div>
           </div>
-          <div className="pallet-table-wrap">
+          <div className="pallet-table-wrap pallet-history-table-wrap pallet-history-table-wrap--transactions">
             <table className="pallet-inventory-table">
               <thead><tr><th>Time</th><th>Action</th><th>Pallet Tag</th><th>Customer</th><th>From</th><th>To</th><th>Sales Order / Pick Ticket</th><th>Scanned By</th></tr></thead>
               <tbody>
@@ -185,7 +188,7 @@ const PalletInventoryHistory: React.FC = () => {
           <div className="pallet-section-heading">
             <div><h2>Live Inventory</h2><span>{visiblePallets.length} pallets currently in the building</span></div>
           </div>
-          <div className="pallet-table-wrap">
+          <div className="pallet-table-wrap pallet-history-table-wrap pallet-history-table-wrap--inventory">
             <table className="pallet-inventory-table">
               <thead><tr><th>Pallet Tag</th><th>Customer</th><th>Current Location</th><th>Received</th><th>Last Updated</th></tr></thead>
               <tbody>

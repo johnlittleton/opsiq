@@ -356,7 +356,6 @@ const PalletTracker: React.FC = () => {
             <span className="wms-live-indicator"><span />Live{inventoryUpdatedAt ? ` · ${inventoryUpdatedAt.toLocaleTimeString()}` : ''}</span>
             <button className="nav-btn" onClick={() => void loadInventory()}>Refresh</button>
             <button className="summary-btn" onClick={() => navigate('/inventory-pallet-history')}>History / Live Feed</button>
-            <button className="nav-btn" onClick={() => navigate('/production-scheduler')}>Scheduler</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
             <button className="logout-btn" onClick={logout}>Logout</button>
           </div>
@@ -376,6 +375,8 @@ const PalletTracker: React.FC = () => {
               <div><span>Configured Lanes</span><strong>{activeLanes.length}</strong></div>
             </div>
 
+            <div className="wms-dashboard-grid">
+            <div className="wms-floor-column">
             <section className="wms-floor-board" aria-label="Warehouse storage locations">
               <div className="pallet-section-heading">
                 <div><h2>Cooler Storage Map</h2><span>10 numbered positions per lane · occupied positions show the pallet tag</span></div>
@@ -445,6 +446,8 @@ const PalletTracker: React.FC = () => {
               ) : <div className="wms-queue-clear">Receiving queue is clear.</div>}
             </section>
 
+            </div>
+            <div className="wms-operations-column">
             <div className="pallet-operation-switch" role="group" aria-label="Pallet operation">
               <button type="button" className={operation === 'RECEIVE' ? 'active receive' : ''} onClick={() => { setOperation('RECEIVE'); cancelMove(); }}>Receive</button>
               <button type="button" className={operation === 'MOVE' ? 'active move' : ''} onClick={() => setOperation('MOVE')}>Move to Cooler</button>
@@ -547,6 +550,26 @@ const PalletTracker: React.FC = () => {
                 </table>
               </div>
             </section>
+            <section className="recent-panel wms-activity-panel">
+              <div className="recent-panel-header"><div><h3>Recent Inventory Activity</h3><div className="recent-subtitle">Latest receiving, moves, shipments, and placard changes</div></div></div>
+              {inventory.recentEvents.length ? (
+                <div className="pallet-table-wrap">
+                  <table className="pallet-inventory-table">
+                    <thead><tr><th>Action</th><th>Pallet / Location</th><th>Reference</th><th>Time</th></tr></thead>
+                    <tbody>{inventory.recentEvents.map((event) => (
+                      <tr key={event.id}>
+                        <td><span className={`inventory-event-pill ${event.action.toLowerCase()}`}>{event.action.replace('_', ' ')}</span></td>
+                        <td>{event.palletTag || event.toLocation || event.fromLocation || '--'}</td>
+                        <td>{event.referenceNumber || '--'}</td>
+                        <td>{new Date(event.scannedAt).toLocaleTimeString()}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              ) : <div className="no-data">No inventory activity recorded yet.</div>}
+            </section>
+            </div>
+            </div>
           </>
         ) : (
           <>
@@ -620,26 +643,6 @@ const PalletTracker: React.FC = () => {
           </>
         )}
 
-        <section className="recent-panel">
-          <div className="recent-panel-header"><div><h3>Recent Inventory Activity</h3><div className="recent-subtitle">Latest receiving, moves, shipments, and placard changes</div></div></div>
-          {inventory.recentEvents.length ? (
-            <div className="pallet-table-wrap">
-              <table className="pallet-inventory-table">
-                <thead><tr><th>Action</th><th>Pallet / Location</th><th>From / To</th><th>Order / Ticket</th><th>Scanned By</th><th>Time</th></tr></thead>
-                <tbody>{inventory.recentEvents.map((event) => (
-                  <tr key={event.id}>
-                    <td><span className={`inventory-event-pill ${event.action.toLowerCase()}`}>{event.action.replace('_', ' ')}</span></td>
-                    <td>{event.palletTag || event.toLocation || event.fromLocation || '--'}</td>
-                    <td>{event.fromLocation && event.toLocation ? `${event.fromLocation} → ${event.toLocation}` : event.fromLocation || event.toLocation || '--'}</td>
-                    <td>{event.referenceNumber || '--'}</td>
-                    <td>{event.scannedBy}</td>
-                    <td>{new Date(event.scannedAt).toLocaleString()}</td>
-                  </tr>
-                ))}</tbody>
-              </table>
-            </div>
-          ) : <div className="no-data">No inventory activity recorded yet.</div>}
-        </section>
       </div>
     </div>
   );
