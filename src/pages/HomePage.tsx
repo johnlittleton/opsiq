@@ -151,11 +151,20 @@ export const HomePage: React.FC = () => {
       description: 'View completed work orders',
       onClick: () => navigate('/work-order-history'),
     },
+  ];
+
+  const inventoryControlCards = [
     {
       icon: '🏷️',
-      title: 'Inventory Tracker',
-      description: 'Scan pallet tags for receiving, cycle count, and outbound',
+      title: 'Pallet Inventory',
+      description: 'Receive, locate, move, and ship customer pallets',
       onClick: () => navigate('/pallet-tracker'),
+    },
+    {
+      icon: '📜',
+      title: 'Pallet History & Live Feed',
+      description: 'Search pallet transactions and current inventory by customer',
+      onClick: () => navigate('/inventory-pallet-history'),
     },
   ];
 
@@ -319,6 +328,27 @@ export const HomePage: React.FC = () => {
                 <div className="home-page__card-title-row">
                   <h3 className="home-page__card-title">{card.title}</h3>
                   {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
+                </div>
+                <p className="home-page__card-desc">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="home-page__section">
+        <h2 className="home-page__section-title">Inventory Control</h2>
+        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
+          {inventoryControlCards.map((card, index) => (
+            <div
+              key={index}
+              className="home-page__card"
+              onClick={card.onClick}
+            >
+              <div className="home-page__card-icon">{card.icon}</div>
+              <div className="home-page__card-content">
+                <div className="home-page__card-title-row">
+                  <h3 className="home-page__card-title">{card.title}</h3>
                 </div>
                 <p className="home-page__card-desc">{card.description}</p>
               </div>

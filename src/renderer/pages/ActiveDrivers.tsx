@@ -39,7 +39,10 @@ const ActiveDrivers: React.FC = () => {
   };
 
   const handleCheckout = async (checkin: DockCheckin) => {
-    if (!confirm(`Check out ${checkin.driverName} from Door ${checkin.doorId}?`)) {
+    const checkoutMessage = checkin.inboundOutbound === 'Outbound' && checkin.appointmentId
+      ? `Confirm checkout for ${checkin.driverName} from Door ${checkin.doorId} and mark the linked appointment as shipped? It will remain in its original scheduled time slot.`
+      : `Check out ${checkin.driverName} from Door ${checkin.doorId}?`;
+    if (!confirm(checkoutMessage)) {
       return;
     }
 

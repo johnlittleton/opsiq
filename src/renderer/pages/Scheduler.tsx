@@ -527,7 +527,7 @@ const Scheduler: React.FC = () => {
                       <button
                         type="button"
                         key={appointment.id}
-                        className={`scheduler__door-appointment scheduler__door-appointment--${appointment.type.toLowerCase()}`}
+                        className={`scheduler__door-appointment scheduler__door-appointment--${appointment.type.toLowerCase()} ${appointment.status === 'Shipped' ? 'scheduler__door-appointment--shipped' : ''}`}
                         onClick={() => openModal(selectedTimeslotDate, appointment)}
                         onMouseEnter={() => setHoveredAppointment({ door: 0, appointment })}
                         onMouseLeave={() => setHoveredAppointment(null)}
@@ -575,7 +575,7 @@ const Scheduler: React.FC = () => {
                         <button
                           type="button"
                           key={appointment.id}
-                          className={`scheduler__door-appointment scheduler__door-appointment--${appointment.type.toLowerCase()}`}
+                          className={`scheduler__door-appointment scheduler__door-appointment--${appointment.type.toLowerCase()} ${appointment.status === 'Shipped' ? 'scheduler__door-appointment--shipped' : ''}`}
                           onClick={() => openModal(selectedTimeslotDate, appointment)}
                           onMouseEnter={() => setHoveredAppointment({ door, appointment })}
                           onMouseLeave={() => setHoveredAppointment(null)}

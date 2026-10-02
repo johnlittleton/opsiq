@@ -1091,6 +1091,17 @@
   background: rgba(146, 64, 14, 0.5);
 }
 
+.scheduler__door-appointment--shipped {
+  border-color: #ff5a00;
+  color: #fff7ed;
+  background: #ff5a00;
+  box-shadow: 0 0 8px rgba(255, 90, 0, 0.65);
+}
+
+.scheduler__door-appointment--shipped span {
+  color: #fff7ed;
+}
+
 .scheduler__door-empty {
   margin-top: 14px;
   color: #86efac;

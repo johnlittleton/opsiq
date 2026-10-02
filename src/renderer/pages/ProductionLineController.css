@@ -223,6 +223,37 @@
   font-size: 14px !important;
 }
 
+.production-line-controller__scan {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 6px;
+  background: rgba(6, 78, 59, 0.18);
+}
+
+.production-line-controller__scan > label {
+  color: #a7f3d0;
+}
+
+.production-line-controller__scan-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.production-line-controller__scan-controls button {
+  min-width: 110px;
+  border-color: #34d399;
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.45);
+}
+
+.production-line-controller__scan-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .production-line-controller__work-order-actions {
   display: flex;
   gap: 8px;
@@ -276,6 +307,10 @@
   .production-line-controller__inputs {
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .production-line-controller__scan-controls {
+    grid-template-columns: 1fr;
   }
 }
 

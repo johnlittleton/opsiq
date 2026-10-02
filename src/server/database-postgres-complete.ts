@@ -215,6 +215,7 @@ export class DatabaseService implements IDatabaseService {
           updated_at TIMESTAMP NOT NULL,
           closed_at TIMESTAMP,
           client_request_id TEXT NOT NULL UNIQUE,
+          appointment_id INTEGER,
           FOREIGN KEY (door_id) REFERENCES dock_doors(door_id)
         );
 
@@ -452,6 +453,52 @@ export class DatabaseService implements IDatabaseService {
           scanned_at TIMESTAMP NOT NULL DEFAULT NOW(),
           scanner_source TEXT DEFAULT 'wireless',
           notes TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS pallet_tracker_locations (
+          placard_code TEXT PRIMARY KEY,
+          location_type TEXT NOT NULL CHECK (location_type IN ('COOLER', 'LANE')),
+          cooler_placard TEXT,
+          is_active BOOLEAN NOT NULL DEFAULT true,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS pallet_tracker_inventory (
+          pallet_tag TEXT PRIMARY KEY,
+          customer TEXT,
+          location_type TEXT NOT NULL CHECK (location_type IN ('RECEIVING', 'COOLER')),
+          cooler_placard TEXT,
+          lane_placard TEXT,
+          position INTEGER CHECK (position BETWEEN 1 AND 10),
+          received_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pallet_tracker_inventory_slot
+          ON pallet_tracker_inventory(lane_placard, position)
+          WHERE lane_placard IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_pallet_tracker_locations_parent
+          ON pallet_tracker_locations(cooler_placard, location_type, is_active);
+
+        CREATE TABLE IF NOT EXISTS pallet_tracker_location_events (
+          id SERIAL PRIMARY KEY,
+          action TEXT NOT NULL,
+          pallet_tag TEXT,
+          customer TEXT,
+          from_location TEXT,
+          to_location TEXT,
+          reference_number TEXT,
+          scanned_by TEXT NOT NULL,
+          scanned_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        ALTER TABLE pallet_tracker_inventory ADD COLUMN IF NOT EXISTS customer TEXT;
+        ALTER TABLE pallet_tracker_location_events ADD COLUMN IF NOT EXISTS customer TEXT;
+
+        CREATE TABLE IF NOT EXISTS pallet_tracker_migrations (
+          migration_key TEXT PRIMARY KEY,
+          applied_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
         CREATE TABLE IF NOT EXISTS production_order_verifications (
@@ -815,6 +862,7 @@ export class DatabaseService implements IDatabaseService {
       // Migration: Add hasAppointment column if it doesn't exist
       await client.query(`
         ALTER TABLE dock_checkins ADD COLUMN IF NOT EXISTS has_appointment BOOLEAN DEFAULT false;
+        ALTER TABLE dock_checkins ADD COLUMN IF NOT EXISTS appointment_id INTEGER;
       `);
 
       // Migration: Add customer and carrier columns to appointments
@@ -1066,26 +1114,26 @@ export class DatabaseService implements IDatabaseService {
             INSERT INTO dock_checkins (
               inbound_outbound, company, driver_name, pickup_number, pallets,
               commodity, forklift_driver, checker, plate_number, phone_number,
-              door_id, status, status_start_time, load_start_time, created_at, updated_at, client_request_id, has_appointment
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+              door_id, status, status_start_time, load_start_time, created_at, updated_at, client_request_id, has_appointment, appointment_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
             RETURNING *
           `, [
             data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
             data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
-            null, data.status, now, now, now, now, data.clientRequestId, data.hasAppointment
+            null, data.status, now, now, now, now, data.clientRequestId, data.hasAppointment, data.appointmentId || null
           ]);
         } else {
           checkinResult = await client.query(`
             INSERT INTO dock_checkins (
               inbound_outbound, company, driver_name, pickup_number, pallets,
               commodity, forklift_driver, checker, plate_number, phone_number,
-              door_id, status, status_start_time, created_at, updated_at, client_request_id, has_appointment
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+              door_id, status, status_start_time, created_at, updated_at, client_request_id, has_appointment, appointment_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
             RETURNING *
           `, [
             data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
             data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
-            null, data.status, now, now, now, data.clientRequestId, data.hasAppointment
+            null, data.status, now, now, now, data.clientRequestId, data.hasAppointment, data.appointmentId || null
           ]);
         }
 
@@ -1117,26 +1165,26 @@ export class DatabaseService implements IDatabaseService {
           INSERT INTO dock_checkins (
             inbound_outbound, company, driver_name, pickup_number, pallets,
             commodity, forklift_driver, checker, plate_number, phone_number,
-            door_id, status, status_start_time, load_start_time, created_at, updated_at, client_request_id, has_appointment
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            door_id, status, status_start_time, load_start_time, created_at, updated_at, client_request_id, has_appointment, appointment_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
           RETURNING id
         `, [
           data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
           data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
-          data.doorId, data.status, now, now, now, now, data.clientRequestId, data.hasAppointment
+          data.doorId, data.status, now, now, now, now, data.clientRequestId, data.hasAppointment, data.appointmentId || null
         ]);
       } else {
         checkinResult = await client.query(`
           INSERT INTO dock_checkins (
             inbound_outbound, company, driver_name, pickup_number, pallets,
             commodity, forklift_driver, checker, plate_number, phone_number,
-            door_id, status, status_start_time, created_at, updated_at, client_request_id, has_appointment
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+            door_id, status, status_start_time, created_at, updated_at, client_request_id, has_appointment, appointment_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
           RETURNING id
         `, [
           data.inboundOutbound, data.company, data.driverName, data.pickupNumber, sanitizedPlannedPallets,
           data.commodity, data.forkliftDriver, data.checker, data.plateNumber, data.phoneNumber,
-          data.doorId, data.status, now, now, now, data.clientRequestId, data.hasAppointment
+          data.doorId, data.status, now, now, now, data.clientRequestId, data.hasAppointment, data.appointmentId || null
         ]);
       }
 
@@ -5118,6 +5166,17 @@ export class DatabaseService implements IDatabaseService {
     return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
   }
 
+  async incrementWorkOrderCase(id: string): Promise<any> {
+    const result = await this.pool.query(`
+      UPDATE work_orders
+      SET completed_cases = COALESCE(completed_cases, 0) + 1, updated_at = $1
+      WHERE id = $2 AND status = 'Active'
+      RETURNING *
+    `, [getLocalISOString(), id]);
+
+    return result.rows.length > 0 ? this.toCamelCase(result.rows[0]) : null;
+  }
+
   async deleteWorkOrder(id: string): Promise<boolean> {
     const result = await this.pool.query('DELETE FROM work_orders WHERE id = $1', [id]);
     return result.rowCount ? result.rowCount > 0 : false;
@@ -5132,6 +5191,277 @@ export class DatabaseService implements IDatabaseService {
       LIMIT 200
     `);
     return this.toCamelCase(result.rows);
+  }
+
+  async getPalletLocationInventory(): Promise<any> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const migrationKey = 'legacy-pallet-scans-to-location-inventory-v1';
+      const applied = await client.query('SELECT migration_key FROM pallet_tracker_migrations WHERE migration_key = $1 FOR UPDATE', [migrationKey]);
+      if (!applied.rows.length) {
+        await client.query(`
+          INSERT INTO pallet_tracker_inventory (pallet_tag, location_type, received_at, updated_at)
+          SELECT event.pallet_tag, 'RECEIVING', event.scanned_at, NOW()
+          FROM pallet_tracker_events event
+          INNER JOIN (
+            SELECT pallet_tag, MAX(id) AS latest_id
+            FROM pallet_tracker_events
+            WHERE order_type = 'INV' AND order_id = 'GENERAL'
+            GROUP BY pallet_tag
+          ) latest ON latest.latest_id = event.id
+          WHERE event.direction IN ('IN', 'COUNT')
+          ON CONFLICT (pallet_tag) DO NOTHING
+        `);
+        await client.query(`
+          INSERT INTO pallet_tracker_location_events (action, pallet_tag, to_location, scanned_by, scanned_at)
+          SELECT CASE direction WHEN 'IN' THEN 'RECEIVED' WHEN 'COUNT' THEN 'COUNTED' ELSE 'SHIPPED' END,
+            pallet_tag, CASE WHEN direction IN ('IN', 'COUNT') THEN 'RECEIVING' ELSE NULL END,
+            scanned_by, scanned_at
+          FROM pallet_tracker_events WHERE order_type = 'INV' AND order_id = 'GENERAL'
+        `);
+        await client.query('INSERT INTO pallet_tracker_migrations (migration_key, applied_at) VALUES ($1, NOW())', [migrationKey]);
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    const [locations, pallets, events] = await Promise.all([
+      this.pool.query(`
+        SELECT * FROM pallet_tracker_locations WHERE is_active = true
+        ORDER BY CASE location_type WHEN 'COOLER' THEN 0 ELSE 1 END, cooler_placard, placard_code
+      `),
+      this.pool.query(`
+        SELECT * FROM pallet_tracker_inventory
+        ORDER BY location_type, cooler_placard, lane_placard, position, pallet_tag
+      `),
+      this.pool.query('SELECT * FROM pallet_tracker_location_events ORDER BY id DESC LIMIT 50'),
+    ]);
+    return {
+      locations: this.toCamelCase(locations.rows),
+      pallets: this.toCamelCase(pallets.rows),
+      recentEvents: this.toCamelCase(events.rows),
+    };
+  }
+
+  async getPalletLocationHistory(searchValue?: string): Promise<any> {
+    const inventory = await this.getPalletLocationInventory();
+    const search = String(searchValue || '').trim();
+    const pattern = `%${search}%`;
+    const events = await this.pool.query(`
+      SELECT * FROM pallet_tracker_location_events
+      WHERE $1 = '' OR pallet_tag ILIKE $2 OR customer ILIKE $2 OR action ILIKE $2 OR from_location ILIKE $2
+        OR to_location ILIKE $2 OR reference_number ILIKE $2 OR scanned_by ILIKE $2
+      ORDER BY id DESC
+    `, [search, pattern]);
+    return { ...inventory, events: this.toCamelCase(events.rows) };
+  }
+
+  async receivePalletIntoReceiving(payload: { palletTag: string; customer: string; scannedBy: string }): Promise<any> {
+    const palletTag = String(payload.palletTag || '').trim();
+    const customer = String(payload.customer || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!palletTag) throw new Error('Pallet tag is required');
+    if (!customer) throw new Error('Customer is required when receiving a pallet');
+    const client = await this.pool.connect();
+    const now = getLocalISOString();
+    try {
+      await client.query('BEGIN');
+      const existing = await client.query('SELECT pallet_tag FROM pallet_tracker_inventory WHERE pallet_tag = $1 FOR UPDATE', [palletTag]);
+      if (existing.rows.length) throw new Error(`Pallet ${palletTag} is already in inventory`);
+      const result = await client.query(`
+        INSERT INTO pallet_tracker_inventory (pallet_tag, customer, location_type, received_at, updated_at)
+        VALUES ($1, $2, 'RECEIVING', $3, $3) RETURNING *
+      `, [palletTag, customer, now]);
+      await client.query(`
+        INSERT INTO pallet_tracker_location_events (action, pallet_tag, customer, to_location, scanned_by, scanned_at)
+        VALUES ('RECEIVED', $1, $2, 'RECEIVING', $3, $4)
+      `, [palletTag, customer, scannedBy, now]);
+      await client.query('COMMIT');
+      return this.toCamelCase(result.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async movePalletToLane(payload: {
+    palletTag: string; coolerPlacard: string; lanePlacard: string; scannedBy: string;
+  }): Promise<any> {
+    const palletTag = String(payload.palletTag || '').trim();
+    const coolerPlacard = String(payload.coolerPlacard || '').trim();
+    const lanePlacard = String(payload.lanePlacard || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!palletTag || !coolerPlacard || !lanePlacard) throw new Error('Pallet, cooler, and lane scans are required');
+    const client = await this.pool.connect();
+    const now = getLocalISOString();
+    try {
+      await client.query('BEGIN');
+      const palletResult = await client.query('SELECT * FROM pallet_tracker_inventory WHERE pallet_tag = $1 FOR UPDATE', [palletTag]);
+      const pallet = palletResult.rows[0];
+      if (!pallet) throw new Error(`Pallet ${palletTag} is not in inventory. Receive it first.`);
+      const cooler = await client.query(`
+        SELECT placard_code FROM pallet_tracker_locations
+        WHERE placard_code = $1 AND location_type = 'COOLER' AND is_active = true
+        FOR SHARE
+      `, [coolerPlacard]);
+      if (!cooler.rows.length) throw new Error(`Cooler placard ${coolerPlacard} is not configured`);
+      const lane = await client.query(`
+        SELECT placard_code FROM pallet_tracker_locations
+        WHERE placard_code = $1 AND location_type = 'LANE' AND cooler_placard = $2 AND is_active = true
+        FOR SHARE
+      `, [lanePlacard, coolerPlacard]);
+      if (!lane.rows.length) throw new Error(`Lane placard ${lanePlacard} is not configured under cooler ${coolerPlacard}`);
+      const usedResult = await client.query(`
+        SELECT position FROM pallet_tracker_inventory WHERE lane_placard = $1 FOR UPDATE
+      `, [lanePlacard]);
+      const occupied = new Set(usedResult.rows.map((slot) => Number(slot.position)));
+      let position = 1;
+      while (position <= 10 && occupied.has(position)) position += 1;
+      if (position > 10) throw new Error(`Lane ${lanePlacard} is full (10 of 10 pallet positions)`);
+      const fromLocation = pallet.location_type === 'RECEIVING'
+        ? 'RECEIVING'
+        : `${pallet.cooler_placard}/${pallet.lane_placard}/${pallet.position}`;
+      const result = await client.query(`
+        UPDATE pallet_tracker_inventory
+        SET location_type = 'COOLER', cooler_placard = $1, lane_placard = $2, position = $3, updated_at = $4
+        WHERE pallet_tag = $5 RETURNING *
+      `, [coolerPlacard, lanePlacard, position, now, palletTag]);
+      await client.query(`
+        INSERT INTO pallet_tracker_location_events (action, pallet_tag, customer, from_location, to_location, scanned_by, scanned_at)
+        VALUES ('MOVED', $1, $2, $3, $4, $5, $6)
+      `, [palletTag, pallet.customer, fromLocation, `${coolerPlacard}/${lanePlacard}/${position}`, scannedBy, now]);
+      await client.query('COMMIT');
+      return this.toCamelCase(result.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async shipPalletFromInventory(payload: { palletTag: string; referenceNumber: string; scannedBy: string }): Promise<any> {
+    const palletTag = String(payload.palletTag || '').trim();
+    const referenceNumber = String(payload.referenceNumber || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!palletTag || !referenceNumber) throw new Error('Pallet tag and sales order or pick ticket are required');
+    const client = await this.pool.connect();
+    const now = getLocalISOString();
+    try {
+      await client.query('BEGIN');
+      const palletResult = await client.query('SELECT * FROM pallet_tracker_inventory WHERE pallet_tag = $1 FOR UPDATE', [palletTag]);
+      const pallet = palletResult.rows[0];
+      if (!pallet) throw new Error(`Pallet ${palletTag} is not in inventory`);
+      const fromLocation = pallet.location_type === 'RECEIVING'
+        ? 'RECEIVING'
+        : `${pallet.cooler_placard}/${pallet.lane_placard}/${pallet.position}`;
+      await client.query('DELETE FROM pallet_tracker_inventory WHERE pallet_tag = $1', [palletTag]);
+      await client.query(`
+        INSERT INTO pallet_tracker_location_events (action, pallet_tag, customer, from_location, reference_number, scanned_by, scanned_at)
+        VALUES ('SHIPPED', $1, $2, $3, $4, $5, $6)
+      `, [palletTag, pallet.customer, fromLocation, referenceNumber, scannedBy, now]);
+      await client.query('COMMIT');
+      return { palletTag, customer: pallet.customer, fromLocation, referenceNumber, scannedBy, scannedAt: now };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async configurePalletLocation(payload: {
+    locationType: 'COOLER' | 'LANE'; palletTag: string; coolerPlacard?: string; scannedBy: string;
+  }): Promise<any> {
+    const locationType = payload.locationType;
+    const placardCode = String(payload.palletTag || '').trim();
+    const coolerPlacard = String(payload.coolerPlacard || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!['COOLER', 'LANE'].includes(locationType) || !placardCode) throw new Error('Location type and placard scan are required');
+    if (locationType === 'LANE' && !coolerPlacard) throw new Error('Select the parent cooler before scanning a lane placard');
+    const client = await this.pool.connect();
+    const now = getLocalISOString();
+    try {
+      await client.query('BEGIN');
+      if (locationType === 'LANE') {
+        const cooler = await client.query(`
+          SELECT placard_code FROM pallet_tracker_locations
+          WHERE placard_code = $1 AND location_type = 'COOLER' AND is_active = true FOR SHARE
+        `, [coolerPlacard]);
+        if (!cooler.rows.length) throw new Error(`Cooler placard ${coolerPlacard} is not configured`);
+      }
+      const existingResult = await client.query('SELECT * FROM pallet_tracker_locations WHERE placard_code = $1 FOR UPDATE', [placardCode]);
+      const existing = existingResult.rows[0];
+      if (existing?.is_active) throw new Error(`Placard ${placardCode} is already configured`);
+      if (existing && existing.location_type !== locationType) throw new Error(`Placard ${placardCode} is already registered as a ${existing.location_type.toLowerCase()}`);
+      let result;
+      if (existing) {
+        result = await client.query(`
+          UPDATE pallet_tracker_locations SET cooler_placard = $1, is_active = true, updated_at = $2
+          WHERE placard_code = $3 RETURNING *
+        `, [locationType === 'LANE' ? coolerPlacard : null, now, placardCode]);
+      } else {
+        result = await client.query(`
+          INSERT INTO pallet_tracker_locations (placard_code, location_type, cooler_placard, is_active, created_at, updated_at)
+          VALUES ($1, $2, $3, true, $4, $4) RETURNING *
+        `, [placardCode, locationType, locationType === 'LANE' ? coolerPlacard : null, now]);
+      }
+      await client.query(`
+        INSERT INTO pallet_tracker_location_events (action, to_location, scanned_by, scanned_at)
+        VALUES ('LOCATION_ADDED', $1, $2, $3)
+      `, [`${locationType}/${placardCode}${locationType === 'LANE' ? `/${coolerPlacard}` : ''}`, scannedBy, now]);
+      await client.query('COMMIT');
+      return this.toCamelCase(result.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async removePalletLocation(placardCodeValue: string, scannedByValue: string): Promise<any> {
+    const placardCode = String(placardCodeValue || '').trim();
+    const scannedBy = String(scannedByValue || '').trim() || 'Unknown';
+    const client = await this.pool.connect();
+    const now = getLocalISOString();
+    try {
+      await client.query('BEGIN');
+      const locationResult = await client.query(`
+        SELECT * FROM pallet_tracker_locations WHERE placard_code = $1 AND is_active = true FOR UPDATE
+      `, [placardCode]);
+      const location = locationResult.rows[0];
+      if (!location) throw new Error(`Active location ${placardCode} was not found`);
+      const stockResult = location.location_type === 'COOLER'
+        ? await client.query('SELECT pallet_tag FROM pallet_tracker_inventory WHERE cooler_placard = $1 LIMIT 1', [placardCode])
+        : await client.query('SELECT pallet_tag FROM pallet_tracker_inventory WHERE lane_placard = $1 LIMIT 1', [placardCode]);
+      if (stockResult.rows.length) throw new Error(`Location ${placardCode} still contains pallets; move or ship them first`);
+      if (location.location_type === 'COOLER') {
+        const child = await client.query(`
+          SELECT placard_code FROM pallet_tracker_locations
+          WHERE cooler_placard = $1 AND location_type = 'LANE' AND is_active = true LIMIT 1
+        `, [placardCode]);
+        if (child.rows.length) throw new Error(`Remove the cooler's active lanes before removing cooler ${placardCode}`);
+      }
+      await client.query('UPDATE pallet_tracker_locations SET is_active = false, updated_at = $1 WHERE placard_code = $2', [now, placardCode]);
+      await client.query(`
+        INSERT INTO pallet_tracker_location_events (action, from_location, scanned_by, scanned_at)
+        VALUES ('LOCATION_REMOVED', $1, $2, $3)
+      `, [`${location.location_type}/${placardCode}`, scannedBy, now]);
+      await client.query('COMMIT');
+      return { placardCode, locationType: location.location_type, removed: true };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async recordPalletTrackerScan(payload: {

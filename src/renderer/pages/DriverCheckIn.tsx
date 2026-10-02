@@ -4,6 +4,7 @@ import { TitleBar } from '../../components/layout/TitleBar';
 import { apiClient } from '../services/api';
 import { InboundOutbound, DoorStatus } from '../../shared/types';
 import { v4 as uuidv4 } from 'uuid';
+import { addDays, format } from 'date-fns';
 import './DriverCheckIn.css';
 
 const COMMODITIES = ['Lemons', 'Navels', 'Mandarins', 'Clementines', 'Limes', 'Avocado', 'Cara Cara', 'Grapefruit', 'Grapes', 'Argentina', 'Dry Inventory'];
@@ -16,6 +17,8 @@ const DriverCheckIn: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [outboundAppointments, setOutboundAppointments] = useState<any[]>([]);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
 
   const [formData, setFormData] = useState({
     inboundOutbound: 'Inbound' as InboundOutbound,
@@ -31,7 +34,18 @@ const DriverCheckIn: React.FC = () => {
     doorId: (location.state as any)?.selectedDoor?.toString() || '',
     status: 'Waiting' as DoorStatus,
     hasAppointment: false,
+    appointmentId: '',
   });
+
+  useEffect(() => {
+    if (formData.inboundOutbound !== 'Outbound') return;
+    setLoadingAppointments(true);
+    apiClient.getAppointments({
+      startDate: format(addDays(new Date(), -1), 'yyyy-MM-dd'),
+      endDate: format(addDays(new Date(), 90), 'yyyy-MM-dd'),
+      type: 'Outbound',
+    }).then(setOutboundAppointments).catch(() => setOutboundAppointments([])).finally(() => setLoadingAppointments(false));
+  }, [formData.inboundOutbound]);
 
   // Touch keyboard support
   useEffect(() => {
@@ -84,6 +98,9 @@ const DriverCheckIn: React.FC = () => {
     if (!formData.driverName.trim()) return 'Driver name is required';
     if (!formData.pickupNumber.trim()) return formData.inboundOutbound === 'Inbound' ? 'P/U # is required' : 'S/O # is required';
     if (!formData.pallets || parseInt(formData.pallets) < 1) return 'Valid pallet count is required';
+    if (formData.inboundOutbound === 'Outbound' && formData.hasAppointment && !formData.appointmentId) {
+      return 'Select the scheduled outbound appointment for this driver';
+    }
     // Door is optional for Parked status
     if (formData.status !== 'Parked') {
       if (!formData.doorId || parseInt(formData.doorId) < 1 || parseInt(formData.doorId) > 39) {
@@ -122,6 +139,7 @@ const DriverCheckIn: React.FC = () => {
         status: formData.status,
         clientRequestId: uuidv4(),
         hasAppointment: formData.hasAppointment,
+        appointmentId: formData.appointmentId ? Number(formData.appointmentId) : null,
       });
 
       setSuccess(true);
@@ -247,6 +265,25 @@ const DriverCheckIn: React.FC = () => {
                   <span className="driver-checkin__checkbox-label">Driver had an appointment</span>
                 </div>
               </div>
+              {formData.inboundOutbound === 'Outbound' && formData.hasAppointment && (
+                <div className="driver-checkin__field">
+                  <label className="driver-checkin__label">Scheduled outbound appointment *</label>
+                  <select
+                    name="appointmentId"
+                    value={formData.appointmentId}
+                    onChange={handleChange}
+                    className="driver-checkin__select"
+                    disabled={submitting || loadingAppointments}
+                  >
+                    <option value="">{loadingAppointments ? 'Loading appointments...' : 'Select the original appointment'}</option>
+                    {outboundAppointments.map((appointment) => (
+                      <option key={appointment.id} value={appointment.id}>
+                        {appointment.appointmentDate} · {appointment.appointmentTime} · Door {appointment.doorId || 'Unassigned'} · {appointment.customer || appointment.company} · S/O {appointment.pickupNumber || 'N/A'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 

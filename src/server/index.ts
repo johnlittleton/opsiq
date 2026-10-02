@@ -1272,6 +1272,13 @@ app.post('/api/doors/:doorId/clear', async (req, res) => {
     }
 
     const result = await db.clearDoor(data);
+
+    if (checkinType === 'outbound' && checkin?.appointmentId != null && Number.isInteger(Number(checkin.appointmentId))) {
+      const appointment = await db.updateAppointment(Number(checkin.appointmentId), { status: 'Shipped' });
+      if (appointment) {
+        io.emit('appointment:updated', appointment);
+      }
+    }
     
     // Broadcast update to all clients
     io.emit('dock:updated', result);
@@ -3607,6 +3614,25 @@ app.post('/api/production/work-orders', async (req, res) => {
   }
 });
 
+app.post('/api/production/work-orders/:id/scan-case', async (req, res) => {
+  try {
+    const barcode = String(req.body?.barcode || '').trim();
+    if (!barcode || barcode.length > 500) {
+      return res.status(400).json({ error: 'A valid box barcode is required.' });
+    }
+
+    const workOrder = await db.incrementWorkOrderCase(req.params.id);
+    if (!workOrder) {
+      return res.status(409).json({ error: 'Cases can only be scanned against an active work order.' });
+    }
+
+    io.emit('workorder:updated', workOrder);
+    res.json(workOrder);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.put('/api/production/work-orders/:id', async (req, res) => {
   try {
     const { planned_run_rate, plannedrate, ...restBody } = req.body;
@@ -3683,6 +3709,94 @@ app.get('/api/production/pallet-tracker/orders', async (_req, res) => {
     res.json(orders);
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to load pallet tracker orders' });
+  }
+});
+
+app.get('/api/production/pallet-tracker/location-inventory', async (_req, res) => {
+  try {
+    res.json(await db.getPalletLocationInventory());
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load pallet locations' });
+  }
+});
+
+app.get('/api/production/pallet-tracker/location-history', async (req, res) => {
+  try {
+    res.json(await db.getPalletLocationHistory(String(req.query.search || '')));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load pallet transaction history' });
+  }
+});
+
+app.post('/api/production/pallet-tracker/receive', async (req, res) => {
+  try {
+    const pallet = await db.receivePalletIntoReceiving({
+      palletTag: req.body?.palletTag,
+      customer: req.body?.customer,
+      scannedBy: req.body?.scannedBy,
+    });
+    io.emit('pallet-tracker:inventory-updated', { action: 'RECEIVED', pallet });
+    res.status(201).json(pallet);
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to receive pallet');
+    res.status(message.includes('already') ? 409 : 400).json({ error: message });
+  }
+});
+
+app.post('/api/production/pallet-tracker/move', async (req, res) => {
+  try {
+    const pallet = await db.movePalletToLane({
+      palletTag: req.body?.palletTag,
+      coolerPlacard: req.body?.coolerPlacard,
+      lanePlacard: req.body?.lanePlacard,
+      scannedBy: req.body?.scannedBy,
+    });
+    io.emit('pallet-tracker:inventory-updated', { action: 'MOVED', pallet });
+    res.json(pallet);
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to move pallet');
+    res.status(message.includes('required') ? 400 : 409).json({ error: message });
+  }
+});
+
+app.post('/api/production/pallet-tracker/ship', async (req, res) => {
+  try {
+    const shipment = await db.shipPalletFromInventory({
+      palletTag: req.body?.palletTag,
+      referenceNumber: req.body?.referenceNumber,
+      scannedBy: req.body?.scannedBy,
+    });
+    io.emit('pallet-tracker:inventory-updated', { action: 'SHIPPED', shipment });
+    res.json(shipment);
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to ship pallet');
+    res.status(message.includes('required') ? 400 : 409).json({ error: message });
+  }
+});
+
+app.post('/api/production/pallet-tracker/locations', async (req, res) => {
+  try {
+    const location = await db.configurePalletLocation({
+      locationType: req.body?.locationType,
+      palletTag: req.body?.placardCode,
+      coolerPlacard: req.body?.coolerPlacard,
+      scannedBy: req.body?.scannedBy,
+    });
+    io.emit('pallet-tracker:inventory-updated', { action: 'LOCATION_ADDED', location });
+    res.status(201).json(location);
+  } catch (error: any) {
+    const message = String(error?.message || 'Failed to configure location');
+    res.status(message.includes('required') ? 400 : 409).json({ error: message });
+  }
+});
+
+app.delete('/api/production/pallet-tracker/locations/:placardCode', async (req, res) => {
+  try {
+    const result = await db.removePalletLocation(req.params.placardCode, req.body?.scannedBy);
+    io.emit('pallet-tracker:inventory-updated', { action: 'LOCATION_REMOVED', location: result });
+    res.json(result);
+  } catch (error: any) {
+    res.status(409).json({ error: String(error?.message || 'Failed to remove location') });
   }
 });
 

@@ -219,6 +219,7 @@ export class DatabaseService implements IDatabaseService {
         updatedAt TEXT NOT NULL,
         closedAt TEXT,
         clientRequestId TEXT NOT NULL UNIQUE,
+        appointmentId INTEGER,
         FOREIGN KEY (doorId) REFERENCES dock_doors(doorId)
       );
 
@@ -558,6 +559,49 @@ export class DatabaseService implements IDatabaseService {
         notes TEXT
       );
 
+      CREATE TABLE IF NOT EXISTS pallet_tracker_locations (
+        placardCode TEXT PRIMARY KEY,
+        locationType TEXT NOT NULL CHECK (locationType IN ('COOLER', 'LANE')),
+        coolerPlacard TEXT,
+        isActive INTEGER NOT NULL DEFAULT 1,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pallet_tracker_inventory (
+        palletTag TEXT PRIMARY KEY,
+        customer TEXT,
+        locationType TEXT NOT NULL CHECK (locationType IN ('RECEIVING', 'COOLER')),
+        coolerPlacard TEXT,
+        lanePlacard TEXT,
+        position INTEGER CHECK (position BETWEEN 1 AND 10),
+        receivedAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_pallet_tracker_inventory_slot
+        ON pallet_tracker_inventory(lanePlacard, position)
+        WHERE lanePlacard IS NOT NULL;
+      CREATE INDEX IF NOT EXISTS idx_pallet_tracker_locations_parent
+        ON pallet_tracker_locations(coolerPlacard, locationType, isActive);
+
+      CREATE TABLE IF NOT EXISTS pallet_tracker_location_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT NOT NULL,
+        palletTag TEXT,
+        customer TEXT,
+        fromLocation TEXT,
+        toLocation TEXT,
+        referenceNumber TEXT,
+        scannedBy TEXT NOT NULL,
+        scannedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pallet_tracker_migrations (
+        migrationKey TEXT PRIMARY KEY,
+        appliedAt TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS production_dock_statuses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         dockNumber INTEGER NOT NULL UNIQUE,
@@ -752,6 +796,20 @@ export class DatabaseService implements IDatabaseService {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
       ON shift_sessions(date, shiftNumber) WHERE status = 'active';
     `);
+
+    const palletInventoryColumns = (this.db.pragma('table_info(pallet_tracker_inventory)') as any[]).map((column) => column.name);
+    if (!palletInventoryColumns.includes('customer')) {
+      this.db.exec('ALTER TABLE pallet_tracker_inventory ADD COLUMN customer TEXT');
+    }
+    const palletEventColumns = (this.db.pragma('table_info(pallet_tracker_location_events)') as any[]).map((column) => column.name);
+    if (!palletEventColumns.includes('customer')) {
+      this.db.exec('ALTER TABLE pallet_tracker_location_events ADD COLUMN customer TEXT');
+    }
+
+    const checkinColumns = (this.db.pragma('table_info(dock_checkins)') as any[]).map((column) => column.name);
+    if (!checkinColumns.includes('appointmentId')) {
+      this.db.exec('ALTER TABLE dock_checkins ADD COLUMN appointmentId INTEGER');
+    }
 
     // Migration: Add performance tracking columns if they don't exist
     try {
@@ -1120,8 +1178,8 @@ export class DatabaseService implements IDatabaseService {
           INSERT INTO dock_checkins (
             inboundOutbound, company, driverName, pickupNumber, pallets,
             commodity, forkliftDriver, checker, plateNumber, phoneNumber,
-            doorId, status, statusStartTime, loadStartTime, createdAt, updatedAt, clientRequestId, hasAppointment
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            doorId, status, statusStartTime, loadStartTime, createdAt, updatedAt, clientRequestId, hasAppointment, appointmentId
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           data.inboundOutbound,
           data.company,
@@ -1140,7 +1198,8 @@ export class DatabaseService implements IDatabaseService {
           now,
           now,
           data.clientRequestId,
-          data.hasAppointment ? 1 : 0
+          data.hasAppointment ? 1 : 0,
+          data.appointmentId || null
         );
         checkinId = result.lastInsertRowid as number;
       } else {
@@ -1148,8 +1207,8 @@ export class DatabaseService implements IDatabaseService {
           INSERT INTO dock_checkins (
             inboundOutbound, company, driverName, pickupNumber, pallets,
             commodity, forkliftDriver, checker, plateNumber, phoneNumber,
-            doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId, hasAppointment
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId, hasAppointment, appointmentId
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           data.inboundOutbound,
           data.company,
@@ -1167,7 +1226,8 @@ export class DatabaseService implements IDatabaseService {
           now,
           now,
           data.clientRequestId,
-          data.hasAppointment ? 1 : 0
+          data.hasAppointment ? 1 : 0,
+          data.appointmentId || null
         );
         checkinId = result.lastInsertRowid as number;
       }
@@ -1197,8 +1257,8 @@ export class DatabaseService implements IDatabaseService {
           INSERT INTO dock_checkins (
             inboundOutbound, company, driverName, pickupNumber, pallets,
             commodity, forkliftDriver, checker, plateNumber, phoneNumber,
-            doorId, status, statusStartTime, loadStartTime, createdAt, updatedAt, clientRequestId, hasAppointment
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            doorId, status, statusStartTime, loadStartTime, createdAt, updatedAt, clientRequestId, hasAppointment, appointmentId
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           data.inboundOutbound,
           data.company,
@@ -1217,7 +1277,8 @@ export class DatabaseService implements IDatabaseService {
           now,
           now,
           data.clientRequestId,
-          data.hasAppointment ? 1 : 0
+          data.hasAppointment ? 1 : 0,
+          data.appointmentId || null
         );
         var checkinId = result.lastInsertRowid as number;
       } else {
@@ -1226,8 +1287,8 @@ export class DatabaseService implements IDatabaseService {
           INSERT INTO dock_checkins (
             inboundOutbound, company, driverName, pickupNumber, pallets,
             commodity, forkliftDriver, checker, plateNumber, phoneNumber,
-            doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId, hasAppointment
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            doorId, status, statusStartTime, createdAt, updatedAt, clientRequestId, hasAppointment, appointmentId
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
           data.inboundOutbound,
           data.company,
@@ -1245,7 +1306,8 @@ export class DatabaseService implements IDatabaseService {
           now,
           now,
           data.clientRequestId,
-          data.hasAppointment ? 1 : 0
+          data.hasAppointment ? 1 : 0,
+          data.appointmentId || null
         );
         var checkinId = result.lastInsertRowid as number;
       }
@@ -4607,6 +4669,19 @@ export class DatabaseService implements IDatabaseService {
     return this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) || null;
   }
 
+  async incrementWorkOrderCase(id: string): Promise<any> {
+    const now = getLocalISOString();
+    const result = this.db.prepare(`
+      UPDATE work_orders
+      SET completedCases = COALESCE(completedCases, 0) + 1, updatedAt = ?
+      WHERE id = ? AND status = 'Active'
+    `).run(now, id);
+
+    return result.changes > 0
+      ? this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(id) || null
+      : null;
+  }
+
   async deleteWorkOrder(id: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM work_orders WHERE id = ?').run(id);
     return result.changes > 0;
@@ -4620,6 +4695,219 @@ export class DatabaseService implements IDatabaseService {
       ORDER BY date DESC, line ASC, slot ASC
       LIMIT 200
     `).all();
+  }
+
+  async getPalletLocationInventory(): Promise<any> {
+    this.db.transaction(() => {
+      const migrationKey = 'legacy-pallet-scans-to-location-inventory-v1';
+      const applied = this.db.prepare('SELECT migrationKey FROM pallet_tracker_migrations WHERE migrationKey = ?').get(migrationKey);
+      if (applied) return;
+      const now = getLocalISOString();
+      this.db.prepare(`
+        INSERT OR IGNORE INTO pallet_tracker_inventory (palletTag, locationType, receivedAt, updatedAt)
+        SELECT event.palletTag, 'RECEIVING', event.scannedAt, ?
+        FROM pallet_tracker_events event
+        INNER JOIN (
+          SELECT palletTag, MAX(id) AS latestId
+          FROM pallet_tracker_events
+          WHERE orderType = 'INV' AND orderId = 'GENERAL'
+          GROUP BY palletTag
+        ) latest ON latest.latestId = event.id
+        WHERE event.direction IN ('IN', 'COUNT')
+      `).run(now);
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_location_events (action, palletTag, toLocation, scannedBy, scannedAt)
+        SELECT CASE direction WHEN 'IN' THEN 'RECEIVED' WHEN 'COUNT' THEN 'COUNTED' ELSE 'SHIPPED' END,
+          palletTag, CASE WHEN direction IN ('IN', 'COUNT') THEN 'RECEIVING' ELSE NULL END,
+          scannedBy, scannedAt
+        FROM pallet_tracker_events
+        WHERE orderType = 'INV' AND orderId = 'GENERAL'
+      `).run();
+      this.db.prepare('INSERT INTO pallet_tracker_migrations (migrationKey, appliedAt) VALUES (?, ?)').run(migrationKey, now);
+    })();
+    const locations = this.db.prepare(`
+      SELECT * FROM pallet_tracker_locations WHERE isActive = 1
+      ORDER BY CASE locationType WHEN 'COOLER' THEN 0 ELSE 1 END, coolerPlacard, placardCode
+    `).all();
+    const pallets = this.db.prepare(`
+      SELECT * FROM pallet_tracker_inventory
+      ORDER BY locationType, coolerPlacard, lanePlacard, position, palletTag
+    `).all();
+    const recentEvents = this.db.prepare(`
+      SELECT * FROM pallet_tracker_location_events ORDER BY id DESC LIMIT 50
+    `).all();
+    return { locations, pallets, recentEvents };
+  }
+
+  async getPalletLocationHistory(searchValue?: string): Promise<any> {
+    const inventory = await this.getPalletLocationInventory();
+    const search = String(searchValue || '').trim();
+    const searchPattern = `%${search}%`;
+    const events = this.db.prepare(`
+      SELECT * FROM pallet_tracker_location_events
+      WHERE ? = '' OR palletTag LIKE ? OR customer LIKE ? OR action LIKE ? OR fromLocation LIKE ?
+        OR toLocation LIKE ? OR referenceNumber LIKE ? OR scannedBy LIKE ?
+      ORDER BY id DESC
+    `).all(search, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
+    return { ...inventory, events };
+  }
+
+  async receivePalletIntoReceiving(payload: { palletTag: string; customer: string; scannedBy: string }): Promise<any> {
+    const palletTag = String(payload.palletTag || '').trim();
+    const customer = String(payload.customer || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!palletTag) throw new Error('Pallet tag is required');
+    if (!customer) throw new Error('Customer is required when receiving a pallet');
+    const now = getLocalISOString();
+    const receive = this.db.transaction(() => {
+      const existing = this.db.prepare('SELECT palletTag FROM pallet_tracker_inventory WHERE palletTag = ?').get(palletTag);
+      if (existing) throw new Error(`Pallet ${palletTag} is already in inventory`);
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_inventory (palletTag, customer, locationType, receivedAt, updatedAt)
+        VALUES (?, ?, 'RECEIVING', ?, ?)
+      `).run(palletTag, customer, now, now);
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_location_events (action, palletTag, customer, toLocation, scannedBy, scannedAt)
+        VALUES ('RECEIVED', ?, ?, 'RECEIVING', ?, ?)
+      `).run(palletTag, customer, scannedBy, now);
+      return this.db.prepare('SELECT * FROM pallet_tracker_inventory WHERE palletTag = ?').get(palletTag);
+    });
+    return receive();
+  }
+
+  async movePalletToLane(payload: {
+    palletTag: string; coolerPlacard: string; lanePlacard: string; scannedBy: string;
+  }): Promise<any> {
+    const palletTag = String(payload.palletTag || '').trim();
+    const coolerPlacard = String(payload.coolerPlacard || '').trim();
+    const lanePlacard = String(payload.lanePlacard || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!palletTag || !coolerPlacard || !lanePlacard) throw new Error('Pallet, cooler, and lane scans are required');
+    const now = getLocalISOString();
+    const move = this.db.transaction(() => {
+      const pallet = this.db.prepare('SELECT * FROM pallet_tracker_inventory WHERE palletTag = ?').get(palletTag) as any;
+      if (!pallet) throw new Error(`Pallet ${palletTag} is not in inventory. Receive it first.`);
+      const cooler = this.db.prepare(`
+        SELECT placardCode FROM pallet_tracker_locations
+        WHERE placardCode = ? AND locationType = 'COOLER' AND isActive = 1
+      `).get(coolerPlacard);
+      if (!cooler) throw new Error(`Cooler placard ${coolerPlacard} is not configured`);
+      const lane = this.db.prepare(`
+        SELECT placardCode FROM pallet_tracker_locations
+        WHERE placardCode = ? AND locationType = 'LANE' AND coolerPlacard = ? AND isActive = 1
+      `).get(lanePlacard, coolerPlacard);
+      if (!lane) throw new Error(`Lane placard ${lanePlacard} is not configured under cooler ${coolerPlacard}`);
+      const occupied = new Set((this.db.prepare(`
+        SELECT position FROM pallet_tracker_inventory WHERE lanePlacard = ?
+      `).all(lanePlacard) as Array<{ position: number }>).map((slot) => Number(slot.position)));
+      let position = 1;
+      while (position <= 10 && occupied.has(position)) position += 1;
+      if (position > 10) throw new Error(`Lane ${lanePlacard} is full (10 of 10 pallet positions)`);
+      const fromLocation = pallet.locationType === 'RECEIVING'
+        ? 'RECEIVING'
+        : `${pallet.coolerPlacard}/${pallet.lanePlacard}/${pallet.position}`;
+      this.db.prepare(`
+        UPDATE pallet_tracker_inventory
+        SET locationType = 'COOLER', coolerPlacard = ?, lanePlacard = ?, position = ?, updatedAt = ?
+        WHERE palletTag = ?
+      `).run(coolerPlacard, lanePlacard, position, now, palletTag);
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_location_events (action, palletTag, customer, fromLocation, toLocation, scannedBy, scannedAt)
+        VALUES ('MOVED', ?, ?, ?, ?, ?, ?)
+      `).run(palletTag, pallet.customer, fromLocation, `${coolerPlacard}/${lanePlacard}/${position}`, scannedBy, now);
+      return this.db.prepare('SELECT * FROM pallet_tracker_inventory WHERE palletTag = ?').get(palletTag);
+    });
+    return move();
+  }
+
+  async shipPalletFromInventory(payload: { palletTag: string; referenceNumber: string; scannedBy: string }): Promise<any> {
+    const palletTag = String(payload.palletTag || '').trim();
+    const referenceNumber = String(payload.referenceNumber || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!palletTag || !referenceNumber) throw new Error('Pallet tag and sales order or pick ticket are required');
+    const now = getLocalISOString();
+    const ship = this.db.transaction(() => {
+      const pallet = this.db.prepare('SELECT * FROM pallet_tracker_inventory WHERE palletTag = ?').get(palletTag) as any;
+      if (!pallet) throw new Error(`Pallet ${palletTag} is not in inventory`);
+      const fromLocation = pallet.locationType === 'RECEIVING'
+        ? 'RECEIVING'
+        : `${pallet.coolerPlacard}/${pallet.lanePlacard}/${pallet.position}`;
+      this.db.prepare('DELETE FROM pallet_tracker_inventory WHERE palletTag = ?').run(palletTag);
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_location_events (action, palletTag, customer, fromLocation, referenceNumber, scannedBy, scannedAt)
+        VALUES ('SHIPPED', ?, ?, ?, ?, ?, ?)
+      `).run(palletTag, pallet.customer, fromLocation, referenceNumber, scannedBy, now);
+      return { palletTag, customer: pallet.customer, fromLocation, referenceNumber, scannedBy, scannedAt: now };
+    });
+    return ship();
+  }
+
+  async configurePalletLocation(payload: {
+    locationType: 'COOLER' | 'LANE'; palletTag: string; coolerPlacard?: string; scannedBy: string;
+  }): Promise<any> {
+    const locationType = payload.locationType;
+    const placardCode = String(payload.palletTag || '').trim();
+    const coolerPlacard = String(payload.coolerPlacard || '').trim();
+    const scannedBy = String(payload.scannedBy || '').trim() || 'Unknown';
+    if (!['COOLER', 'LANE'].includes(locationType) || !placardCode) throw new Error('Location type and placard scan are required');
+    if (locationType === 'LANE' && !coolerPlacard) throw new Error('Select the parent cooler before scanning a lane placard');
+    const now = getLocalISOString();
+    const configure = this.db.transaction(() => {
+      if (locationType === 'LANE') {
+        const cooler = this.db.prepare(`
+          SELECT placardCode FROM pallet_tracker_locations
+          WHERE placardCode = ? AND locationType = 'COOLER' AND isActive = 1
+        `).get(coolerPlacard);
+        if (!cooler) throw new Error(`Cooler placard ${coolerPlacard} is not configured`);
+      }
+      const existing = this.db.prepare('SELECT * FROM pallet_tracker_locations WHERE placardCode = ?').get(placardCode) as any;
+      if (existing?.isActive) throw new Error(`Placard ${placardCode} is already configured`);
+      if (existing && existing.locationType !== locationType) throw new Error(`Placard ${placardCode} is already registered as a ${existing.locationType.toLowerCase()}`);
+      if (existing) {
+        this.db.prepare(`UPDATE pallet_tracker_locations SET coolerPlacard = ?, isActive = 1, updatedAt = ? WHERE placardCode = ?`)
+          .run(locationType === 'LANE' ? coolerPlacard : null, now, placardCode);
+      } else {
+        this.db.prepare(`
+          INSERT INTO pallet_tracker_locations (placardCode, locationType, coolerPlacard, isActive, createdAt, updatedAt)
+          VALUES (?, ?, ?, 1, ?, ?)
+        `).run(placardCode, locationType, locationType === 'LANE' ? coolerPlacard : null, now, now);
+      }
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_location_events (action, toLocation, scannedBy, scannedAt)
+        VALUES ('LOCATION_ADDED', ?, ?, ?)
+      `).run(`${locationType}/${placardCode}${locationType === 'LANE' ? `/${coolerPlacard}` : ''}`, scannedBy, now);
+      return this.db.prepare('SELECT * FROM pallet_tracker_locations WHERE placardCode = ?').get(placardCode);
+    });
+    return configure();
+  }
+
+  async removePalletLocation(placardCodeValue: string, scannedByValue: string): Promise<any> {
+    const placardCode = String(placardCodeValue || '').trim();
+    const scannedBy = String(scannedByValue || '').trim() || 'Unknown';
+    const now = getLocalISOString();
+    const remove = this.db.transaction(() => {
+      const location = this.db.prepare(`
+        SELECT * FROM pallet_tracker_locations WHERE placardCode = ? AND isActive = 1
+      `).get(placardCode) as any;
+      if (!location) throw new Error(`Active location ${placardCode} was not found`);
+      const stock = location.locationType === 'COOLER'
+        ? this.db.prepare('SELECT palletTag FROM pallet_tracker_inventory WHERE coolerPlacard = ? LIMIT 1').get(placardCode)
+        : this.db.prepare('SELECT palletTag FROM pallet_tracker_inventory WHERE lanePlacard = ? LIMIT 1').get(placardCode);
+      if (stock) throw new Error(`Location ${placardCode} still contains pallets; move or ship them first`);
+      if (location.locationType === 'COOLER') {
+        const child = this.db.prepare(`
+          SELECT placardCode FROM pallet_tracker_locations WHERE coolerPlacard = ? AND locationType = 'LANE' AND isActive = 1 LIMIT 1
+        `).get(placardCode);
+        if (child) throw new Error(`Remove the cooler's active lanes before removing cooler ${placardCode}`);
+      }
+      this.db.prepare('UPDATE pallet_tracker_locations SET isActive = 0, updatedAt = ? WHERE placardCode = ?').run(now, placardCode);
+      this.db.prepare(`
+        INSERT INTO pallet_tracker_location_events (action, fromLocation, scannedBy, scannedAt)
+        VALUES ('LOCATION_REMOVED', ?, ?, ?)
+      `).run(`${location.locationType}/${placardCode}`, scannedBy, now);
+      return { placardCode, locationType: location.locationType, removed: true };
+    });
+    return remove();
   }
 
   async recordPalletTrackerScan(payload: {

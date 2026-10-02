@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { apiClient } from '../services/api';
@@ -45,11 +45,14 @@ export default function ProductionLineController() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [headcount, setHeadcount] = useState('');
   const [completedCases, setCompletedCases] = useState('');
+  const [scanValue, setScanValue] = useState('');
+  const [pendingScans, setPendingScans] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [dismissedAlertKey, setDismissedAlertKey] = useState('');
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
 
   const loadWorkOrders = async () => {
     setLoading(true);
@@ -102,6 +105,12 @@ export default function ProductionLineController() {
   }, [activeWorkOrder?.id, activeWorkOrder?.labor, activeWorkOrder?.completedCases]);
 
   useEffect(() => {
+    if (String(activeWorkOrder?.status || '').toLowerCase() === 'active') {
+      scanInputRef.current?.focus();
+    }
+  }, [activeWorkOrder?.id, activeWorkOrder?.status]);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => setClockTick((value) => value + 1), 1000);
     return () => window.clearInterval(intervalId);
   }, []);
@@ -134,6 +143,46 @@ export default function ProductionLineController() {
       setError(saveError?.message || 'Could not update the production line.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const scanCase = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const barcode = scanValue.trim();
+    if (!barcode || !activeWorkOrder) return;
+
+    const workOrderId = activeWorkOrder.id;
+    setScanValue('');
+    setPendingScans((count) => count + 1);
+    setError('');
+    setMessage('');
+    try {
+      const response = await fetch(`${API_BASE}/api/production/work-orders/${encodeURIComponent(workOrderId)}/scan-case`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ barcode }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error || 'Could not record the scanned case.');
+      }
+
+      const updatedWorkOrder = await response.json();
+      setWorkOrders((current) => current.map((workOrder) => (
+        workOrder.id === updatedWorkOrder.id
+          ? {
+              ...updatedWorkOrder,
+              completedCases: Math.max(Number(workOrder.completedCases || 0), Number(updatedWorkOrder.completedCases || 0)),
+            }
+          : workOrder
+      )));
+      setMessage(`Case recorded. ${Number(updatedWorkOrder.completedCases || 0).toLocaleString()} completed.`);
+      scanInputRef.current?.focus();
+    } catch (scanError: any) {
+      setError(scanError?.message || 'Could not record the scanned case.');
+      scanInputRef.current?.focus();
+    } finally {
+      setPendingScans((count) => Math.max(0, count - 1));
     }
   };
 
@@ -412,6 +461,26 @@ export default function ProductionLineController() {
                 </button>
               </label>
             </div>
+            {String(activeWorkOrder.status || '').toLowerCase() === 'active' && (
+              <form className="production-line-controller__scan" onSubmit={(event) => void scanCase(event)}>
+                <label htmlFor="case-barcode-scan">Scan box barcode</label>
+                <div className="production-line-controller__scan-controls">
+                  <input
+                    id="case-barcode-scan"
+                    ref={scanInputRef}
+                    type="text"
+                    value={scanValue}
+                    onChange={(event) => setScanValue(event.target.value)}
+                    autoComplete="off"
+                    autoFocus
+                    aria-label="Scan box barcode"
+                  />
+                  <button type="submit" disabled={!scanValue.trim()}>
+                    {pendingScans > 0 ? 'Recording...' : 'Record Case'}
+                  </button>
+                </div>
+              </form>
+            )}
             <div className="production-line-controller__work-order-actions">
               {String(activeWorkOrder.status || '').toLowerCase() !== 'active' && (
                 <button type="button" onClick={() => void startWorkOrder()} disabled={saving}>Start</button>

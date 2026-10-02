@@ -39,6 +39,7 @@ import CombinedLiveOperationsDashboard from './pages/CombinedLiveOperationsDashb
 import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
+import PalletInventoryHistory from './pages/PalletInventoryHistory';
 import StorageBilling from './pages/StorageBilling';
 import ExtraServices from './pages/ExtraServices';
 import AIDualEntry from './pages/AIDualEntry';
@@ -136,6 +137,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/production-line-controller" element={<ProductionLineController />} />
       <Route path="/dashboard" element={<ProductionDashboard />} />
       <Route path="/pallet-tracker" element={<PalletTracker />} />
+      <Route path="/inventory-pallet-history" element={<PalletInventoryHistory />} />
       <Route path="/work-order-history" element={<WorkOrderHistory />} />
       <Route path="/downtime-history" element={<DowntimeHistory />} />
       <Route path="/settings" element={<Settings />} />

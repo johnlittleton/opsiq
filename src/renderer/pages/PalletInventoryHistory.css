@@ -1,0 +1,30 @@
+.pallet-history-page .pallet-history-search {
+  display: grid;
+  gap: 6px;
+  max-width: 560px;
+  margin: 4px 0 14px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pallet-history-page .pallet-history-search input {
+  min-height: 40px;
+  box-sizing: border-box;
+  border: 1px solid #475569;
+  border-radius: 5px;
+  padding: 8px 10px;
+  color: #f8fafc;
+  background: #0b1220;
+  font: inherit;
+}
+
+.pallet-history-section {
+  margin: 12px 0 20px;
+  border-top: 1px solid #334155;
+  padding-top: 14px;
+}
+
+.pallet-history-section .pallet-inventory-table {
+  min-width: 760px;
+}

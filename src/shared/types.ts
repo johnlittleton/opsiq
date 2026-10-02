@@ -37,6 +37,7 @@ export interface DockCheckin {
   updatedAt: string;
   closedAt: string | null;
   clientRequestId: string;
+  appointmentId?: number | null;
 }
 
 export interface DockEvent {
@@ -104,6 +105,7 @@ export interface CreateCheckinRequest {
   status: DoorStatus;
   clientRequestId: string;
   hasAppointment: boolean;
+  appointmentId?: number | null;
 }
 
 export interface UpdateDoorStatusRequest {
@@ -117,6 +119,7 @@ export interface ClearDoorRequest {
   doorId: number;
   updatedBy: string;
   actualPallets?: number;
+  markAppointmentShipped?: boolean;
 }
 
 export interface CreateProductionEntryRequest {
