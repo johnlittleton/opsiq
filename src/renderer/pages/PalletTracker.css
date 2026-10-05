@@ -1,6 +1,6 @@
 .pallet-tracker-page {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 29px);
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
@@ -468,7 +468,40 @@
 }
 
 .wms-operations-column {
-  grid-template-rows: auto auto minmax(100px, 1fr) minmax(86px, 0.7fr);
+  grid-template-rows: auto minmax(136px, auto) minmax(0, 1fr) minmax(0, 0.8fr);
+}
+
+.wms-operations-column > .scanner-box {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 5px;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+}
+
+.wms-operations-column > .scanner-box > label {
+  margin: 0;
+}
+
+.wms-operations-column > .scanner-box .field-group {
+  gap: 3px;
+  margin: 0;
+}
+
+.wms-operations-column > .scanner-box input,
+.wms-operations-column > .scanner-box select {
+  min-height: 32px;
+  padding: 6px 8px;
+}
+
+.wms-operations-column > .scanner-box .scanner-actions {
+  margin-top: 0;
+}
+
+.wms-operations-column > .scanner-box .scanner-preferences {
+  gap: 8px 12px;
 }
 
 .wms-cooler-grid {

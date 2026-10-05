@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { useAuth } from '../context/AuthContext';
+import { WORK_ORDER_CUSTOMERS } from '../../shared/constants/workOrderCustomers';
 import './PalletTracker.css';
 
 type Operation = 'RECEIVE' | 'MOVE' | 'SHIP';
@@ -153,10 +154,6 @@ const PalletTracker: React.FC = () => {
   );
   const coolerPalletCount = inventory.pallets.filter((pallet) => pallet.locationType === 'COOLER').length;
   const receivingPalletCount = inventory.pallets.filter((pallet) => pallet.locationType === 'RECEIVING').length;
-  const customerNames = useMemo(
-    () => Array.from(new Set(inventory.pallets.map((pallet) => pallet.customer?.trim()).filter((customer): customer is string => Boolean(customer)))).sort((a, b) => a.localeCompare(b)),
-    [inventory.pallets]
-  );
   const customerInventory = useMemo(() => {
     const grouped = new Map<string, InventoryPallet[]>();
     inventory.pallets.forEach((pallet) => {
@@ -458,16 +455,14 @@ const PalletTracker: React.FC = () => {
               {operation === 'RECEIVE' && (
                 <label className="field-group">
                   Customer
-                  <input
+                  <select
                     value={receiveCustomer}
                     onChange={(event) => setReceiveCustomer(event.target.value)}
-                    list="pallet-customer-options"
-                    placeholder="Enter or select customer"
-                    autoComplete="off"
-                  />
-                  <datalist id="pallet-customer-options">
-                    {customerNames.map((customer) => <option key={customer} value={customer} />)}
-                  </datalist>
+                    disabled={loading}
+                  >
+                    <option value="">Select customer...</option>
+                    {WORK_ORDER_CUSTOMERS.map((customer) => <option key={customer} value={customer}>{customer}</option>)}
+                  </select>
                 </label>
               )}
               {operation === 'SHIP' && (
@@ -516,7 +511,9 @@ const PalletTracker: React.FC = () => {
                 <div className="inventory-filters">
                   <select aria-label="Filter inventory by customer" value={customerFilter} onChange={(event) => setCustomerFilter(event.target.value)}>
                     <option value="">All customers</option>
-                    {customerInventory.map(([customer]) => <option key={customer} value={customer}>{customer}</option>)}
+                    {WORK_ORDER_CUSTOMERS.map((customer) => <option key={customer} value={customer}>{customer}</option>)}
+                    {customerInventory.some(([customer]) => customer === 'Unassigned') && <option value="Unassigned">Unassigned</option>}
+                    {customerInventory.filter(([customer]) => customer !== 'Unassigned' && !WORK_ORDER_CUSTOMERS.includes(customer)).map(([customer]) => <option key={customer} value={customer}>{customer}</option>)}
                   </select>
                   <input aria-label="Search pallet inventory" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search tag or location" />
                 </div>
