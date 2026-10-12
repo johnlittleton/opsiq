@@ -122,6 +122,12 @@ export const HomePage: React.FC = () => {
 
   const productionCards = [
     {
+      icon: '🪪',
+      title: 'Line Scan',
+      description: 'Assign employees to lines and review badge scan history',
+      onClick: () => navigate('/production-line-scan'),
+    },
+    {
       icon: '📋',
       title: 'Production Scheduler',
       description: 'Schedule work orders for 5 Giro lines',

@@ -401,6 +401,28 @@ export class DatabaseService implements IDatabaseService {
         UNIQUE(department, employeeId)
       );
 
+      CREATE TABLE IF NOT EXISTS production_line_assignments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        employeeId TEXT NOT NULL,
+        employeeName TEXT NOT NULL,
+        lineId INTEGER NOT NULL,
+        assignedAt TEXT NOT NULL,
+        UNIQUE(date, employeeId)
+      );
+
+      CREATE TABLE IF NOT EXISTS production_line_scan_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT NOT NULL,
+        employeeId TEXT NOT NULL,
+        employeeName TEXT NOT NULL,
+        action TEXT NOT NULL,
+        fromLineId INTEGER,
+        toLineId INTEGER,
+        scanCode TEXT,
+        scannedAt TEXT NOT NULL
+      );
+
       CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
       CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
       CREATE INDEX IF NOT EXISTS idx_dept_shifts_status ON department_shift_sessions(status);
@@ -2750,6 +2772,85 @@ export class DatabaseService implements IDatabaseService {
       WHERE isActive = 1
       ORDER BY department ASC, employeeName ASC, employeeId ASC
     `).all() as any[];
+  }
+
+  getProductionLineAssignments(date: string): any[] {
+    return this.db.prepare(`
+      SELECT date, employeeId, employeeName, lineId, assignedAt
+      FROM production_line_assignments
+      WHERE date = ?
+      ORDER BY lineId ASC, employeeName ASC
+    `).all(date) as any[];
+  }
+
+  getProductionLineScanHistory(date: string): any[] {
+    return this.db.prepare(`
+      SELECT date, employeeId, employeeName, action, fromLineId, toLineId, scanCode, scannedAt
+      FROM production_line_scan_history
+      WHERE date = ?
+      ORDER BY scannedAt DESC, id DESC
+      LIMIT 500
+    `).all(date) as any[];
+  }
+
+  assignProductionEmployeeToLine(data: { date: string; employeeId: string; employeeName: string; lineId: number; scanCode?: string }): any {
+    const existing = this.db.prepare(`
+      SELECT lineId FROM production_line_assignments WHERE date = ? AND employeeId = ?
+    `).get(data.date, data.employeeId) as { lineId: number } | undefined;
+    const assignedAt = getLocalISOString();
+    const saveAssignment = this.db.transaction(() => {
+      this.db.prepare(`
+      INSERT INTO production_line_assignments (date, employeeId, employeeName, lineId, assignedAt)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(date, employeeId) DO UPDATE SET
+        employeeName = excluded.employeeName,
+        lineId = excluded.lineId,
+        assignedAt = excluded.assignedAt
+      `).run(data.date, data.employeeId, data.employeeName, data.lineId, assignedAt);
+
+      this.db.prepare(`
+        INSERT INTO production_line_scan_history
+          (date, employeeId, employeeName, action, fromLineId, toLineId, scanCode, scannedAt)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        data.date,
+        data.employeeId,
+        data.employeeName,
+        existing ? 'moved' : 'assigned',
+        existing?.lineId ?? null,
+        data.lineId,
+        data.scanCode || null,
+        assignedAt,
+      );
+    });
+    saveAssignment();
+
+    return this.db.prepare(`
+      SELECT date, employeeId, employeeName, lineId, assignedAt
+      FROM production_line_assignments
+      WHERE date = ? AND employeeId = ?
+    `).get(data.date, data.employeeId);
+  }
+
+  removeProductionLineAssignment(date: string, employeeId: string): boolean {
+    const removeAssignment = this.db.transaction(() => {
+      const assignment = this.db.prepare(`
+        SELECT employeeName, lineId FROM production_line_assignments WHERE date = ? AND employeeId = ?
+      `).get(date, employeeId) as { employeeName: string; lineId: number } | undefined;
+      if (!assignment) return false;
+
+      const removedAt = getLocalISOString();
+      this.db.prepare(`
+        DELETE FROM production_line_assignments WHERE date = ? AND employeeId = ?
+      `).run(date, employeeId);
+      this.db.prepare(`
+        INSERT INTO production_line_scan_history
+          (date, employeeId, employeeName, action, fromLineId, toLineId, scannedAt)
+        VALUES (?, ?, ?, 'removed', ?, NULL, ?)
+      `).run(date, employeeId, assignment.employeeName, assignment.lineId, removedAt);
+      return true;
+    });
+    return removeAssignment();
   }
 
   createKioskEmployee(data: {

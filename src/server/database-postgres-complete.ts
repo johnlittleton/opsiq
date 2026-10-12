@@ -402,6 +402,28 @@ export class DatabaseService implements IDatabaseService {
           UNIQUE (department, employee_id)
         );
 
+        CREATE TABLE IF NOT EXISTS production_line_assignments (
+          id SERIAL PRIMARY KEY,
+          date TEXT NOT NULL,
+          employee_id TEXT NOT NULL,
+          employee_name TEXT NOT NULL,
+          line_id INTEGER NOT NULL,
+          assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          UNIQUE (date, employee_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS production_line_scan_history (
+          id SERIAL PRIMARY KEY,
+          date TEXT NOT NULL,
+          employee_id TEXT NOT NULL,
+          employee_name TEXT NOT NULL,
+          action TEXT NOT NULL,
+          from_line_id INTEGER,
+          to_line_id INTEGER,
+          scan_code TEXT,
+          scanned_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
         CREATE TABLE IF NOT EXISTS checkin_audit_log (
           id SERIAL PRIMARY KEY,
           checkin_id INTEGER NOT NULL,
@@ -3021,6 +3043,66 @@ export class DatabaseService implements IDatabaseService {
         `);
 
     return this.toCamelCase(result.rows);
+  }
+
+  async getProductionLineAssignments(date: string): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT date, employee_id, employee_name, line_id, assigned_at
+      FROM production_line_assignments
+      WHERE date = $1
+      ORDER BY line_id ASC, employee_name ASC
+    `, [date]);
+    return this.toCamelCase(result.rows);
+  }
+
+  async getProductionLineScanHistory(date: string): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT date, employee_id, employee_name, action, from_line_id, to_line_id, scan_code, scanned_at
+      FROM production_line_scan_history
+      WHERE date = $1
+      ORDER BY scanned_at DESC, id DESC
+      LIMIT 500
+    `, [date]);
+    return this.toCamelCase(result.rows);
+  }
+
+  async assignProductionEmployeeToLine(data: { date: string; employeeId: string; employeeName: string; lineId: number; scanCode?: string }): Promise<any> {
+    const existingResult = await this.pool.query(`
+      SELECT line_id FROM production_line_assignments WHERE date = $1 AND employee_id = $2
+    `, [data.date, data.employeeId]);
+    const existingLineId = existingResult.rows[0]?.line_id ?? null;
+    const assignedAt = getLocalISOString();
+    const result = await this.pool.query(`
+      INSERT INTO production_line_assignments (date, employee_id, employee_name, line_id, assigned_at)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (date, employee_id) DO UPDATE SET
+        employee_name = EXCLUDED.employee_name,
+        line_id = EXCLUDED.line_id,
+        assigned_at = EXCLUDED.assigned_at
+      RETURNING date, employee_id, employee_name, line_id, assigned_at
+    `, [data.date, data.employeeId, data.employeeName, data.lineId, assignedAt]);
+    await this.pool.query(`
+      INSERT INTO production_line_scan_history
+        (date, employee_id, employee_name, action, from_line_id, to_line_id, scan_code, scanned_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `, [data.date, data.employeeId, data.employeeName, existingLineId == null ? 'assigned' : 'moved', existingLineId, data.lineId, data.scanCode || null, assignedAt]);
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async removeProductionLineAssignment(date: string, employeeId: string): Promise<boolean> {
+    const removedAt = getLocalISOString();
+    const result = await this.pool.query(`
+      DELETE FROM production_line_assignments WHERE date = $1 AND employee_id = $2
+      RETURNING employee_name, line_id
+    `, [date, employeeId]);
+    if (result.rows[0]) {
+      await this.pool.query(`
+        INSERT INTO production_line_scan_history
+          (date, employee_id, employee_name, action, from_line_id, scanned_at)
+        VALUES ($1, $2, $3, 'removed', $4, $5)
+      `, [date, employeeId, result.rows[0].employee_name, result.rows[0].line_id, removedAt]);
+    }
+    return (result.rowCount || 0) > 0;
   }
 
   async createKioskEmployee(data: {

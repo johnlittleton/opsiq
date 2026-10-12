@@ -7,6 +7,14 @@ import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
 
+interface ProductionLineAssignment {
+  date: string;
+  employeeId: string;
+  employeeName: string;
+  lineId: number;
+  assignedAt: string;
+}
+
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
 
 const LINES = [
@@ -65,17 +73,20 @@ export default function ProductionDashboard() {
   const [rateAlertsMinimized, setRateAlertsMinimized] = useState(false);
   const [kpiOnTargetMinimized, setKpiOnTargetMinimized] = useState(false);
   const [rateOnTargetMinimized, setRateOnTargetMinimized] = useState(false);
+  const [lineAssignments, setLineAssignments] = useState<ProductionLineAssignment[]>([]);
 
   useEffect(() => {
     fetchWorkOrders();
     fetchCostingData();
     fetchCheckins();
+    fetchLineAssignments();
     fetchActiveDowntimes();
     checkDriverAlerts();
     const interval = setInterval(() => {
       fetchWorkOrders();
       fetchCostingData();
       fetchCheckins();
+      fetchLineAssignments();
       fetchActiveDowntimes();
       checkDriverAlerts();
     }, 5000); // Refresh every 5 seconds to reduce backend load
@@ -128,6 +139,15 @@ export default function ProductionDashboard() {
       }
     } catch (error) {
       console.error('Failed to fetch check-ins:', error);
+    }
+  };
+
+  const fetchLineAssignments = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/production/line-assignments?date=${selectedDate}`);
+      if (response.ok) setLineAssignments(await response.json());
+    } catch (error) {
+      console.error('Failed to fetch production line assignments:', error);
     }
   };
 
@@ -863,7 +883,7 @@ export default function ProductionDashboard() {
                       </div>
                       <div className="metric">
                         <span className="metric-label">Current Staff:</span>
-                        <span className="metric-value current-staff">{wo.labor || '--'} people</span>
+                        <span className="metric-value current-staff">{lineAssignments.filter((assignment) => assignment.lineId === line.id).length} people</span>
                       </div>
                     </div>
                     <div className="metric-row">

@@ -3553,6 +3553,83 @@ app.get('/api/production/costing', async (req, res) => {
 
 // ==================== PRODUCTION TOOLS API ====================
 
+app.get('/api/production/line-assignments', async (req, res) => {
+  try {
+    const date = String(req.query.date || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'A valid production date is required' });
+    }
+    res.json(await db.getProductionLineAssignments(date));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load line assignments' });
+  }
+});
+
+app.get('/api/production/line-scan-history', async (req, res) => {
+  try {
+    const date = String(req.query.date || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'A valid production date is required' });
+    }
+    res.json(await db.getProductionLineScanHistory(date));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to load line scan history' });
+  }
+});
+
+app.post('/api/production/line-assignments', async (req, res) => {
+  try {
+    const date = String(req.body?.date || '').trim();
+    const employeeId = String(req.body?.employeeId || '').trim().toUpperCase();
+    const lineId = Number(req.body?.lineId);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !employeeId || !Number.isInteger(lineId) || lineId < 1 || lineId > 9) {
+      return res.status(400).json({ error: 'Valid date, production employee, and line are required' });
+    }
+
+    const employees = await db.getKioskEmployees();
+    const employee = employees.find((item: any) =>
+      String(item.department || '').toLowerCase() === 'production'
+      && String(item.employeeId || '').trim().toUpperCase() === employeeId
+    );
+    if (!employee) {
+      return res.status(404).json({ error: 'Active production employee not found' });
+    }
+
+    const currentAssignments = await db.getProductionLineAssignments(date);
+    const currentAssignment = currentAssignments.find((item: any) => item.employeeId === employeeId);
+    const expectedLineId = req.body?.expectedLineId == null ? null : Number(req.body.expectedLineId);
+    if ((currentAssignment?.lineId ?? null) !== expectedLineId) {
+      return res.status(409).json({ error: 'Employee assignment changed. Refresh the line roster and scan again.' });
+    }
+
+    const assignment = await db.assignProductionEmployeeToLine({
+      date,
+      employeeId,
+      employeeName: employee.employeeName,
+      lineId,
+      scanCode: String(req.body?.scanCode || '').trim().slice(0, 100),
+    });
+    res.json(assignment);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to assign employee to line' });
+  }
+});
+
+app.delete('/api/production/line-assignments/:employeeId', async (req, res) => {
+  try {
+    const date = String(req.query.date || '').trim();
+    const employeeId = String(req.params.employeeId || '').trim().toUpperCase();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !employeeId) {
+      return res.status(400).json({ error: 'Valid date and employee id are required' });
+    }
+    const removed = await db.removeProductionLineAssignment(date, employeeId);
+    if (!removed) return res.status(404).json({ error: 'Line assignment not found' });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Failed to remove line assignment' });
+  }
+});
+
 // Work Orders
 app.get('/api/production/work-orders', async (req, res) => {
   console.log('📥 GET /api/production/work-orders called');
