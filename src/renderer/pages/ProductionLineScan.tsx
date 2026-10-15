@@ -124,6 +124,10 @@ export default function ProductionLineScan() {
         <div>
           <p className="line-scan-eyebrow">PRODUCTION / STAFFING</p>
           <h1>Line Scan</h1>
+          <p className="line-scan-total-headcount" role="status" aria-live="polite">
+            <span>Total Headcount Scanned</span>
+            <strong>{assignments.length}</strong>
+          </p>
         </div>
         <label className="line-scan-date">
           <span>Production date</span>

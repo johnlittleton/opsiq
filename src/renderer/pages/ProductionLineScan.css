@@ -62,6 +62,24 @@
   font-size: 1.8rem;
 }
 
+.line-scan-total-headcount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 10px 0 0;
+  color: var(--scan-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.line-scan-total-headcount strong {
+  color: var(--scan-accent);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .line-scan-date {
   display: grid;
   gap: 5px;
