@@ -17,6 +17,7 @@ import {
   LaborSummary,
 } from '../shared/types';
 import { IDatabaseService } from './database-interface';
+import { normalizeEstimatedCompletionTime } from '../shared/estimatedCompletionTime';
 import { DEFAULT_KIOSK_EMPLOYEES, VALID_KIOSK_DEPARTMENTS } from './kiosk-employees';
 
 // Helper to get local time as ISO string (without UTC conversion)
@@ -1021,6 +1022,9 @@ export class DatabaseService implements IDatabaseService {
       if (!workOrderColumnNames.includes('plannedRunRate')) {
         console.log('Adding plannedRunRate column to work_orders...');
         this.db.exec('ALTER TABLE work_orders ADD COLUMN plannedRunRate REAL');
+      }
+      if (!workOrderColumnNames.includes('estimatedCompletionTime')) {
+        this.db.exec('ALTER TABLE work_orders ADD COLUMN estimatedCompletionTime TEXT');
       }
     } catch (err) {
       console.error('Migration error for work_orders:', err);
@@ -4688,8 +4692,8 @@ export class DatabaseService implements IDatabaseService {
           id, line, slot, date, product, bagSize, plannedRunRate, customer, lead, countryOfOrigin, numPallets, 
           labor, priority, lot1, lot2, lot3, lot4, notes, status, 
           targetCases, completedCases, startTimestamp, elapsedMs, 
-          isPaused, elapsedDisplay, createdAt, updatedAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          isPaused, elapsedDisplay, createdAt, updatedAt, estimatedCompletionTime
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       try {
@@ -4721,7 +4725,8 @@ export class DatabaseService implements IDatabaseService {
           workOrder.isPaused ? 1 : 0,
           null,
           now,
-          now
+          now,
+          normalizeEstimatedCompletionTime(workOrder.estimatedCompletionTime)
         );
 
         const result = this.db.prepare('SELECT * FROM work_orders WHERE id = ?').get(workOrderId);
@@ -4742,6 +4747,9 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async updateWorkOrder(id: string, updates: any): Promise<any> {
+    if (Object.prototype.hasOwnProperty.call(updates, 'estimatedCompletionTime')) {
+      updates = { ...updates, estimatedCompletionTime: normalizeEstimatedCompletionTime(updates.estimatedCompletionTime) };
+    }
     const now = getLocalISOString();
     const fields = [];
     const values = [];

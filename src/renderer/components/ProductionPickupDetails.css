@@ -1,0 +1,13 @@
+.production-pickup-note {
+  display: inline-block;
+  max-width: 100%;
+  margin-left: 4px;
+  overflow: hidden;
+  color: #ff7474;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.2;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

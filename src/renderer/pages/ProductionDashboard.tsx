@@ -6,6 +6,9 @@ import './ProductionDashboard.css';
 import DriverWaitingTicker from '../components/DriverWaitingTicker';
 import { MessageBanner } from '../components/MessageBanner';
 import { ChatTicker } from '../components/ChatTicker';
+import { useProductionPickups } from '../hooks/useProductionPickups';
+import { ProductionPickupDetails } from '../components/ProductionPickupDetails';
+import '../components/ProductionPickupDetails.css';
 
 interface ProductionLineAssignment {
   date: string;
@@ -34,6 +37,7 @@ const DIRECT_LABOR_HOURLY_RATE = 25.38;
 
 export default function ProductionDashboard() {
   const navigate = useNavigate();
+  const productionPickups = useProductionPickups();
   const [searchParams] = useSearchParams();
   const lineParam = searchParams.get('line');
   const specificLine = lineParam ? parseInt(lineParam) : null;
@@ -809,7 +813,7 @@ export default function ProductionDashboard() {
 
               {wo ? (
                 <div className="job-info">
-                  <div className="wo-id">SO: {wo.id}</div>
+                  <div className="wo-id">SO: {wo.id} <ProductionPickupDetails orderId={wo.id} {...productionPickups} /></div>
                   <div className="detail"><b>Customer:</b> {wo.customer || 'N/A'}</div>
                   <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
                   <div className="detail"><b>Country:</b> {wo.countryOfOrigin || 'N/A'}</div>

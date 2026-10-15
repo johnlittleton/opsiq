@@ -9,6 +9,11 @@ import { useAuth } from '../context/AuthContext';
 import { WORK_ORDER_CUSTOMERS } from '../../shared/constants/workOrderCustomers';
 import './ProductionScheduler.css';
 import DowntimeTracker from '../components/DowntimeTracker';
+import { useProductionPickups } from '../hooks/useProductionPickups';
+import { ProductionPickupDetails } from '../components/ProductionPickupDetails';
+import '../components/ProductionPickupDetails.css';
+import { DailyProductionSchedule } from '../components/DailyProductionSchedule';
+import { normalizeEstimatedCompletionTime } from '../../shared/estimatedCompletionTime';
 
 const LINES = [
   { id: 1, name: 'Giro Line 1' },
@@ -61,6 +66,7 @@ const buildNotesWithOrderType = (notes: string | null | undefined, orderType: Or
 
 interface WorkOrder {
   id: string;
+  estimatedCompletionTime?: string | null;
   orderType?: OrderType;
   line: number;
   slot: number;
@@ -110,6 +116,7 @@ type ProductionVerificationMode = 'save' | 'complete';
 
 export default function ProductionScheduler() {
   const navigate = useNavigate();
+  const productionPickups = useProductionPickups();
   const { executiveName, userRole, sessionToken } = useAuth();
   const isMobileRuntime =
     typeof window !== 'undefined' &&
@@ -123,7 +130,7 @@ export default function ProductionScheduler() {
     return `${year}-${month}-${day}`;
   };
   
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'daily'>('list');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'ALL' | OrderType>('ALL');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
@@ -428,6 +435,13 @@ export default function ProductionScheduler() {
       alert('Planned Run Rate (bags/min) is required and must be greater than 0.');
       return;
     }
+    let estimatedCompletionTime: string | null;
+    try {
+      estimatedCompletionTime = normalizeEstimatedCompletionTime(editingWorkOrder.estimatedCompletionTime);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Enter a valid estimated completion time.');
+      return;
+    }
     
     const woData = {
       ...restWorkOrder,
@@ -438,7 +452,8 @@ export default function ProductionScheduler() {
       notes: notesWithType,
       status: editingWorkOrder.status || 'Scheduled',
       plannedRunRate: plannedRate,
-      planned_run_rate: plannedRate
+      planned_run_rate: plannedRate,
+      estimatedCompletionTime,
     };
 
     try {
@@ -861,6 +876,7 @@ export default function ProductionScheduler() {
           onClick={() => openModal(line, slot, wo)}
         >
           <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
+          <ProductionPickupDetails orderId={wo.id} {...productionPickups} />
           {hasVerificationForm && <div className="verification-badge-card">Form On File</div>}
           <div className="customer">{wo.customer || 'N/A'}</div>
           <div className="completion-badge">✓ Completed</div>
@@ -883,6 +899,7 @@ export default function ProductionScheduler() {
           onClick={() => openModal(line, slot, wo)}
         >
           <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
+          <ProductionPickupDetails orderId={wo.id} {...productionPickups} />
           {hasVerificationForm && <div className="verification-badge-card">Form On File</div>}
           <div className="wo-actions" onClick={(e) => e.stopPropagation()}>
             <button className="start-btn" onClick={() => startWorkOrder(wo.id)}>
@@ -900,6 +917,7 @@ export default function ProductionScheduler() {
         onClick={() => openModal(line, slot, wo)}
       >
         <div className="wo-number">{normalizeOrderType(wo.orderType)}: {wo.id}</div>
+        <ProductionPickupDetails orderId={wo.id} {...productionPickups} />
         {hasVerificationForm && <div className="verification-badge-card">Form On File</div>}
         <div className="customer"><b>Customer:</b> {wo.customer || 'N/A'}</div>
         <div className="detail"><b>Lead:</b> {wo.lead || 'N/A'}</div>
@@ -1263,6 +1281,13 @@ export default function ProductionScheduler() {
         <h1>Production Scheduler</h1>
         <div className="header-controls">
           <div className="view-toggle-group">
+            <button
+              className={`view-toggle-btn ${viewMode === 'daily' ? 'active' : ''}`}
+              onClick={() => setViewMode('daily')}
+              aria-pressed={viewMode === 'daily'}
+            >
+              Daily Schedule
+            </button>
             <button 
               className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
               onClick={() => setViewMode('list')}
@@ -1354,6 +1379,13 @@ export default function ProductionScheduler() {
         <div className="mobile-scheduler-tools">
           <div className="mobile-tool-row">
             <button
+              className={`view-toggle-btn ${viewMode === 'daily' ? 'active' : ''}`}
+              onClick={() => setViewMode('daily')}
+              aria-pressed={viewMode === 'daily'}
+            >
+              Daily Schedule
+            </button>
+            <button
               className={`view-toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
               onClick={() => setViewMode('list')}
             >
@@ -1405,6 +1437,15 @@ export default function ProductionScheduler() {
         <div className="loading">Loading...</div>
       ) : viewMode === 'calendar' ? (
         renderCalendarView()
+      ) : viewMode === 'daily' ? (
+        <DailyProductionSchedule
+          orders={workOrders.filter(matchesOrderTypeFilter)}
+          date={selectedDateStr}
+          onOpenOrder={(orderId) => {
+            const order = workOrders.find((item) => item.id === orderId);
+            if (order) openModal(order.line, order.slot, order);
+          }}
+        />
       ) : (
         <div className="work-order-sections">
           {/* ACTIVE WORK ORDERS */}
@@ -1453,7 +1494,7 @@ export default function ProductionScheduler() {
                         >
                           ✓
                         </button>
-                        <strong>#{wo.id}</strong>
+                        <strong>#{wo.id} <ProductionPickupDetails orderId={wo.id} {...productionPickups} /></strong>
                       </td>
                       <td>
                         <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
@@ -1553,7 +1594,7 @@ export default function ProductionScheduler() {
                         >
                           ✓
                         </button>
-                        <strong>#{wo.id}</strong>
+                        <strong>#{wo.id} <ProductionPickupDetails orderId={wo.id} {...productionPickups} /></strong>
                       </td>
                       <td>
                         <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
@@ -1627,7 +1668,7 @@ export default function ProductionScheduler() {
                         >
                           ✓
                         </button>
-                        <strong>#{wo.id}</strong>
+                        <strong>#{wo.id} <ProductionPickupDetails orderId={wo.id} {...productionPickups} /></strong>
                       </td>
                       <td>
                         <span className={`order-type-badge-sm order-type-${normalizeOrderType(wo.orderType).toLowerCase()}`}>
@@ -1664,7 +1705,7 @@ export default function ProductionScheduler() {
         <div className="modal-overlay" onClick={closeModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>{editingWorkOrder.id ? 'Edit' : 'Add'} Work Order</h3>
+              <h3>{editingWorkOrder.id ? 'Edit' : 'Add'} Work Order {editingWorkOrder.id && <ProductionPickupDetails orderId={editingWorkOrder.id} {...productionPickups} />}</h3>
               <button className="close-btn" onClick={closeModal}>×</button>
             </div>
             
@@ -1689,6 +1730,18 @@ export default function ProductionScheduler() {
                       <option key={typeOption.value} value={typeOption.value}>{typeOption.label}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="work-order-estimated-completion">Estimated Completion Time</label>
+                  <input
+                    id="work-order-estimated-completion"
+                    type="time"
+                    step={60}
+                    value={editingWorkOrder.estimatedCompletionTime || ''}
+                    onChange={(event) => setEditingWorkOrder({ ...editingWorkOrder, estimatedCompletionTime: event.target.value || null })}
+                  />
                 </div>
               </div>
               <div className="form-row">

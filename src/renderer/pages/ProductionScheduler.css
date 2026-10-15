@@ -1,3 +1,69 @@
+.daily-production-schedule {
+  padding: 16px 20px;
+  color: #f3f6fa;
+}
+
+.daily-production-schedule__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.daily-production-schedule__heading h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.daily-production-schedule__heading span {
+  color: #b7c7cc;
+  font-size: 0.85rem;
+}
+
+.daily-production-schedule__scroll {
+  overflow: auto;
+}
+
+.daily-production-schedule__table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  text-align: left;
+  background: #232837;
+  font-size: 0.85rem;
+}
+
+.daily-production-schedule__table th,
+.daily-production-schedule__table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #39434c;
+  overflow-wrap: anywhere;
+}
+
+.daily-production-schedule__table th {
+  color: #7ffb7f;
+  font-size: 0.78rem;
+}
+
+.daily-production-schedule__order {
+  border: 0;
+  background: transparent;
+  color: #8fd8ff;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  font: inherit;
+  font-weight: 700;
+}
+
+.daily-production-schedule__time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
 .production-scheduler {
   background: #181c24;
   color: #f3f6fa;

@@ -15,6 +15,7 @@ import {
   LaborSummary,
 } from '../shared/types';
 import { IDatabaseService } from './database-interface';
+import { normalizeEstimatedCompletionTime } from '../shared/estimatedCompletionTime';
 import { DEFAULT_KIOSK_EMPLOYEES, VALID_KIOSK_DEPARTMENTS } from './kiosk-employees';
 
 // Helper to get local time as ISO string (without UTC conversion)
@@ -848,6 +849,9 @@ export class DatabaseService implements IDatabaseService {
       // Add country_of_origin column to work_orders if it doesn't exist (migration)
       await client.query(`
         ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS country_of_origin TEXT;
+      `);
+      await client.query(`
+        ALTER TABLE work_orders ADD COLUMN IF NOT EXISTS estimated_completion_time TEXT;
       `);
 
       // Add lead column to work_orders if it doesn't exist (migration)
@@ -5173,8 +5177,8 @@ export class DatabaseService implements IDatabaseService {
           id, line, slot, date, product, bag_size, planned_run_rate, customer, lead, country_of_origin, num_pallets, 
           labor, priority, lot1, lot2, lot3, lot4, notes, status, 
           target_cases, completed_cases, start_timestamp, elapsed_ms, 
-          is_paused, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+          is_paused, created_at, updated_at, estimated_completion_time
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
         RETURNING *
       `, [
         id,
@@ -5202,7 +5206,8 @@ export class DatabaseService implements IDatabaseService {
         workOrder.elapsedMs || 0,
         workOrder.isPaused || false,
         now,
-        now
+        now,
+        normalizeEstimatedCompletionTime(workOrder.estimatedCompletionTime)
       ]);
 
       return this.toCamelCase(result.rows[0]);
@@ -5218,6 +5223,9 @@ export class DatabaseService implements IDatabaseService {
   }
 
   async updateWorkOrder(id: string, updates: any): Promise<any> {
+    if (Object.prototype.hasOwnProperty.call(updates, 'estimatedCompletionTime')) {
+      updates = { ...updates, estimatedCompletionTime: normalizeEstimatedCompletionTime(updates.estimatedCompletionTime) };
+    }
     const now = getLocalISOString();
     const fields = [];
     const values = [];

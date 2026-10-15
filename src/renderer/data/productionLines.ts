@@ -8,6 +8,7 @@ export const PRODUCTION_LINES = [
   { id: 7, name: 'HP7' },
   { id: 8, name: 'RG1' },
   { id: 9, name: 'RG2' },
+  { id: 10, name: 'Support Team' },
 ] as const;
 
 export interface ProductionLineScanHistoryItem {
