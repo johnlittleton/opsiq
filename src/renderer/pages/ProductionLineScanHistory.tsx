@@ -21,6 +21,16 @@ export default function ProductionLineScanHistory() {
   const [history, setHistory] = useState<ProductionLineScanHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+  const searchTerm = search.trim().toLowerCase();
+  const filteredHistory = history.filter((event) => [
+    event.employeeName,
+    event.employeeId,
+    event.action,
+    event.scanCode || '',
+    event.fromLineId == null ? '' : productionLineName(event.fromLineId),
+    event.toLineId == null ? '' : productionLineName(event.toLineId),
+  ].some((value) => value.toLowerCase().includes(searchTerm)));
 
   useEffect(() => {
     let cancelled = false;
@@ -57,27 +67,40 @@ export default function ProductionLineScanHistory() {
         </div>
         <label className="line-scan-date">
           <span>Production date</span>
-          <input type="date" value={selectedDate} onChange={(event) => setSearchParams({ date: event.target.value })} />
+          <input type="date" value={selectedDate} onChange={(event) => {
+            if (event.target.value) setSearchParams({ date: event.target.value });
+          }} />
         </label>
       </header>
 
       <section className="line-scan-history-section line-scan-history-page-section">
         <div className="line-scan-section-heading">
           <div><span>01</span><h2>Line staffing events</h2></div>
-          <span>{loading ? 'Loading...' : `${history.length} events · newest first`}</span>
+          <span>{loading ? 'Loading...' : `${filteredHistory.length} of ${history.length} events · newest first`}</span>
         </div>
+        <label className="line-scan-history-search">
+          <span>Search history</span>
+          <input
+            type="search"
+            placeholder="Employee name, ID, badge, line or action"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
         {error ? (
           <p className="line-scan-history-empty" role="alert">{error}</p>
         ) : loading ? (
           <p className="line-scan-history-empty" role="status">Loading scan history...</p>
         ) : history.length === 0 ? (
           <p className="line-scan-history-empty">No badge scans or staffing changes recorded for this date.</p>
+        ) : filteredHistory.length === 0 ? (
+          <p className="line-scan-history-empty" role="status">No scans match your search.</p>
         ) : (
-          <div className="line-scan-history-table-wrap">
+          <div className="line-scan-history-table-wrap" tabIndex={0} role="region" aria-label="Scan history results">
             <table className="line-scan-history-table">
               <thead><tr><th>Time</th><th>Employee</th><th>Action</th><th>Line change</th><th>Badge</th></tr></thead>
               <tbody>
-                {history.map((event, index) => (
+                {filteredHistory.map((event, index) => (
                   <tr key={`${event.employeeId}-${event.scannedAt}-${index}`}>
                     <td>{formatTime(event.scannedAt)}</td>
                     <td>{event.employeeName}<small>{event.employeeId}</small></td>

@@ -117,20 +117,6 @@ export default function ProductionLineScan() {
     await assignEmployee(employee, selectedLineId, null, scannedCode);
   };
 
-  const removeAssignment = async (employeeId: string) => {
-    const response = await fetch(
-      `${API_BASE}/api/production/line-assignments/${encodeURIComponent(employeeId)}?date=${selectedDate}`,
-      { method: 'DELETE' },
-    );
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) {
-      setMessage(payload?.error || 'Unable to remove assignment');
-      return;
-    }
-    await loadLineData();
-    setMessage('Employee removed from their line.');
-  };
-
   return (
     <main className="production-line-scan-page">
       <header className="line-scan-page-header">
@@ -208,7 +194,7 @@ export default function ProductionLineScan() {
       <section className="line-scan-lines-section">
         <div className="line-scan-section-heading">
           <div><span>02</span><h2>Current line staffing</h2></div>
-          <span>{assignments.length} assigned today</span>
+          <span>{assignments.length} assigned</span>
         </div>
         <div className="line-scan-lines-grid">
           {LINES.map((line) => {
@@ -223,12 +209,6 @@ export default function ProductionLineScan() {
                 }}>
                   <span>{line.name}</span><strong>{lineAssignments.length}</strong>
                 </button>
-                {lineAssignments.length ? lineAssignments.map((assignment) => (
-                  <div className="line-scan-employee" key={assignment.employeeId}>
-                    <span>{assignment.employeeName}<small>{assignment.employeeId}</small></span>
-                    <button type="button" aria-label={`Remove ${assignment.employeeName} from ${line.name}`} onClick={() => void removeAssignment(assignment.employeeId)}>Remove</button>
-                  </div>
-                )) : <p className="line-scan-no-staff">No employees assigned</p>}
               </article>
             );
           })}
