@@ -3583,16 +3583,16 @@ app.post('/api/production/line-assignments', async (req, res) => {
     const employeeId = String(req.body?.employeeId || '').trim().toUpperCase();
     const lineId = Number(req.body?.lineId);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !employeeId || !Number.isInteger(lineId) || lineId < 1 || lineId > 9) {
-      return res.status(400).json({ error: 'Valid date, production employee, and line are required' });
+      return res.status(400).json({ error: 'Valid date, Production labor kiosk employee, and line are required' });
     }
 
     const employees = await db.getKioskEmployees();
     const employee = employees.find((item: any) =>
-      String(item.department || '').toLowerCase() === 'production'
+      String(item.department || '').trim().toLowerCase() === 'production'
       && String(item.employeeId || '').trim().toUpperCase() === employeeId
     );
     if (!employee) {
-      return res.status(404).json({ error: 'Active production employee not found' });
+      return res.status(404).json({ error: 'Active employee not found in the Production labor kiosk roster' });
     }
 
     const currentAssignments = await db.getProductionLineAssignments(date);

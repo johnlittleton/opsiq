@@ -4,6 +4,7 @@ import { API_BASE } from '../services/config';
 import { useKioskEmployees } from '../hooks/useKioskEmployees';
 import './ProductionLineScan.css';
 import { PRODUCTION_LINES, productionLineName } from '../data/productionLines';
+import { findLineScanEmployee } from '../data/lineScanEmployee';
 
 const LINES = PRODUCTION_LINES;
 
@@ -92,10 +93,9 @@ export default function ProductionLineScan() {
     const scannedCode = badgeCode.trim().toUpperCase();
     if (!scannedCode) return;
 
-    const employee = employees.find((item) => item.department === 'production'
-      && (item.badgeCode.trim().toUpperCase() === scannedCode || item.employeeId.trim().toUpperCase() === scannedCode));
+    const employee = findLineScanEmployee(employees, scannedCode);
     if (!employee) {
-      setMessage(`Badge ${scannedCode} was not found in the active production roster.`);
+      setMessage(`Badge ${scannedCode} was not found in the active Production labor kiosk roster.`);
       setBadgeCode('');
       requestAnimationFrame(() => badgeInputRef.current?.focus());
       return;
