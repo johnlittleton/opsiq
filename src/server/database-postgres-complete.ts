@@ -15,6 +15,7 @@ import {
   LaborSummary,
 } from '../shared/types';
 import { IDatabaseService } from './database-interface';
+import { FOOD_SAFETY_CYCLE_DAYS, FOOD_SAFETY_TIN_CAT_TARGET, normalizeTinCatCode } from '../shared/foodSafetyTinCats';
 import { normalizeEstimatedCompletionTime } from '../shared/estimatedCompletionTime';
 import { DEFAULT_KIOSK_EMPLOYEES, VALID_KIOSK_DEPARTMENTS } from './kiosk-employees';
 
@@ -255,6 +256,8 @@ export class DatabaseService implements IDatabaseService {
           contact_name TEXT NOT NULL,
           contact_phone TEXT NOT NULL,
           pickup_number TEXT,
+          pickup_number_2 TEXT,
+          pickup_number_3 TEXT,
           type TEXT NOT NULL,
           door_id INTEGER,
           pallets INTEGER,
@@ -681,6 +684,34 @@ export class DatabaseService implements IDatabaseService {
           updated_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS container_forecasts (
+          id SERIAL PRIMARY KEY,
+          vessel TEXT NOT NULL,
+          container_number TEXT NOT NULL UNIQUE,
+          chassis TEXT,
+          weight REAL,
+          overweight_permit BOOLEAN NOT NULL DEFAULT false,
+          permit_number TEXT,
+          nd_nt_number TEXT,
+          ratecon_number TEXT,
+          rate_amount REAL,
+          pickup_number TEXT,
+          pickup_scac TEXT,
+          driver_load TEXT,
+          port_appointment_number TEXT,
+          delivery_eta TEXT,
+          drop_off_location TEXT NOT NULL,
+          empty_return_date TEXT,
+          empty_return_driver TEXT,
+          vessel_eta TEXT,
+          release_status TEXT NOT NULL DEFAULT 'Pending',
+          notes TEXT,
+          created_by TEXT NOT NULL,
+          updated_by TEXT NOT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
         CREATE TABLE IF NOT EXISTS executives (
           id SERIAL PRIMARY KEY,
           name TEXT NOT NULL UNIQUE,
@@ -769,6 +800,31 @@ export class DatabaseService implements IDatabaseService {
           created_at TIMESTAMP NOT NULL DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS food_safety_tin_cat_cycles (
+          id SERIAL PRIMARY KEY,
+          status TEXT NOT NULL DEFAULT 'open',
+          target_count INTEGER NOT NULL DEFAULT 147,
+          started_by TEXT NOT NULL,
+          started_at TIMESTAMP NOT NULL,
+          due_at TIMESTAMP NOT NULL,
+          completed_at TIMESTAMP,
+          created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS food_safety_tin_cat_scans (
+          id SERIAL PRIMARY KEY,
+          cycle_id INTEGER NOT NULL REFERENCES food_safety_tin_cat_cycles(id) ON DELETE CASCADE,
+          asset_code TEXT NOT NULL,
+          scanned_by TEXT NOT NULL,
+          scanned_at TIMESTAMP NOT NULL,
+          UNIQUE(cycle_id, asset_code)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_cycles_status ON food_safety_tin_cat_cycles(status, started_at);
+        CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scans_cycle ON food_safety_tin_cat_scans(cycle_id, scanned_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_fs_tin_cat_one_open_cycle ON food_safety_tin_cat_cycles(status) WHERE status = 'open';
+
         CREATE INDEX IF NOT EXISTS idx_checkins_door ON dock_checkins(door_id);
         CREATE INDEX IF NOT EXISTS idx_checkins_status ON dock_checkins(status);
         CREATE INDEX IF NOT EXISTS idx_checkins_created ON dock_checkins(created_at);
@@ -805,6 +861,9 @@ export class DatabaseService implements IDatabaseService {
         CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointment_date);
         CREATE INDEX IF NOT EXISTS idx_extra_service_date ON extra_service_entries(service_date);
         CREATE INDEX IF NOT EXISTS idx_extra_service_type_date ON extra_service_entries(service_type, service_date);
+        CREATE INDEX IF NOT EXISTS idx_container_forecasts_vessel ON container_forecasts(vessel);
+        CREATE INDEX IF NOT EXISTS idx_container_forecasts_location ON container_forecasts(drop_off_location);
+        CREATE INDEX IF NOT EXISTS idx_container_forecasts_vessel_eta ON container_forecasts(vessel_eta);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_date ON department_shift_sessions(date);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_department ON department_shift_sessions(department);
         CREATE INDEX IF NOT EXISTS idx_dept_shifts_status ON department_shift_sessions(status);
@@ -844,6 +903,12 @@ export class DatabaseService implements IDatabaseService {
       // Add pickup_number column if it doesn't exist (migration)
       await client.query(`
         ALTER TABLE appointments ADD COLUMN IF NOT EXISTS pickup_number TEXT;
+      `);
+      await client.query(`
+        ALTER TABLE appointments ADD COLUMN IF NOT EXISTS pickup_number_2 TEXT;
+      `);
+      await client.query(`
+        ALTER TABLE appointments ADD COLUMN IF NOT EXISTS pickup_number_3 TEXT;
       `);
 
       // Add country_of_origin column to work_orders if it doesn't exist (migration)
@@ -1561,6 +1626,87 @@ export class DatabaseService implements IDatabaseService {
     return this.toCamelCase(result.rows);
   }
 
+  async listContainerForecasts(filters?: { vessel?: string; location?: string; releaseStatus?: string; search?: string }): Promise<any[]> {
+    let query = 'SELECT * FROM container_forecasts WHERE 1=1';
+    const params: any[] = [];
+    if (filters?.vessel) { params.push(filters.vessel); query += ` AND vessel = $${params.length}`; }
+    if (filters?.location) { params.push(filters.location); query += ` AND drop_off_location = $${params.length}`; }
+    if (filters?.releaseStatus) { params.push(filters.releaseStatus); query += ` AND release_status = $${params.length}`; }
+    if (filters?.search) {
+      params.push(`%${filters.search}%`);
+      const index = params.length;
+      query += ` AND (vessel ILIKE $${index} OR container_number ILIKE $${index} OR chassis ILIKE $${index} OR pickup_number ILIKE $${index} OR drop_off_location ILIKE $${index} OR release_status ILIKE $${index})`;
+    }
+    query += ' ORDER BY vessel_eta ASC NULLS LAST, vessel ASC, container_number ASC';
+    return this.toCamelCase((await this.pool.query(query, params)).rows);
+  }
+
+  async getContainerForecastSummary(filters?: { startDate?: string; endDate?: string }): Promise<any[]> {
+    let query = `SELECT vessel, drop_off_location, COUNT(*)::INTEGER AS container_count,
+      COUNT(*) FILTER (WHERE release_status = 'Released')::INTEGER AS released_count,
+      COUNT(*) FILTER (WHERE overweight_permit = true)::INTEGER AS overweight_count
+      FROM container_forecasts WHERE 1=1`;
+    const params: any[] = [];
+    if (filters?.startDate) { params.push(filters.startDate); query += ` AND vessel_eta >= $${params.length}`; }
+    if (filters?.endDate) { params.push(filters.endDate); query += ` AND vessel_eta <= $${params.length}`; }
+    query += ' GROUP BY vessel, drop_off_location ORDER BY vessel ASC, drop_off_location ASC';
+    return this.toCamelCase((await this.pool.query(query, params)).rows);
+  }
+
+  async createContainerForecast(data: any, actor: string): Promise<any> {
+    const vessel = String(data.vessel || '').trim();
+    const containerNumber = String(data.containerNumber || '').trim().toUpperCase();
+    const dropOffLocation = String(data.dropOffLocation || '').trim();
+    if (!vessel || !containerNumber || !dropOffLocation) throw new Error('Vessel, full container number, and drop-off location are required.');
+    const now = getLocalISOString();
+    const result = await this.pool.query(`INSERT INTO container_forecasts (
+      vessel, container_number, chassis, weight, overweight_permit, permit_number, nd_nt_number, ratecon_number, rate_amount,
+      pickup_number, pickup_scac, driver_load, port_appointment_number, delivery_eta, drop_off_location, empty_return_date,
+      empty_return_driver, vessel_eta, release_status, notes, created_by, updated_by, created_at, updated_at
+    ) VALUES (${Array.from({ length: 24 }, (_, i) => `$${i + 1}`).join(', ')}) RETURNING *`, [
+      vessel, containerNumber, data.chassis || null, data.weight ?? null, Boolean(data.overweightPermit),
+      data.permitNumber || null, data.ndNtNumber || null, data.rateconNumber || null, data.rateAmount ?? null,
+      data.pickupNumber || null, data.pickupScac || null, data.driverLoad || null, data.portAppointmentNumber || null,
+      data.deliveryEta || null, dropOffLocation, data.emptyReturnDate || null, data.emptyReturnDriver || null,
+      data.vesselEta || null, data.releaseStatus || 'Pending', data.notes || null, actor, actor, now, now,
+    ]);
+    return this.toCamelCase(result.rows[0]);
+  }
+
+  async updateContainerForecast(id: number, data: any, actor: string): Promise<any> {
+    const columns: Record<string, string> = {
+      vessel: 'vessel', containerNumber: 'container_number', chassis: 'chassis', weight: 'weight',
+      overweightPermit: 'overweight_permit', permitNumber: 'permit_number', ndNtNumber: 'nd_nt_number',
+      rateconNumber: 'ratecon_number', rateAmount: 'rate_amount', pickupNumber: 'pickup_number', pickupScac: 'pickup_scac',
+      driverLoad: 'driver_load', portAppointmentNumber: 'port_appointment_number', deliveryEta: 'delivery_eta',
+      dropOffLocation: 'drop_off_location', emptyReturnDate: 'empty_return_date', emptyReturnDriver: 'empty_return_driver',
+      vesselEta: 'vessel_eta', releaseStatus: 'release_status', notes: 'notes',
+    };
+    const fields: string[] = [];
+    const values: any[] = [];
+    for (const [key, column] of Object.entries(columns)) {
+      if (data[key] === undefined) continue;
+      values.push(key === 'overweightPermit' ? Boolean(data[key]) : data[key] === '' ? null : data[key]);
+      fields.push(`${column} = $${values.length}`);
+    }
+    if (data.vessel !== undefined && !String(data.vessel).trim()) throw new Error('Vessel is required.');
+    if (data.containerNumber !== undefined && !String(data.containerNumber).trim()) throw new Error('Full container number is required.');
+    if (data.dropOffLocation !== undefined && !String(data.dropOffLocation).trim()) throw new Error('Drop-off location is required.');
+    if (!fields.length) throw new Error('No forecast changes supplied.');
+    values.push(actor);
+    fields.push(`updated_by = $${values.length}`);
+    values.push(getLocalISOString());
+    fields.push(`updated_at = $${values.length}`);
+    values.push(id);
+    const result = await this.pool.query(`UPDATE container_forecasts SET ${fields.join(', ')} WHERE id = $${values.length} RETURNING *`, values);
+    return result.rows.length ? this.toCamelCase(result.rows[0]) : null;
+  }
+
+  async deleteContainerForecast(id: number): Promise<boolean> {
+    const result = await this.pool.query('DELETE FROM container_forecasts WHERE id = $1', [id]);
+    return (result.rowCount || 0) > 0;
+  }
+
   async createExtraServiceEntry(data: {
     serviceDate: string;
     serviceType: string;
@@ -1854,6 +2000,8 @@ export class DatabaseService implements IDatabaseService {
     contactName: string;
     contactPhone: string;
     pickupNumber?: string;
+    pickupNumber2?: string;
+    pickupNumber3?: string;
     customer?: string;
     carrier?: string;
     type: 'Inbound' | 'Outbound';
@@ -1867,8 +2015,8 @@ export class DatabaseService implements IDatabaseService {
     const result = await this.pool.query(`
       INSERT INTO appointments (
         appointment_date, appointment_time, company, contact_name, contact_phone,
-        pickup_number, customer, carrier, type, door_id, pallets, commodity, notes, confirmation_number, status, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        pickup_number, pickup_number_2, pickup_number_3, customer, carrier, type, door_id, pallets, commodity, notes, confirmation_number, status, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
       RETURNING *
     `, [
       data.appointmentDate,
@@ -1877,6 +2025,8 @@ export class DatabaseService implements IDatabaseService {
       data.contactName,
       data.contactPhone,
       data.pickupNumber || null,
+      data.pickupNumber2 || null,
+      data.pickupNumber3 || null,
       data.customer || null,
       data.carrier || null,
       data.type,
@@ -2032,6 +2182,8 @@ export class DatabaseService implements IDatabaseService {
     contactName?: string;
     contactPhone?: string;
     pickupNumber?: string;
+    pickupNumber2?: string;
+    pickupNumber3?: string;
     customer?: string;
     carrier?: string;
     type?: 'Inbound' | 'Outbound';
@@ -2069,6 +2221,14 @@ export class DatabaseService implements IDatabaseService {
     if (data.pickupNumber !== undefined) {
       fields.push(`pickup_number = $${paramIndex++}`);
       params.push(data.pickupNumber);
+    }
+    if (data.pickupNumber2 !== undefined) {
+      fields.push(`pickup_number_2 = $${paramIndex++}`);
+      params.push(data.pickupNumber2 || null);
+    }
+    if (data.pickupNumber3 !== undefined) {
+      fields.push(`pickup_number_3 = $${paramIndex++}`);
+      params.push(data.pickupNumber3 || null);
     }
     if (data.customer !== undefined) {
       fields.push(`customer = $${paramIndex++}`);
@@ -3779,6 +3939,139 @@ export class DatabaseService implements IDatabaseService {
       return this.toCamelCase(report);
     } catch (error) {
       await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getFoodSafetyTinCatCycles(): Promise<any[]> {
+    const result = await this.pool.query(`
+      SELECT c.*, COUNT(s.id)::INTEGER AS scanned_count
+      FROM food_safety_tin_cat_cycles c
+      LEFT JOIN food_safety_tin_cat_scans s ON s.cycle_id = c.id
+      GROUP BY c.id
+      ORDER BY c.started_at DESC, c.id DESC
+    `);
+    return this.toCamelCase(result.rows);
+  }
+
+  async getFoodSafetyTinCatCycle(cycleId: number): Promise<any | null> {
+    const cycleResult = await this.pool.query(`
+      SELECT c.*, COUNT(s.id)::INTEGER AS scanned_count
+      FROM food_safety_tin_cat_cycles c
+      LEFT JOIN food_safety_tin_cat_scans s ON s.cycle_id = c.id
+      WHERE c.id = $1
+      GROUP BY c.id
+    `, [cycleId]);
+    if (!cycleResult.rows.length) return null;
+    const scansResult = await this.pool.query(`
+      SELECT id, cycle_id, asset_code, scanned_by, scanned_at
+      FROM food_safety_tin_cat_scans WHERE cycle_id = $1
+      ORDER BY scanned_at DESC, id DESC
+    `, [cycleId]);
+    return { ...this.toCamelCase(cycleResult.rows[0]), scans: this.toCamelCase(scansResult.rows) };
+  }
+
+  async createFoodSafetyTinCatCycle(startedBy: string): Promise<any> {
+    const userName = String(startedBy || '').trim();
+    if (!userName) throw new Error('Signed-in user is required to start a cycle.');
+    const nowDate = new Date();
+    const now = getLocalISOString(nowDate);
+    const existingResult = await this.pool.query(`
+      SELECT c.*, COUNT(s.id)::INTEGER AS scanned_count
+      FROM food_safety_tin_cat_cycles c
+      LEFT JOIN food_safety_tin_cat_scans s ON s.cycle_id = c.id
+      WHERE c.status = 'open'
+      GROUP BY c.id
+      ORDER BY c.id DESC LIMIT 1
+    `);
+    const existing = existingResult.rows.length ? this.toCamelCase(existingResult.rows[0]) : null;
+    if (existing && new Date(existing.dueAt).getTime() > nowDate.getTime() && Number(existing.scannedCount) < Number(existing.targetCount)) {
+      throw new Error('The current Food Safety cycle is still open. Complete it or wait until it is due before starting another.');
+    }
+
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (existing) {
+        await client.query(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updated_at = $1 WHERE id = $2 AND status = 'open'`, [now, existing.id]);
+      }
+      const dueAt = getLocalISOString(new Date(nowDate.getTime() + FOOD_SAFETY_CYCLE_DAYS * 24 * 60 * 60 * 1000));
+      const result = await client.query(`
+        INSERT INTO food_safety_tin_cat_cycles (status, target_count, started_by, started_at, due_at, created_at, updated_at)
+        VALUES ('open', $1, $2, $3, $4, $3, $3) RETURNING id
+      `, [FOOD_SAFETY_TIN_CAT_TARGET, userName, now, dueAt]);
+      await client.query('COMMIT');
+      return this.getFoodSafetyTinCatCycle(Number(result.rows[0].id));
+    } catch (error) {
+      await client.query('ROLLBACK');
+      if ((error as any)?.code === '23505') {
+        throw new Error('Another user started the next Food Safety cycle. Refresh the page.');
+      }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async addFoodSafetyTinCatScan(cycleId: number, assetCodeValue: string, scannedBy: string): Promise<any> {
+    const normalizedCycleId = Number(cycleId);
+    const assetCode = normalizeTinCatCode(assetCodeValue);
+    const userName = String(scannedBy || '').trim();
+    if (!Number.isInteger(normalizedCycleId) || normalizedCycleId <= 0) throw new Error('Valid cycle is required.');
+    if (!assetCode || assetCode.length > 120) throw new Error('A valid tin-cat barcode is required.');
+    if (!userName) throw new Error('Signed-in user is required to record a scan.');
+
+    const nowDate = new Date();
+    const now = getLocalISOString(nowDate);
+    const client = await this.pool.connect();
+    let committed = false;
+    try {
+      await client.query('BEGIN');
+      const cycleResult = await client.query('SELECT * FROM food_safety_tin_cat_cycles WHERE id = $1 FOR UPDATE', [normalizedCycleId]);
+      if (!cycleResult.rows.length) throw new Error('Food Safety cycle not found.');
+      const cycle = this.toCamelCase(cycleResult.rows[0]);
+      if (cycle.status !== 'open') throw new Error('This Food Safety cycle is not open.');
+      if (new Date(cycle.dueAt).getTime() <= nowDate.getTime()) {
+        await client.query(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updated_at = $1 WHERE id = $2`, [now, normalizedCycleId]);
+        await client.query('COMMIT');
+        committed = true;
+        throw new Error('This Food Safety cycle is overdue. Start a new cycle to continue scanning.');
+      }
+
+      const existing = await client.query(`SELECT * FROM food_safety_tin_cat_scans WHERE cycle_id = $1 AND asset_code = $2`, [normalizedCycleId, assetCode]);
+      if (existing.rows.length) {
+        await client.query('COMMIT');
+        committed = true;
+        return { duplicate: true, scan: this.toCamelCase(existing.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+      }
+
+      const countResult = await client.query('SELECT COUNT(*)::INTEGER AS scanned_count FROM food_safety_tin_cat_scans WHERE cycle_id = $1', [normalizedCycleId]);
+      if (Number(countResult.rows[0]?.scanned_count || 0) >= Number(cycle.targetCount)) {
+        await client.query(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completed_at = $1, updated_at = $1 WHERE id = $2`, [now, normalizedCycleId]);
+        await client.query('COMMIT');
+        committed = true;
+        throw new Error('This Food Safety cycle is already complete.');
+      }
+
+      const scanResult = await client.query(`
+        INSERT INTO food_safety_tin_cat_scans (cycle_id, asset_code, scanned_by, scanned_at)
+        VALUES ($1, $2, $3, $4) RETURNING *
+      `, [normalizedCycleId, assetCode, userName, now]);
+      const updatedCountResult = await client.query('SELECT COUNT(*)::INTEGER AS scanned_count FROM food_safety_tin_cat_scans WHERE cycle_id = $1', [normalizedCycleId]);
+      if (Number(updatedCountResult.rows[0]?.scanned_count || 0) >= Number(cycle.targetCount)) {
+        await client.query(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completed_at = $1, updated_at = $1 WHERE id = $2`, [now, normalizedCycleId]);
+      }
+      await client.query('COMMIT');
+      committed = true;
+      return { duplicate: false, scan: this.toCamelCase(scanResult.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+    } catch (error: any) {
+      if (!committed) await client.query('ROLLBACK');
+      if (error?.code === '23505') {
+        const duplicate = await this.pool.query('SELECT * FROM food_safety_tin_cat_scans WHERE cycle_id = $1 AND asset_code = $2', [normalizedCycleId, assetCode]);
+        return { duplicate: true, scan: this.toCamelCase(duplicate.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+      }
       throw error;
     } finally {
       client.release();

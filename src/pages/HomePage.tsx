@@ -174,6 +174,24 @@ export const HomePage: React.FC = () => {
     },
   ];
 
+  const foodSafetyCards = [
+    {
+      icon: '🛡️',
+      title: 'Food Safety',
+      description: 'Run biweekly tin-cat inspections and review scan history',
+      onClick: () => navigate('/food-safety-tin-cats'),
+    },
+  ];
+
+  const dispatchCards = [
+    {
+      icon: '🚢',
+      title: 'Vessel & Container Forecast',
+      description: 'Track vessel arrivals, containers, delivery locations, and release status',
+      onClick: () => navigate('/container-forecast'),
+    },
+  ];
+
   const managementCards = [
     ...(userRole === 'executive' ? [{
       icon: '📊',
@@ -343,9 +361,7 @@ export const HomePage: React.FC = () => {
       </div>
 
       <div className="home-page__section">
-        <h2 className="home-page__section-title home-page__section-title--beta">
-          Inventory Control <span className="home-page__beta-badge">Beta · Development</span>
-        </h2>
+        <h2 className="home-page__section-title">Inventory Control</h2>
         <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
           {inventoryControlCards.map((card, index) => (
             <div
@@ -380,6 +396,36 @@ export const HomePage: React.FC = () => {
                   <h3 className="home-page__card-title">{card.title}</h3>
                   {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
                 </div>
+                <p className="home-page__card-desc">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="home-page__section">
+        <h2 className="home-page__section-title">Food Safety</h2>
+        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
+          {foodSafetyCards.map((card) => (
+            <div key={card.title} className="home-page__card" onClick={card.onClick}>
+              <div className="home-page__card-icon">{card.icon}</div>
+              <div className="home-page__card-content">
+                <div className="home-page__card-title-row"><h3 className="home-page__card-title">{card.title}</h3></div>
+                <p className="home-page__card-desc">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="home-page__section">
+        <h2 className="home-page__section-title">Dispatch</h2>
+        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
+          {dispatchCards.map((card) => (
+            <div key={card.title} className="home-page__card" onClick={card.onClick}>
+              <div className="home-page__card-icon">{card.icon}</div>
+              <div className="home-page__card-content">
+                <div className="home-page__card-title-row"><h3 className="home-page__card-title">{card.title}</h3></div>
                 <p className="home-page__card-desc">{card.description}</p>
               </div>
             </div>

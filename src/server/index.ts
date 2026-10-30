@@ -2433,6 +2433,55 @@ app.get('/api/dock-checker/history', async (req, res) => {
 
 // ==================== INVENTORY AUDITOR API ====================
 
+app.get('/api/food-safety/tin-cats/cycles', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    res.json(await db.getFoodSafetyTinCatCycles());
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load Food Safety cycles.' });
+  }
+});
+
+app.post('/api/food-safety/tin-cats/cycles', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const cycle = await db.createFoodSafetyTinCatCycle(user.name);
+    res.status(201).json(cycle);
+  } catch (error: any) {
+    res.status(409).json({ error: error?.message || 'Failed to start Food Safety cycle.' });
+  }
+});
+
+app.get('/api/food-safety/tin-cats/cycles/:cycleId', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const cycleId = Number(req.params.cycleId);
+    if (!Number.isInteger(cycleId) || cycleId <= 0) return res.status(400).json({ error: 'Valid cycle ID is required.' });
+    const cycle = await db.getFoodSafetyTinCatCycle(cycleId);
+    if (!cycle) return res.status(404).json({ error: 'Food Safety cycle not found.' });
+    res.json(cycle);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load Food Safety cycle.' });
+  }
+});
+
+app.post('/api/food-safety/tin-cats/cycles/:cycleId/scans', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const cycleId = Number(req.params.cycleId);
+    const assetCode = String(req.body?.assetCode || '').trim();
+    if (!Number.isInteger(cycleId) || cycleId <= 0) return res.status(400).json({ error: 'Valid cycle ID is required.' });
+    if (!assetCode) return res.status(400).json({ error: 'Scan a tin-cat barcode first.' });
+    res.status(201).json(await db.addFoodSafetyTinCatScan(cycleId, assetCode, user.name));
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to record tin-cat scan.' });
+  }
+});
+
 app.post('/api/inventory-auditor/reports', async (req, res) => {
   try {
     const body = req.body || {};
@@ -3498,6 +3547,94 @@ app.get('/api/services/extra', async (req, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Failed to load extra services' });
+  }
+});
+
+app.get('/api/dispatch/container-forecasts', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const filters = {
+      vessel: String(req.query.vessel || '').trim() || undefined,
+      location: String(req.query.location || '').trim() || undefined,
+      releaseStatus: String(req.query.releaseStatus || '').trim() || undefined,
+      search: String(req.query.search || '').trim() || undefined,
+    };
+    const entries = await db.listContainerForecasts(filters);
+    res.json(entries);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load container forecasts.' });
+  }
+});
+
+app.get('/api/dispatch/container-forecasts/summary', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const summary = await db.getContainerForecastSummary({
+      startDate: String(req.query.startDate || '').trim() || undefined,
+      endDate: String(req.query.endDate || '').trim() || undefined,
+    });
+    res.json(summary);
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load vessel/location forecast.' });
+  }
+});
+
+app.post('/api/dispatch/container-forecasts', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const body = req.body || {};
+    const optionalNumbers = ['weight', 'rateAmount'];
+    const normalized = { ...body };
+    for (const field of optionalNumbers) {
+      if (body[field] === '' || body[field] == null) normalized[field] = null;
+      else if (!Number.isFinite(Number(body[field])) || Number(body[field]) < 0) return res.status(400).json({ error: `${field} must be a non-negative number.` });
+      else normalized[field] = Number(body[field]);
+    }
+    if (typeof body.overweightPermit !== 'boolean') normalized.overweightPermit = ['true', 'yes', '1'].includes(String(body.overweightPermit || '').toLowerCase());
+    const created = await db.createContainerForecast(normalized, user.name);
+    res.status(201).json(created);
+  } catch (error: any) {
+    const duplicate = error?.code === '23505' || String(error?.message || '').includes('UNIQUE constraint failed');
+    res.status(duplicate ? 409 : 400).json({ error: duplicate ? 'That container number is already on the forecast.' : error?.message || 'Failed to create container forecast.' });
+  }
+});
+
+app.put('/api/dispatch/container-forecasts/:id', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Valid forecast ID is required.' });
+    const body = { ...(req.body || {}) };
+    for (const field of ['weight', 'rateAmount']) {
+      if (body[field] === '') body[field] = null;
+      else if (body[field] != null && (!Number.isFinite(Number(body[field])) || Number(body[field]) < 0)) return res.status(400).json({ error: `${field} must be a non-negative number.` });
+      else if (body[field] != null) body[field] = Number(body[field]);
+    }
+    if (body.overweightPermit !== undefined && typeof body.overweightPermit !== 'boolean') body.overweightPermit = ['true', 'yes', '1'].includes(String(body.overweightPermit).toLowerCase());
+    const updated = await db.updateContainerForecast(id, body, user.name);
+    if (!updated) return res.status(404).json({ error: 'Container forecast not found.' });
+    res.json(updated);
+  } catch (error: any) {
+    const duplicate = error?.code === '23505' || String(error?.message || '').includes('UNIQUE constraint failed');
+    res.status(duplicate ? 409 : 400).json({ error: duplicate ? 'That container number is already on the forecast.' : error?.message || 'Failed to update container forecast.' });
+  }
+});
+
+app.delete('/api/dispatch/container-forecasts/:id', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Valid forecast ID is required.' });
+    const deleted = await db.deleteContainerForecast(id);
+    if (!deleted) return res.status(404).json({ error: 'Container forecast not found.' });
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to delete container forecast.' });
   }
 });
 

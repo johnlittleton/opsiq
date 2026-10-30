@@ -278,7 +278,7 @@ const DriverCheckIn: React.FC = () => {
                     <option value="">{loadingAppointments ? 'Loading appointments...' : 'Select the original appointment'}</option>
                     {outboundAppointments.map((appointment) => (
                       <option key={appointment.id} value={appointment.id}>
-                        {appointment.appointmentDate} · {appointment.appointmentTime} · Door {appointment.doorId || 'Unassigned'} · {appointment.customer || appointment.company} · S/O {appointment.pickupNumber || 'N/A'}
+                        {appointment.appointmentDate} · {appointment.appointmentTime} · Door {appointment.doorId || 'Unassigned'} · {appointment.customer || appointment.company} · S/O {[appointment.pickupNumber, appointment.pickupNumber2, appointment.pickupNumber3].filter(Boolean).join(', ') || 'N/A'}
                       </option>
                     ))}
                   </select>

@@ -842,6 +842,9 @@ class ApiClient {
     company: string;
     contactName: string;
     contactPhone: string;
+    pickupNumber?: string;
+    pickupNumber2?: string;
+    pickupNumber3?: string;
     type: 'Inbound' | 'Outbound';
     doorId?: number;
     pallets?: number;

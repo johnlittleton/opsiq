@@ -1,15 +1,21 @@
 import { strict as assert } from 'node:assert';
-import { formatPickupDate, getOrderPickups, getPickupLabel, type ProductionPickup } from './productionPickups';
+import { formatPickupDate, getAppointmentOrderNumbers, getOrderPickups, getPickupLabel, type ProductionPickup } from './productionPickups';
 
 const appointments: ProductionPickup[] = [
-  { id: 1, pickupNumber: ' WO123 ', type: 'Outbound', appointmentDate: '2026-10-16', appointmentTime: '14:00', status: 'Scheduled' },
+  { id: 1, pickupNumber: ' WO123 ', pickupNumber2: ' WO124 ', type: 'Outbound', appointmentDate: '2026-10-16', appointmentTime: '14:00', status: 'Scheduled' },
   { id: 2, pickupNumber: 'WO123', type: 'Inbound', appointmentDate: '2026-10-15' },
   { id: 3, pickupNumber: 'WO123', type: 'Outbound', appointmentDate: '2026-10-14', status: 'Cancelled' },
   { id: 4, pickupNumber: 'WO123', type: 'Outbound', appointmentDate: '2026-10-15', appointmentTime: '09:00', status: 'Scheduled' },
   { id: 5, pickupNumber: 'WO1234', type: 'Outbound', appointmentDate: '2026-10-15' },
   { id: 6, type: 'Outbound', appointmentDate: '2026-10-15' },
+  { id: 7, pickupNumber3: 'WO125', type: 'Outbound', appointmentDate: '2026-10-17', appointmentTime: '16:00', status: 'Scheduled' },
+  { id: 8, pickupNumber2: ' WO123 ', pickupNumber3: 'WO124', type: 'Outbound', appointmentDate: '2026-10-18', status: 'Scheduled' },
 ];
-assert.deepEqual(getOrderPickups(appointments, 'wo123').map((appointment) => appointment.id), [4, 1, 3]);
+assert.deepEqual(getOrderPickups(appointments, 'wo123').map((appointment) => appointment.id), [4, 1, 8, 3]);
+assert.deepEqual(getOrderPickups(appointments, 'wo124').map((appointment) => appointment.id), [1, 8]);
+assert.deepEqual(getOrderPickups(appointments, 'wo125').map((appointment) => appointment.id), [7]);
+assert.deepEqual(getAppointmentOrderNumbers(appointments[0]), ['WO123', 'WO124']);
+assert.deepEqual(getAppointmentOrderNumbers(appointments[7]), ['WO123', 'WO124']);
 assert.deepEqual(getOrderPickups(appointments, ''), []);
 assert.deepEqual(getOrderPickups(appointments, 'UNKNOWN'), []);
 assert.equal(getPickupLabel(appointments[3], new Date(2026, 9, 15)), 'Pickup Today');

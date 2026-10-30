@@ -18,6 +18,8 @@ interface Appointment {
   contactPhone: string;
   confirmationNumber?: string;
   pickupNumber?: string;
+  pickupNumber2?: string;
+  pickupNumber3?: string;
   customer?: string;
   carrier?: string;
   type: 'Inbound' | 'Outbound';
@@ -59,6 +61,8 @@ const Scheduler: React.FC = () => {
     contactName: '',
     contactPhone: '',
     pickupNumber: '',
+    pickupNumber2: '',
+    pickupNumber3: '',
     customer: '',
     carrier: '',
     type: 'Inbound' as 'Inbound' | 'Outbound',
@@ -187,6 +191,8 @@ const Scheduler: React.FC = () => {
         contactName: appointment.contactName,
         contactPhone: appointment.contactPhone,
         pickupNumber: appointment.pickupNumber || '',
+        pickupNumber2: appointment.pickupNumber2 || '',
+        pickupNumber3: appointment.pickupNumber3 || '',
         customer: appointment.customer || '',
         carrier: appointment.carrier || '',
         type: appointment.type,
@@ -204,6 +210,8 @@ const Scheduler: React.FC = () => {
         contactName: '',
         contactPhone: '',
         pickupNumber: '',
+        pickupNumber2: '',
+        pickupNumber3: '',
         customer: '',
         carrier: '',
         type: 'Inbound',
@@ -267,7 +275,7 @@ const Scheduler: React.FC = () => {
           <div class="apt-row"><div class="apt-label">Carrier:</div><div class="apt-value">${apt.carrier || 'N/A'}</div></div>
           <div class="apt-row"><div class="apt-label">Contact Name:</div><div class="apt-value">${apt.contactName || 'N/A'}</div></div>
           <div class="apt-row"><div class="apt-label">Contact Phone:</div><div class="apt-value">${apt.contactPhone || 'N/A'}</div></div>
-          <div class="apt-row"><div class="apt-label">${apt.type === 'Inbound' ? 'P/U Number' : 'S/O Number'}:</div><div class="apt-value">${apt.pickupNumber || 'N/A'}</div></div>
+          <div class="apt-row"><div class="apt-label">${apt.type === 'Inbound' ? 'P/U Number' : 'S/O Numbers'}:</div><div class="apt-value">${(apt.type === 'Inbound' ? [apt.pickupNumber] : [apt.pickupNumber, apt.pickupNumber2, apt.pickupNumber3]).filter(Boolean).join(', ') || 'N/A'}</div></div>
         </div>
 
         <div class="apt-section">
@@ -412,6 +420,8 @@ const Scheduler: React.FC = () => {
         contactName: '',
         contactPhone: '',
         pickupNumber: '',
+        pickupNumber2: '',
+        pickupNumber3: '',
         customer: '',
         carrier: '',
         type: 'Inbound',
@@ -435,6 +445,8 @@ const Scheduler: React.FC = () => {
       appointment.company,
       appointment.confirmationNumber,
       appointment.pickupNumber,
+      appointment.pickupNumber2,
+      appointment.pickupNumber3,
       appointment.customer,
       appointment.carrier,
       appointment.contactName,
@@ -535,7 +547,7 @@ const Scheduler: React.FC = () => {
                         <b>{appointment.appointmentTime}</b>
                         <span>{appointment.carrier || appointment.company || 'No carrier'}</span>
                         <span>{appointment.customer || 'No customer'}</span>
-                        <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.pickupNumber || 'N/A'}</span>
+                        <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.type === 'Inbound' ? appointment.pickupNumber || 'N/A' : [appointment.pickupNumber, appointment.pickupNumber2, appointment.pickupNumber3].filter(Boolean).join(', ') || 'N/A'}</span>
                         <span>Conf: {appointment.confirmationNumber || 'N/A'}</span>
                       </button>
                     ))}
@@ -546,7 +558,7 @@ const Scheduler: React.FC = () => {
                       <b>{hoveredAppointment.appointment.appointmentTime} · {hoveredAppointment.appointment.type}</b>
                       <span>Carrier: {hoveredAppointment.appointment.carrier || 'N/A'}</span>
                       <span>Customer: {hoveredAppointment.appointment.customer || 'N/A'}</span>
-                      <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.pickupNumber || 'N/A'}</span>
+                      <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.type === 'Inbound' ? hoveredAppointment.appointment.pickupNumber || 'N/A' : [hoveredAppointment.appointment.pickupNumber, hoveredAppointment.appointment.pickupNumber2, hoveredAppointment.appointment.pickupNumber3].filter(Boolean).join(', ') || 'N/A'}</span>
                       <span>Confirmation #: {hoveredAppointment.appointment.confirmationNumber || 'N/A'}</span>
                       <span>Company: {hoveredAppointment.appointment.company || 'N/A'}</span>
                       <span>Contact: {hoveredAppointment.appointment.contactName || 'N/A'}</span>
@@ -583,7 +595,7 @@ const Scheduler: React.FC = () => {
                           <b>{appointment.appointmentTime}</b>
                           <span>{appointment.carrier || 'No carrier'}</span>
                           <span>{appointment.customer || 'No customer'}</span>
-                          <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.pickupNumber || 'N/A'}</span>
+                          <span>{appointment.type === 'Inbound' ? 'P/U' : 'S/O'} {appointment.type === 'Inbound' ? appointment.pickupNumber || 'N/A' : [appointment.pickupNumber, appointment.pickupNumber2, appointment.pickupNumber3].filter(Boolean).join(', ') || 'N/A'}</span>
                           <span>Conf: {appointment.confirmationNumber || 'N/A'}</span>
                         </button>
                       )) : <span className="scheduler__door-empty">Available</span>}
@@ -594,7 +606,7 @@ const Scheduler: React.FC = () => {
                         <b>{hoveredAppointment.appointment.appointmentTime} · {hoveredAppointment.appointment.type}</b>
                         <span>Carrier: {hoveredAppointment.appointment.carrier || 'N/A'}</span>
                         <span>Customer: {hoveredAppointment.appointment.customer || 'N/A'}</span>
-                        <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.pickupNumber || 'N/A'}</span>
+                        <span>{hoveredAppointment.appointment.type === 'Inbound' ? 'P/U' : 'Sales Order'}: {hoveredAppointment.appointment.type === 'Inbound' ? hoveredAppointment.appointment.pickupNumber || 'N/A' : [hoveredAppointment.appointment.pickupNumber, hoveredAppointment.appointment.pickupNumber2, hoveredAppointment.appointment.pickupNumber3].filter(Boolean).join(', ') || 'N/A'}</span>
                         <span>Confirmation #: {hoveredAppointment.appointment.confirmationNumber || 'N/A'}</span>
                         <span>Company: {hoveredAppointment.appointment.company || 'N/A'}</span>
                         <span>Contact: {hoveredAppointment.appointment.contactName || 'N/A'}</span>
@@ -681,7 +693,7 @@ const Scheduler: React.FC = () => {
                         </td>
                         <td>{apt.company || '-'}</td>
                         <td>{apt.confirmationNumber || '-'}</td>
-                        <td>{apt.pickupNumber || '-'}</td>
+                        <td>{apt.type === 'Inbound' ? apt.pickupNumber || '-' : [apt.pickupNumber, apt.pickupNumber2, apt.pickupNumber3].filter(Boolean).join(', ') || '-'}</td>
                         <td>{apt.contactName || '-'}</td>
                         <td>{apt.contactPhone || '-'}</td>
                         <td>{apt.doorId ? `D${apt.doorId}` : '-'}</td>
@@ -872,6 +884,28 @@ const Scheduler: React.FC = () => {
                       placeholder="Optional"
                     />
                   </div>
+                  {formData.type === 'Outbound' && (
+                    <>
+                      <div className="scheduler__form-field">
+                        <label>Additional S/O Number 2</label>
+                        <input
+                          type="text"
+                          value={formData.pickupNumber2}
+                          onChange={(e) => setFormData({ ...formData, pickupNumber2: e.target.value })}
+                          placeholder="Optional"
+                        />
+                      </div>
+                      <div className="scheduler__form-field">
+                        <label>Additional S/O Number 3</label>
+                        <input
+                          type="text"
+                          value={formData.pickupNumber3}
+                          onChange={(e) => setFormData({ ...formData, pickupNumber3: e.target.value })}
+                          placeholder="Optional"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="scheduler__form-row">
@@ -993,6 +1027,8 @@ const Scheduler: React.FC = () => {
                       contactName: formData.contactName,
                       contactPhone: formData.contactPhone,
                       pickupNumber: formData.pickupNumber,
+                      pickupNumber2: formData.type === 'Outbound' ? formData.pickupNumber2 : '',
+                      pickupNumber3: formData.type === 'Outbound' ? formData.pickupNumber3 : '',
                       customer: formData.customer,
                       carrier: formData.carrier,
                       type: formData.type,

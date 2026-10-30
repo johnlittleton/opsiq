@@ -50,6 +50,8 @@ import OutboundDockCheckerForm from './pages/OutboundDockCheckerForm';
 import InboundDockCheckerForm from './pages/InboundDockCheckerForm';
 import DockCheckerHistory from './pages/DockCheckerHistory';
 import InventoryAuditor from './pages/InventoryAuditor';
+import FoodSafetyTinCats from './pages/FoodSafetyTinCats';
+import ContainerForecast from './pages/ContainerForecast';
 import LoadBalancer from './pages/LoadBalancer';
 import CustomerPortal from './pages/CustomerPortal';
 import CustomerPortalAdmin from './pages/CustomerPortalAdmin';
@@ -113,6 +115,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/dock-checker/inbound" element={<InboundDockCheckerForm />} />
       <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
       <Route path="/inventory-auditor" element={<InventoryAuditor />} />
+      <Route path="/food-safety-tin-cats" element={<FoodSafetyTinCats />} />
+      <Route path="/container-forecast" element={<ContainerForecast />} />
       <Route path="/load-balancer" element={<LoadBalancer />} />
       <Route path="/load-calculator" element={<Navigate to="/load-balancer" replace />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />

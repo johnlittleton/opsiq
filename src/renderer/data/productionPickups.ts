@@ -1,6 +1,8 @@
 export interface ProductionPickup {
   id: number;
   pickupNumber?: string;
+  pickupNumber2?: string;
+  pickupNumber3?: string;
   type: string;
   appointmentDate: string;
   appointmentTime?: string;
@@ -8,12 +10,18 @@ export interface ProductionPickup {
   status?: string;
 }
 
+export function getAppointmentOrderNumbers(appointment: ProductionPickup): string[] {
+  return [appointment.pickupNumber, appointment.pickupNumber2, appointment.pickupNumber3]
+    .map((number) => String(number || '').trim())
+    .filter(Boolean);
+}
+
 export function getOrderPickups(appointments: ProductionPickup[], orderId: string): ProductionPickup[] {
   const normalizedId = String(orderId || '').trim().toUpperCase();
   if (!normalizedId) return [];
   return appointments.filter((appointment) =>
     appointment.type?.trim().toLowerCase() === 'outbound'
-    && String(appointment.pickupNumber || '').trim().toUpperCase() === normalizedId,
+    && getAppointmentOrderNumbers(appointment).some((number) => number.toUpperCase() === normalizedId),
   ).sort((left, right) =>
     Number(isClosedPickup(left)) - Number(isClosedPickup(right))
     || `${left.appointmentDate} ${left.appointmentTime || ''}`.localeCompare(`${right.appointmentDate} ${right.appointmentTime || ''}`),

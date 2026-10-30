@@ -244,11 +244,13 @@
   margin-bottom: 12px;
   padding-bottom: 6px;
   border-bottom: 1px solid var(--border);
+  text-align: center;
 }
 
 .home-page__section-title--beta {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -264,15 +266,18 @@
 
 .home-page__quick-access {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .home-page__quick-access--compact {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  align-items: stretch;
 }
 
 .home-page__quick-access--grid {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
 }
 
 .home-page__card {
@@ -281,13 +286,20 @@
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--border-bright);
   border-radius: 8px;
-  padding: 10px 12px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 9px;
   box-shadow: var(--shadow);
   transition: all var(--transition-normal);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+.home-page__quick-access--compact .home-page__card {
+  flex: 1 1 175px;
+  max-width: 220px;
 }
 
 .home-page__card:hover {
@@ -304,10 +316,11 @@
 
 .home-page__card-content {
   flex: 1;
+  min-width: 0;
 }
 
 .home-page__card-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-bright);
   margin-bottom: 2px;
@@ -316,8 +329,9 @@
 .home-page__card-title-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   margin-bottom: 2px;
 }
 
@@ -337,7 +351,7 @@
 }
 
 .home-page__card-desc {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-muted);
   line-height: 1.3;
 }
@@ -426,13 +440,13 @@
   }
 
   .home-page__header {
-    margin-top: 12px;
-    margin-bottom: 8px;
+    margin-top: 8px;
+    margin-bottom: 5px;
   }
 
   .home-page__title {
-    font-size: 25px;
-    margin-bottom: 2px;
+    font-size: 22px;
+    margin-bottom: 0;
   }
 
   .home-page__subtitle {
@@ -440,41 +454,50 @@
   }
 
   .home-page__section {
-    margin-bottom: 10px;
+    margin-bottom: 6px;
   }
 
   .home-page__section-title {
-    margin-bottom: 5px;
-    padding-bottom: 3px;
-    font-size: 10px;
+    margin-bottom: 3px;
+    padding-bottom: 2px;
+    font-size: 9px;
   }
 
   .home-page__quick-access {
-    gap: 6px;
+    gap: 5px;
   }
 
   .home-page__quick-access--compact {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    justify-content: space-evenly;
+  }
+
+  .home-page__quick-access--compact .home-page__card {
+    flex-basis: 145px;
+    max-width: 170px;
+  }
+
+  .home-page__quick-access--grid {
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
   }
 
   .home-page__card {
-    min-height: 54px;
-    padding: 6px 8px;
-    gap: 7px;
+    min-height: 46px;
+    padding: 5px 7px;
+    gap: 6px;
   }
 
   .home-page__card-icon {
-    font-size: 17px;
+    font-size: 16px;
   }
 
   .home-page__card-title {
-    font-size: 11px;
-    margin-bottom: 1px;
+    font-size: 10px;
+    margin-bottom: 0;
   }
 
   .home-page__card-desc {
-    font-size: 9px;
-    line-height: 1.15;
+    font-size: 8px;
+    line-height: 1.1;
   }
 
   .home-page__card-badge {
@@ -555,6 +578,14 @@
   .home-page__quick-access--grid,
   .home-page__status {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-page__quick-access--compact {
+    display: grid;
+  }
+
+  .home-page__quick-access--compact .home-page__card {
+    max-width: none;
   }
 
   .home-page__card {

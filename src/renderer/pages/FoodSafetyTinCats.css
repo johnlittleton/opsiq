@@ -1,0 +1,344 @@
+.food-safety-page {
+  --fs-ink: #e7eef1;
+  --fs-muted: #9caeb5;
+  --fs-border: #33464d;
+  --fs-panel: #18252b;
+  --fs-accent: #70d9bd;
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 22px clamp(16px, 3vw, 40px) 36px;
+  background: #10191e;
+  color: var(--fs-ink);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.food-safety-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 20px;
+  max-width: 1450px;
+  margin: 0 auto 22px;
+  border-bottom: 1px solid var(--fs-border);
+  padding-bottom: 18px;
+}
+
+.food-safety-header button,
+.food-safety-start-button,
+.food-safety-scan-row button {
+  min-height: 42px;
+  border: 1px solid #4a6d66;
+  border-radius: 4px;
+  background: #1c4841;
+  color: #effff9;
+  cursor: pointer;
+  padding: 0 14px;
+  font: inherit;
+  font-weight: 700;
+}
+
+.food-safety-home {
+  background: #1b2930 !important;
+  border-color: #52646b !important;
+}
+
+.food-safety-title p,
+.food-safety-eyebrow {
+  margin: 0 0 5px;
+  color: var(--fs-accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.food-safety-title h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.food-safety-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.food-safety-header-actions span {
+  margin-right: 8px;
+  color: var(--fs-muted);
+  font-size: 0.83rem;
+}
+
+.food-safety-header-actions button {
+  min-height: 36px;
+  background: #202e34;
+}
+
+.food-safety-start-panel,
+.food-safety-cycle-summary,
+.food-safety-scan-panel,
+.food-safety-scans-section,
+.food-safety-history-section {
+  max-width: 1450px;
+  margin: 0 auto 16px;
+  border: 1px solid var(--fs-border);
+  border-radius: 5px;
+  background: var(--fs-panel);
+}
+
+.food-safety-start-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px;
+}
+
+.food-safety-start-panel h2,
+.food-safety-cycle-heading h2,
+.food-safety-section-heading h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.food-safety-start-panel p {
+  margin: 7px 0 0;
+  color: var(--fs-muted);
+}
+
+.food-safety-start-button {
+  min-height: 48px;
+  background: #1b5b4d;
+}
+
+.food-safety-start-button:disabled,
+.food-safety-scan-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.food-safety-cycle-summary {
+  padding: 20px;
+}
+
+.food-safety-cycle-heading,
+.food-safety-progress-copy,
+.food-safety-cycle-meta,
+.food-safety-section-heading,
+.food-safety-scan-row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.food-safety-status {
+  display: inline-block;
+  border-radius: 3px;
+  background: #203b34;
+  color: #83e0bd;
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.food-safety-status.is-completed {
+  background: #203b34;
+  color: #83e0bd;
+}
+
+.food-safety-status.is-overdue {
+  background: #482c23;
+  color: #ffac82;
+}
+
+.food-safety-progress-copy {
+  margin: 22px 0 10px;
+}
+
+.food-safety-progress-copy strong {
+  color: var(--fs-accent);
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.food-safety-progress-copy small {
+  color: var(--fs-ink);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.food-safety-progress-copy span,
+.food-safety-cycle-meta {
+  color: var(--fs-muted);
+  font-size: 0.82rem;
+}
+
+.food-safety-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #0d171b;
+}
+
+.food-safety-progress-track div {
+  height: 100%;
+  border-radius: inherit;
+  background: #57cbaa;
+  transition: width 180ms ease;
+}
+
+.food-safety-cycle-meta {
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.food-safety-scan-panel,
+.food-safety-scans-section,
+.food-safety-history-section {
+  padding: 18px 20px;
+}
+
+.food-safety-scan-panel label {
+  display: block;
+  margin-bottom: 8px;
+  color: #c5d3d8;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.food-safety-scan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+}
+
+.food-safety-scan-row input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #52646b;
+  border-radius: 4px;
+  background: #101a1f;
+  color: var(--fs-ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 1.05rem;
+}
+
+.food-safety-scan-row input:focus {
+  outline: 2px solid var(--fs-accent);
+  outline-offset: 1px;
+}
+
+.food-safety-scan-row button {
+  min-height: 48px;
+}
+
+.food-safety-message {
+  max-width: 1450px;
+  margin: 0 auto 14px;
+  border: 1px solid #4b625b;
+  border-left: 4px solid var(--fs-accent);
+  border-radius: 4px;
+  background: #172923;
+  padding: 11px 14px;
+  color: #a7efcf;
+  font-weight: 700;
+}
+
+.food-safety-message.is-warning {
+  border-left-color: #efbf60;
+  background: #302818;
+  color: #f8d98a;
+}
+
+.food-safety-message.is-error {
+  border-left-color: #f17878;
+  background: #351e22;
+  color: #ffb5ae;
+}
+
+.food-safety-section-heading {
+  margin-bottom: 12px;
+}
+
+.food-safety-section-heading span,
+.food-safety-empty {
+  color: var(--fs-muted);
+  font-size: 0.83rem;
+}
+
+.food-safety-scan-list {
+  max-height: 360px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.food-safety-scan-row-item {
+  justify-content: initial;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(100px, 0.7fr) minmax(155px, 0.8fr);
+  border-bottom: 1px solid #293b41;
+  padding: 10px 4px;
+  font-size: 0.84rem;
+}
+
+.food-safety-scan-row-item strong {
+  color: #f2f7f8;
+  font-family: Consolas, monospace;
+}
+
+.food-safety-scan-row-item span,
+.food-safety-scan-row-item time {
+  color: var(--fs-muted);
+}
+
+.food-safety-cycle-list {
+  display: grid;
+  gap: 6px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.food-safety-cycle-list button {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.3fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-bottom-color: #293b41;
+  background: transparent;
+  color: var(--fs-ink);
+  cursor: pointer;
+  padding: 10px 8px;
+  text-align: left;
+  font: inherit;
+  font-size: 0.83rem;
+}
+
+.food-safety-cycle-list button.is-selected {
+  border-color: #4a6d66;
+  border-radius: 4px;
+  background: #1b302c;
+}
+
+.food-safety-cycle-list button > span:not(.food-safety-status) {
+  color: var(--fs-muted);
+}
+
+.food-safety-empty {
+  margin: 12px 0 2px;
+}
+
+@media (max-width: 680px) {
+  .food-safety-page { padding: 14px 11px 24px; }
+  .food-safety-header { grid-template-columns: auto 1fr; gap: 12px; }
+  .food-safety-title h1 { font-size: 1.4rem; }
+  .food-safety-header-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  .food-safety-scan-row { grid-template-columns: 1fr; }
+  .food-safety-scan-row-item { grid-template-columns: 1fr 1fr; }
+  .food-safety-scan-row-item time { grid-column: 1 / -1; }
+  .food-safety-cycle-list button { grid-template-columns: 1fr 1fr; }
+  .food-safety-cycle-list button .food-safety-status { justify-self: start; }
+}

@@ -19,6 +19,7 @@ import {
 import { IDatabaseService } from './database-interface';
 import { normalizeEstimatedCompletionTime } from '../shared/estimatedCompletionTime';
 import { DEFAULT_KIOSK_EMPLOYEES, VALID_KIOSK_DEPARTMENTS } from './kiosk-employees';
+import { FOOD_SAFETY_CYCLE_DAYS, FOOD_SAFETY_TIN_CAT_TARGET, normalizeTinCatCode } from '../shared/foodSafetyTinCats';
 
 // Helper to get local time as ISO string (without UTC conversion)
 function getLocalISOString(date: Date = new Date()): string {
@@ -267,6 +268,8 @@ export class DatabaseService implements IDatabaseService {
         contactName TEXT NOT NULL,
         contactPhone TEXT NOT NULL,
         type TEXT NOT NULL,
+        pickupNumber2 TEXT,
+        pickupNumber3 TEXT,
         doorId INTEGER,
         pallets INTEGER,
         commodity TEXT,
@@ -677,6 +680,34 @@ export class DatabaseService implements IDatabaseService {
         updatedAt TEXT NOT NULL
       );
 
+      CREATE TABLE IF NOT EXISTS container_forecasts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        vessel TEXT NOT NULL,
+        containerNumber TEXT NOT NULL UNIQUE,
+        chassis TEXT,
+        weight REAL,
+        overweightPermit INTEGER NOT NULL DEFAULT 0,
+        permitNumber TEXT,
+        ndNtNumber TEXT,
+        rateconNumber TEXT,
+        rateAmount REAL,
+        pickupNumber TEXT,
+        pickupScac TEXT,
+        driverLoad TEXT,
+        portAppointmentNumber TEXT,
+        deliveryEta TEXT,
+        dropOffLocation TEXT NOT NULL,
+        emptyReturnDate TEXT,
+        emptyReturnDriver TEXT,
+        vesselEta TEXT,
+        releaseStatus TEXT NOT NULL DEFAULT 'Pending',
+        notes TEXT,
+        createdBy TEXT NOT NULL,
+        updatedBy TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
       CREATE TABLE IF NOT EXISTS executives (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
@@ -760,10 +791,35 @@ export class DatabaseService implements IDatabaseService {
         FOREIGN KEY (sessionId) REFERENCES inventory_audit_sessions(id)
       );
 
+      CREATE TABLE IF NOT EXISTS food_safety_tin_cat_cycles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL DEFAULT 'open',
+        targetCount INTEGER NOT NULL DEFAULT 147,
+        startedBy TEXT NOT NULL,
+        startedAt TEXT NOT NULL,
+        dueAt TEXT NOT NULL,
+        completedAt TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS food_safety_tin_cat_scans (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cycleId INTEGER NOT NULL,
+        assetCode TEXT NOT NULL,
+        scannedBy TEXT NOT NULL,
+        scannedAt TEXT NOT NULL,
+        UNIQUE(cycleId, assetCode),
+        FOREIGN KEY (cycleId) REFERENCES food_safety_tin_cat_cycles(id) ON DELETE CASCADE
+      );
+
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_reports_site_date ON inventory_audit_reports(site, reportDate);
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_report_rows_report ON inventory_audit_report_rows(reportId);
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_sessions_site_status ON inventory_audit_sessions(site, status);
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_scans_session ON inventory_audit_scans(sessionId);
+      CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_cycles_status ON food_safety_tin_cat_cycles(status, startedAt);
+      CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scans_cycle ON food_safety_tin_cat_scans(cycleId, scannedAt);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_fs_tin_cat_one_open_cycle ON food_safety_tin_cat_cycles(status) WHERE status = 'open';
 
       CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -814,6 +870,9 @@ export class DatabaseService implements IDatabaseService {
       CREATE INDEX IF NOT EXISTS idx_production_dock_appt_date ON production_dock_appointments(appointmentDate);
       CREATE INDEX IF NOT EXISTS idx_extra_service_date ON extra_service_entries(serviceDate);
       CREATE INDEX IF NOT EXISTS idx_extra_service_type_date ON extra_service_entries(serviceType, serviceDate);
+      CREATE INDEX IF NOT EXISTS idx_container_forecasts_vessel ON container_forecasts(vessel);
+      CREATE INDEX IF NOT EXISTS idx_container_forecasts_location ON container_forecasts(dropOffLocation);
+      CREATE INDEX IF NOT EXISTS idx_container_forecasts_vessel_eta ON container_forecasts(vesselEta);
       
       -- Partial unique index: only one active shift per date/shift_number
       CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
@@ -867,6 +926,12 @@ export class DatabaseService implements IDatabaseService {
       if (!appointmentColumnNames.includes('pickupNumber')) {
         console.log('Adding pickupNumber column to appointments...');
         this.db.exec('ALTER TABLE appointments ADD COLUMN pickupNumber TEXT');
+      }
+      if (!appointmentColumnNames.includes('pickupNumber2')) {
+        this.db.exec('ALTER TABLE appointments ADD COLUMN pickupNumber2 TEXT');
+      }
+      if (!appointmentColumnNames.includes('pickupNumber3')) {
+        this.db.exec('ALTER TABLE appointments ADD COLUMN pickupNumber3 TEXT');
       }
       if (!appointmentColumnNames.includes('customer')) {
         console.log('Adding customer column to appointments...');
@@ -1624,6 +1689,84 @@ export class DatabaseService implements IDatabaseService {
     return this.db.prepare(query).all(...params) as DockCheckin[];
   }
 
+  async listContainerForecasts(filters?: { vessel?: string; location?: string; releaseStatus?: string; search?: string }): Promise<any[]> {
+    let query = 'SELECT * FROM container_forecasts WHERE 1=1';
+    const params: any[] = [];
+    if (filters?.vessel) { query += ' AND vessel = ?'; params.push(filters.vessel); }
+    if (filters?.location) { query += ' AND dropOffLocation = ?'; params.push(filters.location); }
+    if (filters?.releaseStatus) { query += ' AND releaseStatus = ?'; params.push(filters.releaseStatus); }
+    if (filters?.search) {
+      query += ' AND (vessel LIKE ? OR containerNumber LIKE ? OR chassis LIKE ? OR pickupNumber LIKE ? OR dropOffLocation LIKE ? OR releaseStatus LIKE ?)';
+      const like = `%${filters.search}%`;
+      params.push(like, like, like, like, like, like);
+    }
+    query += ' ORDER BY vesselEta ASC, vessel ASC, containerNumber ASC';
+    return this.db.prepare(query).all(...params) as any[];
+  }
+
+  async getContainerForecastSummary(filters?: { startDate?: string; endDate?: string }): Promise<any[]> {
+    let query = `SELECT vessel, dropOffLocation, COUNT(*) AS containerCount,
+      SUM(CASE WHEN releaseStatus = 'Released' THEN 1 ELSE 0 END) AS releasedCount,
+      SUM(CASE WHEN overweightPermit = 1 THEN 1 ELSE 0 END) AS overweightCount
+      FROM container_forecasts WHERE 1=1`;
+    const params: any[] = [];
+    if (filters?.startDate) { query += ' AND vesselEta >= ?'; params.push(filters.startDate); }
+    if (filters?.endDate) { query += ' AND vesselEta <= ?'; params.push(filters.endDate); }
+    query += ' GROUP BY vessel, dropOffLocation ORDER BY vessel ASC, dropOffLocation ASC';
+    return this.db.prepare(query).all(...params) as any[];
+  }
+
+  async createContainerForecast(data: any, actor: string): Promise<any> {
+    const vessel = String(data.vessel || '').trim();
+    const containerNumber = String(data.containerNumber || '').trim().toUpperCase();
+    const dropOffLocation = String(data.dropOffLocation || '').trim();
+    if (!vessel || !containerNumber || !dropOffLocation) throw new Error('Vessel, full container number, and drop-off location are required.');
+    const now = getLocalISOString();
+    const result = this.db.prepare(`INSERT INTO container_forecasts (
+      vessel, containerNumber, chassis, weight, overweightPermit, permitNumber, ndNtNumber, rateconNumber, rateAmount,
+      pickupNumber, pickupScac, driverLoad, portAppointmentNumber, deliveryEta, dropOffLocation, emptyReturnDate,
+      emptyReturnDriver, vesselEta, releaseStatus, notes, createdBy, updatedBy, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      vessel, containerNumber, data.chassis || null, data.weight ?? null, data.overweightPermit ? 1 : 0,
+      data.permitNumber || null, data.ndNtNumber || null, data.rateconNumber || null, data.rateAmount ?? null,
+      data.pickupNumber || null, data.pickupScac || null, data.driverLoad || null, data.portAppointmentNumber || null,
+      data.deliveryEta || null, dropOffLocation, data.emptyReturnDate || null, data.emptyReturnDriver || null,
+      data.vesselEta || null, data.releaseStatus || 'Pending', data.notes || null, actor, actor, now, now,
+    );
+    return this.db.prepare('SELECT * FROM container_forecasts WHERE id = ?').get(result.lastInsertRowid);
+  }
+
+  async updateContainerForecast(id: number, data: any, actor: string): Promise<any> {
+    const columns: Record<string, string> = {
+      vessel: 'vessel', containerNumber: 'containerNumber', chassis: 'chassis', weight: 'weight',
+      overweightPermit: 'overweightPermit', permitNumber: 'permitNumber', ndNtNumber: 'ndNtNumber',
+      rateconNumber: 'rateconNumber', rateAmount: 'rateAmount', pickupNumber: 'pickupNumber', pickupScac: 'pickupScac',
+      driverLoad: 'driverLoad', portAppointmentNumber: 'portAppointmentNumber', deliveryEta: 'deliveryEta',
+      dropOffLocation: 'dropOffLocation', emptyReturnDate: 'emptyReturnDate', emptyReturnDriver: 'emptyReturnDriver',
+      vesselEta: 'vesselEta', releaseStatus: 'releaseStatus', notes: 'notes',
+    };
+    const fields: string[] = [];
+    const values: any[] = [];
+    for (const [key, column] of Object.entries(columns)) {
+      if (data[key] === undefined) continue;
+      fields.push(`${column} = ?`);
+      values.push(key === 'overweightPermit' ? (data[key] ? 1 : 0) : (data[key] === '' ? null : data[key]));
+    }
+    if (data.vessel !== undefined && !String(data.vessel).trim()) throw new Error('Vessel is required.');
+    if (data.containerNumber !== undefined && !String(data.containerNumber).trim()) throw new Error('Full container number is required.');
+    if (data.dropOffLocation !== undefined && !String(data.dropOffLocation).trim()) throw new Error('Drop-off location is required.');
+    if (!fields.length) throw new Error('No forecast changes supplied.');
+    const now = getLocalISOString();
+    fields.push('updatedBy = ?', 'updatedAt = ?');
+    values.push(actor, now, id);
+    this.db.prepare(`UPDATE container_forecasts SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+    return this.db.prepare('SELECT * FROM container_forecasts WHERE id = ?').get(id) || null;
+  }
+
+  async deleteContainerForecast(id: number): Promise<boolean> {
+    return this.db.prepare('DELETE FROM container_forecasts WHERE id = ?').run(id).changes > 0;
+  }
+
   createExtraServiceEntry(data: {
     serviceDate: string;
     serviceType: string;
@@ -1750,6 +1893,8 @@ export class DatabaseService implements IDatabaseService {
     contactName: string;
     contactPhone: string;
     pickupNumber?: string;
+    pickupNumber2?: string;
+    pickupNumber3?: string;
     customer?: string;
     carrier?: string;
     type: 'Inbound' | 'Outbound';
@@ -1763,8 +1908,8 @@ export class DatabaseService implements IDatabaseService {
     const result = this.db.prepare(`
       INSERT INTO appointments (
         appointmentDate, appointmentTime, company, contactName, contactPhone,
-        pickupNumber, customer, carrier, type, doorId, pallets, commodity, notes, confirmationNumber, status, createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        pickupNumber, pickupNumber2, pickupNumber3, customer, carrier, type, doorId, pallets, commodity, notes, confirmationNumber, status, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       data.appointmentDate,
       data.appointmentTime,
@@ -1772,6 +1917,8 @@ export class DatabaseService implements IDatabaseService {
       data.contactName,
       data.contactPhone,
       data.pickupNumber || null,
+      data.pickupNumber2 || null,
+      data.pickupNumber3 || null,
       data.customer || null,
       data.carrier || null,
       data.type,
@@ -1883,6 +2030,8 @@ export class DatabaseService implements IDatabaseService {
     contactName?: string;
     contactPhone?: string;
     pickupNumber?: string;
+    pickupNumber2?: string;
+    pickupNumber3?: string;
     customer?: string;
     carrier?: string;
     type?: 'Inbound' | 'Outbound';
@@ -1919,6 +2068,14 @@ export class DatabaseService implements IDatabaseService {
     if (data.pickupNumber !== undefined) {
       fields.push('pickupNumber = ?');
       params.push(data.pickupNumber);
+    }
+    if (data.pickupNumber2 !== undefined) {
+      fields.push('pickupNumber2 = ?');
+      params.push(data.pickupNumber2 || null);
+    }
+    if (data.pickupNumber3 !== undefined) {
+      fields.push('pickupNumber3 = ?');
+      params.push(data.pickupNumber3 || null);
     }
     if (data.customer !== undefined) {
       fields.push('customer = ?');
@@ -3775,6 +3932,106 @@ export class DatabaseService implements IDatabaseService {
 
     const reportId = createReport();
     return this.db.prepare('SELECT * FROM inventory_audit_reports WHERE id = ?').get(reportId);
+  }
+
+  async getFoodSafetyTinCatCycles(): Promise<any[]> {
+    return this.db.prepare(`
+      SELECT c.*, COUNT(s.id) AS scannedCount
+      FROM food_safety_tin_cat_cycles c
+      LEFT JOIN food_safety_tin_cat_scans s ON s.cycleId = c.id
+      GROUP BY c.id
+      ORDER BY c.startedAt DESC, c.id DESC
+    `).all() as any[];
+  }
+
+  async getFoodSafetyTinCatCycle(cycleId: number): Promise<any | null> {
+    const cycle = this.db.prepare(`
+      SELECT c.*, COUNT(s.id) AS scannedCount
+      FROM food_safety_tin_cat_cycles c
+      LEFT JOIN food_safety_tin_cat_scans s ON s.cycleId = c.id
+      WHERE c.id = ?
+      GROUP BY c.id
+    `).get(cycleId) as any;
+    if (!cycle) return null;
+    cycle.scans = this.db.prepare(`
+      SELECT id, cycleId, assetCode, scannedBy, scannedAt
+      FROM food_safety_tin_cat_scans WHERE cycleId = ?
+      ORDER BY scannedAt DESC, id DESC
+    `).all(cycleId);
+    return cycle;
+  }
+
+  async createFoodSafetyTinCatCycle(startedBy: string): Promise<any> {
+    const scannedBy = String(startedBy || '').trim();
+    if (!scannedBy) throw new Error('Signed-in user is required to start a cycle.');
+    const nowDate = new Date();
+    const now = getLocalISOString(nowDate);
+    const existing = this.db.prepare(`
+      SELECT c.*, COUNT(s.id) AS scannedCount
+      FROM food_safety_tin_cat_cycles c
+      LEFT JOIN food_safety_tin_cat_scans s ON s.cycleId = c.id
+      WHERE c.status = 'open'
+      GROUP BY c.id
+      ORDER BY c.id DESC LIMIT 1
+    `).get() as any;
+    if (existing && new Date(existing.dueAt).getTime() > nowDate.getTime() && Number(existing.scannedCount) < Number(existing.targetCount)) {
+      throw new Error('The current Food Safety cycle is still open. Complete it or wait until it is due before starting another.');
+    }
+    if (existing) {
+      this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updatedAt = ? WHERE id = ? AND status = 'open'`).run(now, existing.id);
+    }
+
+    const dueDate = new Date(nowDate.getTime() + FOOD_SAFETY_CYCLE_DAYS * 24 * 60 * 60 * 1000);
+    const dueAt = getLocalISOString(dueDate);
+    const result = this.db.prepare(`
+      INSERT INTO food_safety_tin_cat_cycles (status, targetCount, startedBy, startedAt, dueAt, createdAt, updatedAt)
+      VALUES ('open', ?, ?, ?, ?, ?, ?)
+    `).run(FOOD_SAFETY_TIN_CAT_TARGET, scannedBy, now, dueAt, now, now);
+    return this.getFoodSafetyTinCatCycle(Number(result.lastInsertRowid));
+  }
+
+  async addFoodSafetyTinCatScan(cycleId: number, assetCodeValue: string, scannedBy: string): Promise<any> {
+    const normalizedCycleId = Number(cycleId);
+    const assetCode = normalizeTinCatCode(assetCodeValue);
+    const userName = String(scannedBy || '').trim();
+    if (!Number.isInteger(normalizedCycleId) || normalizedCycleId <= 0) throw new Error('Valid cycle is required.');
+    if (!assetCode || assetCode.length > 120) throw new Error('A valid tin-cat barcode is required.');
+    if (!userName) throw new Error('Signed-in user is required to record a scan.');
+
+    const cycle = this.db.prepare('SELECT * FROM food_safety_tin_cat_cycles WHERE id = ?').get(normalizedCycleId) as any;
+    if (!cycle) throw new Error('Food Safety cycle not found.');
+    const nowDate = new Date();
+    const now = getLocalISOString(nowDate);
+    if (cycle.status !== 'open') throw new Error('This Food Safety cycle is not open.');
+    if (new Date(cycle.dueAt).getTime() <= nowDate.getTime()) {
+      this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updatedAt = ? WHERE id = ?`).run(now, normalizedCycleId);
+      throw new Error('This Food Safety cycle is overdue. Start a new cycle to continue scanning.');
+    }
+
+    const existingScan = this.db.prepare(`
+      SELECT * FROM food_safety_tin_cat_scans WHERE cycleId = ? AND assetCode = ?
+    `).get(normalizedCycleId, assetCode) as any;
+    if (existingScan) return { duplicate: true, scan: existingScan, cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+
+    const scanCount = Number((this.db.prepare(`SELECT COUNT(*) AS count FROM food_safety_tin_cat_scans WHERE cycleId = ?`).get(normalizedCycleId) as any).count);
+    if (scanCount >= Number(cycle.targetCount)) {
+      this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, normalizedCycleId);
+      throw new Error('This Food Safety cycle is already complete.');
+    }
+
+    const saveScan = this.db.transaction(() => {
+      this.db.prepare(`
+        INSERT INTO food_safety_tin_cat_scans (cycleId, assetCode, scannedBy, scannedAt)
+        VALUES (?, ?, ?, ?)
+      `).run(normalizedCycleId, assetCode, userName, now);
+      const count = Number((this.db.prepare(`SELECT COUNT(*) AS count FROM food_safety_tin_cat_scans WHERE cycleId = ?`).get(normalizedCycleId) as any).count);
+      if (count >= Number(cycle.targetCount)) {
+        this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, normalizedCycleId);
+      }
+      return this.db.prepare(`SELECT * FROM food_safety_tin_cat_scans WHERE cycleId = ? AND assetCode = ?`).get(normalizedCycleId, assetCode);
+    });
+    const scan = saveScan();
+    return { duplicate: false, scan, cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
   }
 
   async getInventoryAuditReports(filters?: { site?: string }): Promise<any[]> {
