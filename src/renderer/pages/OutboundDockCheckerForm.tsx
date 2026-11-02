@@ -316,7 +316,6 @@ export default function OutboundDockCheckerForm() {
 
       <div className="dock-checker-page__header">
         <h1 className="dock-checker-page__title">Outbound Dock Checker Form</h1>
-        <button className="dock-checker-page__home-btn" onClick={() => navigate('/home')}>Back Home</button>
       </div>
 
       <div className="dock-checker-form">

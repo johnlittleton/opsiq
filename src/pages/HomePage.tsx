@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../renderer/context/AuthContext';
 import { API_BASE } from '../renderer/services/config';
 import { hasRestrictedFeatureAccess } from '../renderer/utils/restrictedAccess';
+import { getNavigationSections } from './navigationSections';
+import opsiqLogo from '../../assets/opsiq-logo.png';
+import atlasLogo from '../../assets/atlas-logo.png';
 import './HomePage.css';
 
 export const HomePage: React.FC = () => {
@@ -14,6 +17,7 @@ export const HomePage: React.FC = () => {
   const [activeUsers, setActiveUsers] = useState<string[]>([]);
   const normalizedExecutiveName = String(executiveName || '').trim().toLowerCase();
   const isJohnView = normalizedExecutiveName === 'john littleton' || normalizedExecutiveName === 'john';
+  const navigationSections = getNavigationSections(userRole, hasRestrictedAccess);
 
   useEffect(() => {
     if (!isJohnView) {
@@ -54,170 +58,6 @@ export const HomePage: React.FC = () => {
     return () => window.clearInterval(intervalId);
   }, [isJohnView, sessionToken]);
   
-  const dockOperationsCards = [
-    {
-      icon: '🚢',
-      title: 'Dock Dashboard',
-      description: 'Monitor all 39 docks in real-time',
-      onClick: () => navigate('/dockboard'),
-    },
-    {
-      icon: '✅',
-      title: 'Driver Check In',
-      description: 'Check in drivers and assign dock doors',
-      onClick: () => navigate('/checkin'),
-    },
-    {
-      icon: '👥',
-      title: 'Active Drivers',
-      description: 'View and manage currently checked-in drivers',
-      onClick: () => navigate('/active-drivers'),
-    },
-    {
-      icon: '🗄️',
-      title: 'Dock History',
-      description: 'View dock status changes and events',
-      onClick: () => navigate('/history'),
-    },
-    {
-      icon: '🚛',
-      title: 'Check-In History',
-      description: 'Comprehensive driver check-in records',
-      onClick: () => navigate('/checkin-history'),
-    },
-    {
-      icon: '📤',
-      title: 'Outbound Checker Form',
-      description: 'Submit outbound dock verification and pallet checks',
-      onClick: () => navigate('/dock-checker/outbound'),
-    },
-    {
-      icon: '📥',
-      title: 'Inbound Checker Form',
-      description: 'Submit inbound manifest, labels, QC, and damage checks',
-      onClick: () => navigate('/dock-checker/inbound'),
-    },
-    {
-      icon: '📚',
-      title: 'Dock Checker History',
-      description: 'Search all inbound and outbound checker forms by date',
-      onClick: () => navigate('/dock-checker/history'),
-    },
-  ];
-
-  const appointmentCards = [
-    {
-      icon: '📅',
-      title: 'Appointment Scheduler',
-      description: 'Schedule inbound and outbound appointments',
-      onClick: () => navigate('/scheduler'),
-    },
-    {
-      icon: '📆',
-      title: 'Appointment History',
-      description: 'View all past and upcoming appointments',
-      onClick: () => navigate('/appointment-history'),
-    },
-  ];
-
-  const productionCards = [
-    {
-      icon: '🪪',
-      title: 'Line Scan',
-      description: 'Assign employees to lines and review badge scan history',
-      onClick: () => navigate('/production-line-scan'),
-    },
-    {
-      icon: '📋',
-      title: 'Production Scheduler',
-      description: 'Schedule work orders for 5 Giro lines',
-      onClick: () => navigate('/production-scheduler'),
-    },
-    {
-      icon: '📈',
-      title: 'Production Dashboard',
-      description: 'Monitor all lines in real-time',
-      onClick: () => navigate('/production-dashboard'),
-    },
-    {
-      icon: '🎛️',
-      title: 'Line Controller',
-      description: 'Update headcount and completed cases for one production line',
-      onClick: () => navigate('/production-line-controller'),
-    },
-    {
-      icon: '🧮',
-      title: 'Production Capacity',
-      description: 'Calculate room capacity, lines, people, and production time',
-      onClick: () => navigate('/production-capacity'),
-    },
-    {
-      icon: '📑',
-      title: 'Work Order History',
-      description: 'View completed work orders',
-      onClick: () => navigate('/work-order-history'),
-    },
-  ];
-
-  const inventoryControlCards = [
-    {
-      icon: '🏷️',
-      title: 'Pallet Inventory',
-      description: 'BETA · Development in progress · Receive, locate, move, and ship customer pallets',
-      onClick: () => navigate('/pallet-tracker'),
-    },
-    {
-      icon: '📜',
-      title: 'Pallet History & Live Feed',
-      description: 'BETA · Development in progress · Search pallet transactions and current inventory by customer',
-      onClick: () => navigate('/inventory-pallet-history'),
-    },
-  ];
-
-  const foodSafetyCards = [
-    {
-      icon: '🛡️',
-      title: 'Food Safety',
-      description: 'Run biweekly tin-cat inspections and review scan history',
-      onClick: () => navigate('/food-safety-tin-cats'),
-    },
-  ];
-
-  const dispatchCards = [
-    {
-      icon: '🚢',
-      title: 'Vessel & Container Forecast',
-      description: 'Track vessel arrivals, containers, delivery locations, and release status',
-      onClick: () => navigate('/container-forecast'),
-    },
-  ];
-
-  const managementCards = [
-    ...(userRole === 'executive' ? [{
-      icon: '📊',
-      title: 'Executive Dashboard',
-      description: 'Site performance metrics and top operators',
-      onClick: () => navigate('/executive'),
-    }, ...(hasRestrictedAccess ? [{
-      icon: '🖥️',
-      title: 'Combined Live Dashboard',
-      description: 'All departments on one live internal screen',
-      onClick: () => navigate('/combined-live-operations'),
-    }] : [])] : []),
-    ...((userRole === 'executive' || userRole === 'manager') ? [{
-      icon: '💼',
-      title: 'Manager Dashboard',
-      description: 'Track department headcount and live performance',
-      onClick: () => navigate('/labor-tracker'),
-    }] : []),
-    ...((userRole === 'executive' || userRole === 'manager') ? [{
-      icon: '�📱',
-      title: 'Labor Kiosk',
-      description: 'Open the employee punch kiosk and admin access',
-      onClick: () => navigate('/labor-kiosk'),
-    }] : []),
-  ];
-
   const handleMinimize = () => {
     if (window.electron) {
       window.electron.minimize();
@@ -316,144 +156,19 @@ export const HomePage: React.FC = () => {
         <p className="home-page__subtitle">Operations Intelligence Platform</p>
       </div>
 
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Dock Operations</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {dockOperationsCards.map((card, index) => (
-            <div 
-              key={index} 
-              className="home-page__card"
-              onClick={card.onClick}
-            >
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row">
-                  <h3 className="home-page__card-title">{card.title}</h3>
-                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
-                </div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Appointments</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {appointmentCards.map((card, index) => (
-            <div 
-              key={index} 
-              className="home-page__card"
-              onClick={card.onClick}
-            >
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row">
-                  <h3 className="home-page__card-title">{card.title}</h3>
-                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
-                </div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Inventory Control</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {inventoryControlCards.map((card, index) => (
-            <div
-              key={index}
-              className="home-page__card"
-              onClick={card.onClick}
-            >
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row">
-                  <h3 className="home-page__card-title">{card.title}</h3>
-                </div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Production</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {productionCards.map((card, index) => (
-            <div 
-              key={index} 
-              className="home-page__card"
-              onClick={card.onClick}
-            >
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row">
-                  <h3 className="home-page__card-title">{card.title}</h3>
-                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
-                </div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Food Safety</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {foodSafetyCards.map((card) => (
-            <div key={card.title} className="home-page__card" onClick={card.onClick}>
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row"><h3 className="home-page__card-title">{card.title}</h3></div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Dispatch</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {dispatchCards.map((card) => (
-            <div key={card.title} className="home-page__card" onClick={card.onClick}>
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row"><h3 className="home-page__card-title">{card.title}</h3></div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="home-page__section">
-        <h2 className="home-page__section-title">Management</h2>
-        <div className={`home-page__quick-access home-page__quick-access--${viewMode}`}>
-          {managementCards.map((card, index) => (
-            <div 
-              key={index} 
-              className="home-page__card"
-              onClick={card.onClick}
-            >
-              <div className="home-page__card-icon">{card.icon}</div>
-              <div className="home-page__card-content">
-                <div className="home-page__card-title-row">
-                  <h3 className="home-page__card-title">{card.title}</h3>
-                  {card.badge && <span className="home-page__card-badge">{card.badge}</span>}
-                </div>
-                <p className="home-page__card-desc">{card.description}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <section className={`home-page__category-grid home-page__category-grid--${viewMode}`} aria-label="OpsIQ navigation sections">
+        {navigationSections.map((section) => (
+          <button type="button" className="home-page__category-card" key={section.id} onClick={() => navigate(`/navigation/${section.id}`)}>
+            <span className="home-page__category-icon" aria-hidden="true">{section.icon}</span>
+            <span className="home-page__category-copy">
+              <strong>{section.title}</strong>
+              <small>{section.description}</small>
+              <em>{section.tools.length} {section.tools.length === 1 ? 'tool' : 'tools'}</em>
+            </span>
+            <span className="home-page__category-arrow" aria-hidden="true">→</span>
+          </button>
+        ))}
+      </section>
 
       <div className="home-page__section">
         <h2 className="home-page__section-title">System Status</h2>
@@ -481,6 +196,14 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <footer className="home-page__brand-footer" aria-label="OpsIQ and ATLAS branding">
+        <img className="home-page__opsiq-logo" src={opsiqLogo} alt="OpsIQ" />
+        <div className="home-page__powered-by">
+          <span>Powered by</span>
+          <img src={atlasLogo} alt="ATLAS Architecture" />
+        </div>
+      </footer>
     </div>
   );
 };

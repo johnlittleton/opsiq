@@ -1275,9 +1275,6 @@ export default function ProductionScheduler() {
         onUnreadCountChange={setUnreadCount}
       />
       <div className="header-bar">
-        <button className="back-btn" onClick={() => navigate('/')}>
-          ← Home
-        </button>
         <h1>Production Scheduler</h1>
         <div className="header-controls">
           <div className="view-toggle-group">

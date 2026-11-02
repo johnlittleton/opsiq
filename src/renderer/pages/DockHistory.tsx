@@ -241,9 +241,6 @@ const DockHistory: React.FC = () => {
         <>
           <div className="history-header">
             <h1 className="history-title">Dock History</h1>
-            <button className="back-button" onClick={() => navigate('/home')}>
-              ← Back to Home
-            </button>
           </div>
 
           <div className="card">

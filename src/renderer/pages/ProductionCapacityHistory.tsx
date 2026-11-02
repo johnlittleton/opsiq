@@ -73,7 +73,6 @@ export default function ProductionCapacityHistory() {
         </div>
         <div className="production-capacity-history__actions">
           <button type="button" onClick={() => navigate('/production-capacity')}>Back to Capacity</button>
-          <button type="button" onClick={() => navigate('/home')}>Home</button>
           {history.length > 0 && <button type="button" className="is-danger" onClick={clearHistory}>Clear History</button>}
         </div>
       </header>

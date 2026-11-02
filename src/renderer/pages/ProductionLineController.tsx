@@ -326,7 +326,6 @@ export default function ProductionLineController() {
           <p>Update only the headcount and completed cases for your assigned line.</p>
         </div>
         <div className="production-line-controller__actions">
-          <button type="button" onClick={() => navigate('/home')}>Home</button>
           <button type="button" onClick={() => void loadWorkOrders()} disabled={loading}>Refresh</button>
         </div>
       </header>

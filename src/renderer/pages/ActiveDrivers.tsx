@@ -121,7 +121,7 @@ const ActiveDrivers: React.FC = () => {
           >
             🚢 Dock Board
           </button>
-          <button 
+          <button
             onClick={() => navigate('/checkin')}
             style={{
               padding: '8px 16px',
@@ -138,24 +138,6 @@ const ActiveDrivers: React.FC = () => {
             onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
           >
             ✅ Check In Driver
-          </button>
-          <button 
-            onClick={() => navigate('/')}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: 'var(--glass)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              color: 'var(--text)',
-              cursor: 'pointer',
-              transition: 'all var(--transition-fast)',
-              fontSize: '13px',
-              fontWeight: 500,
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--accent-primary)'}
-            onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
-          >
-            🏠 Home
           </button>
         </div>
       </div>

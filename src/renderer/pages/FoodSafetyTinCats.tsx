@@ -176,7 +176,6 @@ export default function FoodSafetyTinCats() {
   return (
     <main className="food-safety-page">
       <header className="food-safety-header">
-        <button type="button" className="food-safety-home" onClick={() => navigate('/')}>← Home</button>
         <div className="food-safety-title">
           <p>FOOD SAFETY / BIWEEKLY INSPECTION</p>
           <h1>Tin Cat Scan</h1>

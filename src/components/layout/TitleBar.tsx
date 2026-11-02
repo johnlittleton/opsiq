@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Legend } from '../common/Legend';
 import './TitleBar.css';
 
@@ -10,7 +10,22 @@ interface TitleBarProps {
 
 export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const isTvDashboard = new Set([
+    '/production-dashboard',
+    '/dashboard',
+    '/dockboard-old',
+    '/production',
+    '/shipping',
+    '/combined-live-operations',
+  ]).has(location.pathname);
+
+  const handleBack = () => {
+    const historyIndex = Number(window.history.state?.idx);
+    if (Number.isFinite(historyIndex) && historyIndex > 0) navigate(-1);
+    else navigate('/', { replace: true });
+  };
 
   const handleMinimize = () => {
     if (window.electron) {
@@ -75,6 +90,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({ showLegend = false, children
         {children && <div className="title-bar__content">{children}</div>}
       </div>
       <div className="title-bar__actions">
+        {!isTvDashboard && <button className="title-bar__back-btn" onClick={handleBack}>← Back</button>}
         <button className="title-bar__home-btn" onClick={() => navigate('/')}>← Home</button>
         <div className="title-bar__controls">
           <button className="title-bar__button" onClick={handleMinimize}>

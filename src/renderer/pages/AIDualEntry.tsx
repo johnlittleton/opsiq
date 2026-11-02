@@ -281,9 +281,6 @@ const AIDualEntry: React.FC = () => {
               Maximize
             </button>
           </div>
-          <button type="button" className="btn-secondary" onClick={() => navigate('/home')}>
-            Home
-          </button>
           <button type="button" className="btn-secondary" onClick={() => setStatus('capturing')}>
             Start Capture
           </button>

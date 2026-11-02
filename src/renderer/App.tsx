@@ -4,7 +4,9 @@ import { useAppStore } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { apiClient } from './services/api';
 import PinEntry from './components/PinEntry';
+import { TitleBar } from '../components/layout/TitleBar';
 import { HomePage } from '../pages/HomePage';
+import { NavigationSectionPage } from '../pages/NavigationSectionPage';
 import { DockBoardPage } from '../pages/DockBoardPage';
 import LiveDockBoard from './pages/LiveDockBoard';
 import DriverCheckIn from './pages/DriverCheckIn';
@@ -52,6 +54,7 @@ import DockCheckerHistory from './pages/DockCheckerHistory';
 import InventoryAuditor from './pages/InventoryAuditor';
 import FoodSafetyTinCats from './pages/FoodSafetyTinCats';
 import ContainerForecast from './pages/ContainerForecast';
+import DispatchDashboard from './pages/DispatchDashboard';
 import LoadBalancer from './pages/LoadBalancer';
 import CustomerPortal from './pages/CustomerPortal';
 import CustomerPortalAdmin from './pages/CustomerPortalAdmin';
@@ -83,11 +86,41 @@ const PUBLIC_ROUTES = [
 
 const CUSTOMER_PORTAL_ONLY = import.meta.env.VITE_CUSTOMER_PORTAL_ONLY === 'true';
 
+const ROUTES_WITH_SHARED_TITLE_BAR = new Set([
+  '/navigation/:sectionId',
+  '/active-drivers',
+  '/history',
+  '/dock-checker/outbound',
+  '/dock-checker/inbound',
+  '/dock-checker/history',
+  '/inventory-auditor',
+  '/food-safety-tin-cats',
+  '/container-forecast',
+  '/container-forecast-history',
+  '/dispatch-dashboard',
+  '/production-kpi-history',
+  '/production-labor-planner',
+  '/production-labor-planner-history',
+  '/production-scheduler',
+  '/production-line-scan',
+  '/production-line-scan-history',
+  '/production-capacity',
+  '/production-capacity-history',
+  '/production-line-controller',
+  '/work-order-history',
+  '/downtime-history',
+  '/settings',
+  '/ai-dual-entry',
+  '/driver-avatar',
+]);
+
 const AppRoutes: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, login, executiveName } = useAuth();
   const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
   const hasRestrictedAccess = hasRestrictedFeatureAccess(executiveName);
+  const needsSharedTitleBar = ROUTES_WITH_SHARED_TITLE_BAR.has(location.pathname)
+    || (location.pathname.startsWith('/navigation/') && ROUTES_WITH_SHARED_TITLE_BAR.has('/navigation/:sectionId'));
 
   const handlePinSuccess = (name: string, role: string, sessionToken: string) => {
     login(name, role, sessionToken);
@@ -99,9 +132,12 @@ const AppRoutes: React.FC = () => {
   }
 
   return (
+    <>
+    {needsSharedTitleBar && <TitleBar showLegend={false} />}
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/home" element={<HomePage />} />
+      <Route path="/navigation/:sectionId" element={<NavigationSectionPage />} />
       <Route path="/customer-portal" element={<CustomerPortal />} />
       <Route path="/customer-portal-admin" element={<CustomerPortalAdmin />} />
       <Route path="/dockboard" element={<DockBoardPage />} />
@@ -117,6 +153,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/inventory-auditor" element={<InventoryAuditor />} />
       <Route path="/food-safety-tin-cats" element={<FoodSafetyTinCats />} />
       <Route path="/container-forecast" element={<ContainerForecast />} />
+      <Route path="/container-forecast-history" element={<ContainerForecast historyMode />} />
+      <Route path="/dispatch-dashboard" element={<DispatchDashboard />} />
       <Route path="/load-balancer" element={<LoadBalancer />} />
       <Route path="/load-calculator" element={<Navigate to="/load-balancer" replace />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />
@@ -164,6 +202,7 @@ const AppRoutes: React.FC = () => {
         element={hasRestrictedAccess ? <CombinedLiveOperationsDashboard /> : <HomePage />}
       />
     </Routes>
+    </>
   );
 };
 const AppContent: React.FC = () => {

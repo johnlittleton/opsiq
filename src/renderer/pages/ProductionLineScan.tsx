@@ -120,7 +120,6 @@ export default function ProductionLineScan() {
   return (
     <main className="production-line-scan-page">
       <header className="line-scan-page-header">
-        <button type="button" className="line-scan-home-button" onClick={() => navigate('/')}>← Home</button>
         <div>
           <p className="line-scan-eyebrow">PRODUCTION / STAFFING</p>
           <h1>Line Scan</h1>

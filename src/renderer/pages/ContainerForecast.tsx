@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../services/config';
+import { buildContainerForecastPrintHtml } from '../data/containerForecastPrint';
 import './ContainerForecast.css';
 
 type ReleaseStatus = 'Pending' | 'Released' | 'On Hold' | 'Not Required';
 
-interface ContainerForecastRecord {
+export interface ContainerForecastRecord {
   id: number;
   vessel: string;
   containerNumber: string;
@@ -59,7 +60,7 @@ const displayDate = (value?: string | null) => {
 };
 const isChecked = (value: boolean | number) => value === true || value === 1;
 
-export default function ContainerForecast() {
+export default function ContainerForecast({ historyMode = false }: { historyMode?: boolean }) {
   const navigate = useNavigate();
   const { executiveName, sessionToken } = useAuth();
   const [records, setRecords] = useState<ContainerForecastRecord[]>([]);
@@ -72,6 +73,8 @@ export default function ContainerForecast() {
   const [releaseFilter, setReleaseFilter] = useState('');
   const [etaStart, setEtaStart] = useState('');
   const [etaEnd, setEtaEnd] = useState('');
+  const [historyStart, setHistoryStart] = useState('');
+  const [historyEnd, setHistoryEnd] = useState('');
   const [form, setForm] = useState<ForecastForm>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -190,6 +193,25 @@ export default function ContainerForecast() {
     }
   };
 
+  const handlePrint = async (record: ContainerForecastRecord) => {
+    const printHtml = buildContainerForecastPrintHtml(record as unknown as Record<string, unknown>);
+    if (window.electron?.printHTML) {
+      const result = await window.electron.printHTML(printHtml);
+      if (!result.success) setError(result.error || 'Unable to print container record.');
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=850,height=700');
+    if (!printWindow) {
+      setError('Allow pop-ups to print the container record.');
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 250);
+  };
+
   const updateForm = <K extends keyof ForecastForm>(key: K, value: ForecastForm[K]) => setForm((current) => ({ ...current, [key]: value }));
   const groupedRecords = useMemo(() => {
     const map = new Map<string, ContainerForecastRecord[]>();
@@ -197,18 +219,38 @@ export default function ContainerForecast() {
     return Array.from(map.entries());
   }, [records]);
 
+  const displayedRecords = useMemo(() => {
+    if (!historyMode) return records;
+    const today = new Date().toISOString().slice(0, 10);
+    return records.filter((record) => {
+      const pastDates = [record.vesselEta, record.deliveryEta]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.slice(0, 10))
+        .filter((value) => value < today);
+      if (!pastDates.length) return false;
+      if (historyStart && !pastDates.some((date) => date >= historyStart)) return false;
+      if (historyEnd && !pastDates.some((date) => date <= historyEnd)) return false;
+      return true;
+    });
+  }, [records, historyMode, historyStart, historyEnd]);
+
   return (
     <main className="container-forecast-page">
       <header className="container-forecast-header">
-        <button type="button" className="container-forecast-home" onClick={() => navigate('/')}>← Home</button>
-        <div><p>DISPATCH / FORECASTING</p><h1>Vessel &amp; Container Forecast</h1></div>
-        <div className="container-forecast-header-actions"><button type="button" onClick={() => void loadAll()}>Refresh</button><button type="button" onClick={openNew}>＋ Add Container</button></div>
+        <div><p>DISPATCH / {historyMode ? 'HISTORY' : 'FORECASTING'}</p><h1>{historyMode ? 'Container History' : 'Vessel & Container Forecast'}</h1></div>
+        <div className="container-forecast-header-actions">
+          {historyMode
+            ? <button type="button" onClick={() => navigate('/container-forecast')}>← Forecast</button>
+            : <button type="button" onClick={() => navigate('/container-forecast-history')}>History</button>}
+          <button type="button" onClick={() => void loadAll()}>Refresh</button>
+          {!historyMode && <button type="button" onClick={openNew}>＋ Add Container</button>}
+        </div>
       </header>
 
       {notice && <div className="container-forecast-notice" role="status">{notice}</div>}
       {error && <div className="container-forecast-error" role="alert">{error}</div>}
 
-      <section className="container-forecast-report">
+      {!historyMode && <section className="container-forecast-report">
         <div className="container-forecast-section-heading"><div><p>ARRIVALS BY VESSEL</p><h2>Forecast by drop-off location</h2></div><span>{summary.reduce((sum, row) => sum + Number(row.containerCount || 0), 0)} containers</span></div>
         <div className="container-forecast-date-filters">
           <label>Vessel ETA from<input type="date" value={etaStart} onChange={(event) => setEtaStart(event.target.value)} /></label>
@@ -225,21 +267,26 @@ export default function ContainerForecast() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
-      <section className="container-forecast-records">
-        <div className="container-forecast-section-heading"><div><p>CONTAINER DISPATCH</p><h2>Forecast records</h2></div><span>{records.length} records</span></div>
+      <section className={`container-forecast-records${historyMode ? ' is-history' : ''}`}>
+        <div className="container-forecast-section-heading"><div><p>{historyMode ? 'PAST VESSEL / DELIVERY ETAS' : 'CONTAINER DISPATCH'}</p><h2>{historyMode ? 'Historical container records' : 'Forecast records'}</h2></div><span>{displayedRecords.length} records</span></div>
+        {historyMode && <div className="container-forecast-date-filters container-forecast-history-filters">
+          <label>From<input type="date" value={historyStart} max={historyEnd || undefined} onChange={(event) => setHistoryStart(event.target.value)} /></label>
+          <label>Through<input type="date" value={historyEnd} min={historyStart || undefined} onChange={(event) => setHistoryEnd(event.target.value)} /></label>
+          {(historyStart || historyEnd) && <button type="button" onClick={() => { setHistoryStart(''); setHistoryEnd(''); }}>Clear dates</button>}
+        </div>}
         <div className="container-forecast-filters">
           <input aria-label="Search forecasts" placeholder="Search vessel, container, chassis, pickup, location..." value={search} onChange={(event) => setSearch(event.target.value)} />
           <select aria-label="Filter vessel" value={vesselFilter} onChange={(event) => setVesselFilter(event.target.value)}><option value="">All vessels</option>{vessels.map((vessel) => <option key={vessel}>{vessel}</option>)}</select>
           <select aria-label="Filter drop-off location" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}><option value="">All locations</option>{locations.map((location) => <option key={location}>{location}</option>)}</select>
           <select aria-label="Filter release status" value={releaseFilter} onChange={(event) => setReleaseFilter(event.target.value)}><option value="">All release statuses</option>{['Pending', 'Released', 'On Hold', 'Not Required'].map((status) => <option key={status}>{status}</option>)}</select>
         </div>
-        {loading ? <p className="container-forecast-empty">Loading forecast...</p> : records.length === 0 ? <p className="container-forecast-empty">No containers match these filters.</p> : (
+        {loading ? <p className="container-forecast-empty">Loading forecast...</p> : displayedRecords.length === 0 ? <p className="container-forecast-empty">{historyMode ? 'No historical containers match these dates and filters.' : 'No containers match these filters.'}</p> : (
           <div className="container-forecast-table-scroll">
             <table className="container-forecast-table">
               <thead><tr><th>Vessel / ETA</th><th>Full Container #</th><th>Chassis</th><th>Weight</th><th>OW Permit</th><th>Permit #</th><th>ND/NT #</th><th>Ratecon # / Rate</th><th>Pickup # / SCAC</th><th>Driver / Load</th><th>Port Appt #</th><th>Delivery ETA</th><th>Drop-off Location</th><th>Empty Return</th><th>Release Status</th><th>Actions</th></tr></thead>
-              <tbody>{records.map((record) => (
+              <tbody>{displayedRecords.map((record) => (
                 <tr key={record.id}>
                   <td>{record.vessel}<small>{displayDate(record.vesselEta)}</small></td>
                   <td className="container-forecast-container-number">{record.containerNumber}</td>
@@ -247,7 +294,7 @@ export default function ContainerForecast() {
                   <td>{record.rateconNumber || '—'}<small>{record.rateAmount == null ? '' : `$${Number(record.rateAmount).toFixed(2)}`}</small></td>
                   <td>{record.pickupNumber || '—'}<small>{record.pickupScac || ''}</small></td><td>{record.driverLoad || '—'}</td><td>{record.portAppointmentNumber || '—'}</td><td>{displayDate(record.deliveryEta)}</td><td>{record.dropOffLocation}</td>
                   <td>{displayDate(record.emptyReturnDate)}<small>{record.emptyReturnDriver || ''}</small></td><td><span className={`container-forecast-release is-${record.releaseStatus.toLowerCase().replace(/\s+/g, '-')}`}>{record.releaseStatus}</span></td>
-                  <td><div className="container-forecast-actions"><button type="button" onClick={() => openEdit(record)}>Edit</button><button type="button" className="is-delete" onClick={() => void handleDelete(record)}>Delete</button></div></td>
+                  <td><div className="container-forecast-actions"><button type="button" onClick={() => void handlePrint(record)}>Print</button>{!historyMode && <><button type="button" onClick={() => openEdit(record)}>Edit</button><button type="button" className="is-delete" onClick={() => void handleDelete(record)}>Delete</button></>}</div></td>
                 </tr>
               ))}</tbody>
             </table>

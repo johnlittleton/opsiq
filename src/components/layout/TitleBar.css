@@ -108,7 +108,8 @@
   border-radius: 0 0 4px 4px;
 }
 
-.title-bar__home-btn {
+.title-bar__home-btn,
+.title-bar__back-btn {
   padding: 4px 16px;
   margin-right: 8px;
   background: rgba(255, 255, 255, 0.05);
@@ -122,7 +123,8 @@
   -webkit-app-region: no-drag;
 }
 
-.title-bar__home-btn:hover {
+.title-bar__home-btn:hover,
+.title-bar__back-btn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: var(--accent-primary);
 }
@@ -218,7 +220,8 @@
     flex-shrink: 0;
   }
 
-  .title-bar__home-btn {
+  .title-bar__home-btn,
+  .title-bar__back-btn {
     flex-shrink: 0;
     margin-right: 0;
     padding: 9px 12px;

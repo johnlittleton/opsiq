@@ -190,7 +190,6 @@ export default function ProductionCapacity() {
       <header className="production-capacity__header">
         <nav className="production-capacity__navigation" aria-label="Page navigation">
           <button type="button" onClick={() => navigate(-1)}>← Back</button>
-          <button type="button" onClick={() => navigate('/')}>⌂ Home</button>
         </nav>
         <div>
           <p className="production-capacity__eyebrow">Operations planning tool</p>

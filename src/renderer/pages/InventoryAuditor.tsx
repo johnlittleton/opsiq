@@ -810,7 +810,6 @@ const InventoryAuditor: React.FC = () => {
     <div className="inventory-auditor-page">
       <div className="inventory-auditor-page__header">
         <h1>Inventory Auditor</h1>
-        <button type="button" onClick={() => navigate('/home')}>Back Home</button>
       </div>
 
       <div className="inventory-auditor-page__site-row">

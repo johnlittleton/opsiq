@@ -1,0 +1,160 @@
+.navigation-section-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 66px clamp(18px, 4vw, 56px) 36px;
+  display: flex;
+  flex-direction: column;
+  background: #10141d;
+  color: #eef2f8;
+}
+
+.navigation-section-header,
+.navigation-section-tools {
+  width: min(100%, 1480px);
+  margin: 0 auto;
+}
+
+.navigation-section-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: 28px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 22px;
+}
+
+.navigation-section-title > span {
+  color: #60a5fa;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.navigation-section-title h1 {
+  margin: 4px 0;
+  font-size: clamp(1.45rem, 2.3vw, 2rem);
+}
+
+.navigation-section-title p {
+  margin: 0;
+  color: #a7b0c0;
+  font-size: 0.9rem;
+}
+
+.navigation-section-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+  padding-top: 20px;
+}
+
+.navigation-section-brand-footer {
+  width: min(100%, 1480px);
+  min-height: 260px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: auto auto 0;
+  padding: 20px 0 4px;
+}
+
+.navigation-section-opsiq-logo {
+  width: 360px;
+  height: 240px;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
+.navigation-section-powered-by {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: #a7b0c0;
+  font-size: 11px;
+  text-align: center;
+}
+
+.navigation-section-powered-by img {
+  width: 360px;
+  height: 240px;
+  object-fit: contain;
+}
+
+.navigation-tool-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
+  border: 1px solid rgba(148, 163, 184, 0.19);
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(22, 29, 42, 0.94));
+  color: inherit;
+  cursor: pointer;
+  padding: 12px 14px;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.navigation-tool-card:hover,
+.navigation-tool-card:focus-visible {
+  border-color: rgba(96, 165, 250, 0.72);
+  background: linear-gradient(135deg, rgba(35, 54, 82, 0.98), rgba(24, 34, 52, 0.98));
+  transform: translateY(-1px);
+}
+
+.navigation-tool-icon {
+  display: grid;
+  width: 40px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.13);
+  font-size: 1.25rem;
+}
+
+.navigation-tool-copy {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.navigation-tool-copy strong {
+  font-size: 0.9rem;
+}
+
+.navigation-tool-copy small {
+  color: #a7b0c0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.navigation-tool-arrow {
+  color: #60a5fa;
+  font-size: 1.1rem;
+  text-align: right;
+}
+
+@media (max-width: 600px) {
+  .navigation-section-page {
+    padding: 58px 14px 24px;
+  }
+
+  .navigation-section-header {
+    justify-items: start;
+  }
+
+  .navigation-section-brand-footer {
+    min-height: 140px;
+    gap: 12px;
+  }
+
+  .navigation-section-opsiq-logo,
+  .navigation-section-powered-by img {
+    width: min(44vw, 180px);
+    height: 120px;
+  }
+}
