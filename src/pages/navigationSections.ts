@@ -47,6 +47,7 @@ export function getNavigationSections(userRole: string, hasRestrictedAccess: boo
       icon: '🏷️',
       description: 'Receive, locate, move, and review inventory',
       tools: [
+        { icon: '📊', title: 'Inventory Dashboard', description: 'Review on-hand pallets, storage utilization, and recent movement', path: '/inventory-dashboard' },
         { icon: '🏷️', title: 'Pallet Inventory', description: 'Receive, locate, move, and ship customer pallets', path: '/pallet-tracker' },
         { icon: '📜', title: 'Pallet History & Live Feed', description: 'Search pallet transactions and current inventory', path: '/inventory-pallet-history' },
         { icon: '🔎', title: 'Inventory Auditor', description: 'Run and reconcile inventory audits', path: '/inventory-auditor' },

@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { Download, FileSpreadsheet, Printer } from 'lucide-react';
 import { apiClient } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { exportInventoryWorkbook, printInventoryReport, type InventoryReportSheet } from '../data/inventoryExports';
 import './InventoryAuditor.css';
 
 type SiteOption = 'Produce Depot' | 'Kings River';
@@ -293,6 +295,36 @@ const InventoryAuditor: React.FC = () => {
   const scanInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedSessionNumericId = Number(selectedSessionId || 0);
+  const auditorReportSheets = useMemo<InventoryReportSheet[]>(() => {
+    const scans = Array.isArray(sessionDetail?.scans) ? sessionDetail.scans : [];
+    const discrepancies = Array.isArray(reconciliation?.discrepancies) ? reconciliation.discrepancies : [];
+    const summary = reconciliation?.summary;
+    return [
+      { name: 'Audit Summary', rows: [{
+        Site: sessionDetail?.site || site,
+        Session: sessionDetail?.sessionName || sessionName,
+        'Session ID': selectedSessionNumericId || '',
+        'Report Name': sessionDetail?.reportName || reportName,
+        'Report Date': sessionDetail?.reportDate || reportDate,
+        Status: sessionDetail?.status || '',
+        'Started By': sessionDetail?.startedBy || executiveName || '',
+        'Started At': sessionDetail?.startedAt || '',
+        'Expected Quantity': summary?.totalExpectedQty ?? '',
+        'Scanned Quantity': summary?.totalActualQty ?? scans.reduce((total: number, scan: any) => total + Number(scan.quantity || 0), 0),
+        'Matched Quantity': summary?.matchedQty ?? '',
+        'Accuracy Percent': summary?.accuracyPercent ?? '',
+        'Discrepancy Count': summary?.discrepancyCount ?? '',
+      }] },
+      { name: 'All Scans', rows: scans.map((scan: any) => ({
+        Location: scan.locationCode || '', 'Pallet Tag': scan.palletTag || '', SKU: scan.sku || '', Lot: scan.lot || '',
+        Quantity: scan.quantity, 'Scanned By': scan.scannedBy || '', Source: scan.source || '', 'Scanned At': scan.scannedAt || '',
+      })) },
+      { name: 'All Discrepancies', rows: discrepancies.map((item: any) => ({
+        Type: item.type || '', Location: item.locationCode || '', 'Pallet Tag': item.palletTag || '', SKU: item.sku || '', Lot: item.lot || '',
+        'Expected Quantity': item.expectedQty ?? '', 'Actual Quantity': item.actualQty ?? '', 'Quantity Difference': item.quantityDifference ?? 0,
+      })) },
+    ];
+  }, [sessionDetail, reconciliation, site, sessionName, selectedSessionNumericId, reportName, reportDate, executiveName]);
 
   const activeSiteReports = useMemo(() => {
     return reports.filter((report) => String(report.site || '') === site);
@@ -810,6 +842,10 @@ const InventoryAuditor: React.FC = () => {
     <div className="inventory-auditor-page">
       <div className="inventory-auditor-page__header">
         <h1>Inventory Auditor</h1>
+        <div className="inventory-auditor-actions">
+          <button type="button" disabled={!sessionDetail} onClick={() => exportInventoryWorkbook(`inventory-audit-${selectedSessionNumericId || 'session'}.xlsx`, auditorReportSheets)}><FileSpreadsheet size={16} /><Download size={15} />Export Excel</button>
+          <button type="button" disabled={!sessionDetail} onClick={() => printInventoryReport('Inventory Audit Report', auditorReportSheets)}><Printer size={16} />Print Report</button>
+        </div>
       </div>
 
       <div className="inventory-auditor-page__site-row">

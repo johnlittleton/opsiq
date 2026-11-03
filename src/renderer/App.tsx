@@ -44,6 +44,7 @@ import WorkOrderHistory from './pages/WorkOrderHistory';
 import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
 import PalletInventoryHistory from './pages/PalletInventoryHistory';
+import InventoryControlDashboard from './pages/InventoryControlDashboard';
 import StorageBilling from './pages/StorageBilling';
 import ExtraServices from './pages/ExtraServices';
 import AIDualEntry from './pages/AIDualEntry';
@@ -95,6 +96,7 @@ const ROUTES_WITH_SHARED_TITLE_BAR = new Set([
   '/dock-checker/inbound',
   '/dock-checker/history',
   '/inventory-auditor',
+  '/inventory-dashboard',
   '/food-safety-tin-cats',
   '/food-safety-tin-cats/history',
   '/container-forecast',
@@ -153,6 +155,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/dock-checker/inbound" element={<InboundDockCheckerForm />} />
       <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
       <Route path="/inventory-auditor" element={<InventoryAuditor />} />
+      <Route path="/inventory-dashboard" element={<InventoryControlDashboard />} />
       <Route path="/food-safety-tin-cats" element={<FoodSafetyTinCats />} />
       <Route path="/food-safety-tin-cats/history" element={<FoodSafetyTinCatHistory />} />
       <Route path="/container-forecast" element={<ContainerForecast />} />

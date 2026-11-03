@@ -4,6 +4,8 @@ import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { useAuth } from '../context/AuthContext';
 import { WORK_ORDER_CUSTOMERS } from '../../shared/constants/workOrderCustomers';
+import { Download, FileSpreadsheet, Printer } from 'lucide-react';
+import { exportInventoryWorkbook, printInventoryReport, type InventoryReportSheet } from '../data/inventoryExports';
 import './PalletTracker.css';
 
 type Operation = 'RECEIVE' | 'MOVE' | 'SHIP';
@@ -336,6 +338,17 @@ const PalletTracker: React.FC = () => {
     ? 'Receiving'
     : `Cooler ${pallet.coolerPlacard} / Lane ${pallet.lanePlacard} / Position ${pallet.position}`;
 
+  const inventoryReportSheets: InventoryReportSheet[] = [
+    { name: 'Filtered Pallets', rows: filteredPallets.map((pallet) => ({
+      'Pallet Tag': pallet.palletTag, Customer: pallet.customer || 'Unassigned', Location: formatLocation(pallet),
+      'Received At': pallet.receivedAt, 'Last Updated': pallet.updatedAt,
+    })) },
+    { name: 'Recent Activity', rows: inventory.recentEvents.map((event) => ({
+      Action: event.action, 'Pallet / Location': event.palletTag || event.toLocation || event.fromLocation || '',
+      Reference: event.referenceNumber || '', Time: event.scannedAt,
+    })) },
+  ];
+
   const laneOccupancy = (laneCode: string) => inventory.pallets.filter((pallet) => pallet.lanePlacard === laneCode).length;
   const receivingQueue = inventory.pallets.filter((pallet) => pallet.locationType === 'RECEIVING');
 
@@ -352,6 +365,8 @@ const PalletTracker: React.FC = () => {
           <div className="pallet-tracker-header-actions">
             <span className="wms-live-indicator"><span />Live{inventoryUpdatedAt ? ` · ${inventoryUpdatedAt.toLocaleTimeString()}` : ''}</span>
             <button className="nav-btn" onClick={() => void loadInventory()}>Refresh</button>
+            <button className="nav-btn" onClick={() => exportInventoryWorkbook(`pallet-inventory-${new Date().toISOString().slice(0, 10)}.xlsx`, inventoryReportSheets)}><FileSpreadsheet size={16} /><Download size={15} />Export Excel</button>
+            <button className="nav-btn" onClick={() => printInventoryReport('Pallet Inventory Report', inventoryReportSheets)}><Printer size={16} />Print Report</button>
             <button className="summary-btn" onClick={() => navigate('/inventory-pallet-history')}>History / Live Feed</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
             <button className="logout-btn" onClick={logout}>Logout</button>

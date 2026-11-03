@@ -53,6 +53,11 @@ export default function FoodSafetyTinCats() {
   const scanInputRef = useRef<HTMLInputElement>(null);
   const selectedCycleIdRef = useRef<number | null>(null);
   const scanBusyRef = useRef(false);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (scanTimerRef.current !== null) clearTimeout(scanTimerRef.current);
+  }, []);
 
   const tokenHeaders = useMemo(() => sessionHeaders(sessionToken), [sessionToken]);
 
@@ -141,6 +146,10 @@ export default function FoodSafetyTinCats() {
 
   const handleScan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (scanTimerRef.current !== null) {
+      clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
     if (!selectedCycle || !isActiveCycle || scanBusyRef.current || busy) return;
     const normalized = normalizeTinCatCode(assetCode);
     if (!normalized) return;
@@ -247,7 +256,18 @@ export default function FoodSafetyTinCats() {
                         onKeyDown={(event) => { if (event.key === 'Tab' && assetCode.trim()) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}
                         placeholder="Click here, then scan"
                         value={assetCode}
-                        onChange={(event) => setAssetCode(event.target.value)}
+                        onChange={(event) => {
+                          const input = event.currentTarget;
+                          setAssetCode(input.value);
+                          if (scanTimerRef.current !== null) clearTimeout(scanTimerRef.current);
+                          scanTimerRef.current = null;
+                          if (input.value.trim()) {
+                            scanTimerRef.current = setTimeout(() => {
+                              scanTimerRef.current = null;
+                              if (input.isConnected && !scanBusyRef.current) input.form?.requestSubmit();
+                            }, 350);
+                          }
+                        }}
                         readOnly={busy}
                       />
                       <button type="submit" disabled={busy || !assetCode.trim()}>{busy ? 'Saving...' : 'Record Scan'}</button>

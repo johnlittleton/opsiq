@@ -67,7 +67,6 @@ async function main() {
     assert.equal(await scan.inputValue(), 'TC-REJECTED');
     await page.waitForFunction(() => document.activeElement?.id === 'tin-cat-scan-input');
     await scan.fill('TC-001');
-    await scan.press('Enter');
     await page.getByText('TC-001 scanned successfully.').waitFor();
     await page.waitForFunction(() => document.activeElement?.id === 'tin-cat-scan-input');
     assert.equal(await scan.inputValue(), '');

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE } from '../services/config';
 import { TitleBar } from '../../components/layout/TitleBar';
 import { useAuth } from '../context/AuthContext';
+import { Download, FileSpreadsheet, Printer } from 'lucide-react';
+import { exportInventoryWorkbook, printInventoryReport, type InventoryReportSheet } from '../data/inventoryExports';
 import './PalletTracker.css';
 import './PalletInventoryHistory.css';
 
@@ -92,6 +94,21 @@ const PalletInventoryHistory: React.FC = () => {
     return !query || [event.customer || 'Unassigned', event.palletTag, event.action, event.fromLocation, event.toLocation, event.referenceNumber, event.scannedBy]
       .some((value) => String(value || '').toLowerCase().includes(query));
   });
+  const historyReportSheets: InventoryReportSheet[] = [
+    { name: 'Transactions', rows: visibleEvents.map((event) => ({
+      Time: event.scannedAt, Action: event.action, 'Pallet Tag': event.palletTag || '', Customer: event.customer || 'Unassigned',
+      From: event.fromLocation || '', To: event.toLocation || '', 'Sales Order / Pick Ticket': event.referenceNumber || '', 'Scanned By': event.scannedBy,
+    })) },
+    { name: 'Live Inventory', rows: visiblePallets.map((pallet) => ({
+      'Pallet Tag': pallet.palletTag, Customer: pallet.customer || 'Unassigned', Location: formatLocation(pallet),
+      Received: pallet.receivedAt, 'Last Updated': pallet.updatedAt,
+    })) },
+    { name: 'Customer Totals', rows: customerFeed.map(([customer, customerPallets]) => ({
+      Customer: customer, 'Pallets On Hand': customerPallets.length,
+      Receiving: customerPallets.filter((pallet) => pallet.locationType === 'RECEIVING').length,
+      'In Coolers': customerPallets.filter((pallet) => pallet.locationType === 'COOLER').length,
+    })) },
+  ];
 
   return (
     <div className="pallet-tracker-page pallet-history-page">
@@ -105,7 +122,8 @@ const PalletInventoryHistory: React.FC = () => {
           </div>
           <div className="pallet-tracker-header-actions">
             <button className="summary-btn" onClick={() => setRefreshToken((token) => token + 1)} disabled={loading}>Refresh</button>
-            <button className="nav-btn pallet-history-print" onClick={() => window.print()}>Print</button>
+            <button className="nav-btn" onClick={() => exportInventoryWorkbook(`pallet-history-${new Date().toISOString().slice(0, 10)}.xlsx`, historyReportSheets)}><FileSpreadsheet size={16} /><Download size={15} />Export Excel</button>
+            <button className="nav-btn pallet-history-print" onClick={() => printInventoryReport('Pallet Inventory History Report', historyReportSheets)}><Printer size={16} />Print Report</button>
             <button className="nav-btn" onClick={() => navigate('/pallet-tracker')}>Pallet Inventory</button>
             <button className="nav-btn" onClick={() => navigate('/home')}>Home</button>
             <button className="logout-btn" onClick={logout}>Logout</button>
