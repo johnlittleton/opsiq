@@ -1,3 +1,35 @@
+.food-safety-record-tools,
+.food-safety-history-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin-bottom: 14px; }
+.food-safety-record-tools input { flex: 1 1 260px; }
+.food-safety-record-tools span { align-self: center; font-size: 0.8rem; color: var(--fs-muted); }
+.food-safety-history-filters label,
+.food-safety-edit-form label { display: grid; gap: 5px; font-size: 0.8rem; }
+.food-safety-record-tools input,
+.food-safety-history-filters input,
+.food-safety-edit-form input,
+.food-safety-edit-form textarea { box-sizing: border-box; min-height: 38px; min-width: 0; max-width: 100%; padding: 8px 10px; border: 1px solid #52646b; border-radius: 4px; background: #101a1f; color: var(--fs-ink); color-scheme: dark; font: inherit; }
+.food-safety-record-tools button,
+.food-safety-history-filters button,
+.food-safety-record-actions button,
+.food-safety-edit-form button,
+.food-safety-section-heading > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; border: 1px solid #4a6d66; border-radius: 4px; padding: 7px 10px; background: #203b34; color: #effff9; cursor: pointer; font: inherit; font-size: 0.8rem; }
+.food-safety-record-tools button:disabled,
+.food-safety-edit-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+.food-safety-record-table-scroll { max-height: 55vh; overflow: auto; scrollbar-gutter: stable; }
+.food-safety-record-table { width: 100%; min-width: 730px; border-collapse: collapse; text-align: left; font-size: 0.82rem; }
+.food-safety-record-table th,
+.food-safety-record-table td { border-bottom: 1px solid #33464d; padding: 10px 8px; vertical-align: top; }
+.food-safety-record-table th { position: sticky; top: 0; z-index: 1; background: #203139; color: #70d9bd; }
+.food-safety-record-table td strong { font-family: Consolas, monospace; overflow-wrap: anywhere; }
+.food-safety-record-table details { max-width: 330px; overflow-wrap: anywhere; }
+.food-safety-record-table summary { cursor: pointer; }
+.food-safety-record-actions { display: flex; gap: 6px; }
+.food-safety-record-actions button { width: 36px; height: 36px; padding: 0; }
+.food-safety-edit-backdrop { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; padding: 16px; background: #000a; }
+.food-safety-edit-form { box-sizing: border-box; display: grid; gap: 14px; width: min(100%, 480px); max-height: 90vh; overflow: auto; padding: 20px; border: 1px solid #52646b; border-radius: 6px; background: #18252b; color: #e7eef1; }
+.food-safety-edit-form p { margin: 0; font-size: 0.8rem; }
+.food-safety-edit-form textarea { min-height: 90px; resize: vertical; }
+
 .food-safety-page {
   --fs-ink: #e7eef1;
   --fs-muted: #9caeb5;
@@ -14,7 +46,7 @@
 
 .food-safety-header {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: 20px;
   max-width: 1450px;
@@ -57,6 +89,7 @@
 
 .food-safety-header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -329,6 +362,41 @@
 
 .food-safety-empty {
   margin: 12px 0 2px;
+}
+
+.food-safety-scan-page .food-safety-header { margin-bottom: 8px; padding-bottom: 8px; gap: 10px; }
+.food-safety-scan-page .food-safety-title h1 { font-size: 1.35rem; }
+.food-safety-scan-page .food-safety-cycle-summary,
+.food-safety-scan-page .food-safety-scan-panel,
+.food-safety-scan-page .food-safety-scans-section,
+.food-safety-scan-page .food-safety-history-section,
+.food-safety-scan-page .food-safety-start-panel { box-sizing: border-box; padding: 9px 12px; margin-bottom: 8px; }
+.food-safety-scan-page .food-safety-progress-copy { margin: 6px 0; }
+.food-safety-scan-page .food-safety-progress-copy strong { font-size: 1.5rem; }
+.food-safety-scan-page .food-safety-progress-track { height: 6px; }
+.food-safety-scan-page .food-safety-cycle-meta { margin-top: 6px; }
+.food-safety-scan-page .food-safety-section-heading,
+.food-safety-scan-page .food-safety-record-tools { margin-bottom: 6px; }
+.food-safety-scan-page .food-safety-scan-panel label { margin-bottom: 5px; }
+.food-safety-scan-page .food-safety-scan-row input,
+.food-safety-scan-page .food-safety-scan-row button { min-height: 36px; padding: 6px 10px; }
+.food-safety-scan-page .food-safety-record-tools input { min-height: 32px; padding: 5px 8px; }
+.food-safety-scan-page .food-safety-record-tools button,
+.food-safety-scan-page .food-safety-section-heading > button { min-height: 30px; padding: 4px 8px; }
+.food-safety-scan-page .food-safety-record-table th,
+.food-safety-scan-page .food-safety-record-table td { padding: 5px 8px; }
+.food-safety-scan-page .food-safety-record-actions button { width: 30px; height: 30px; min-height: 30px; }
+.food-safety-scan-page .food-safety-cycle-list { max-height: 70px; }
+.food-safety-scan-page .food-safety-cycle-list button { padding: 5px 8px; }
+.food-safety-scan-page .food-safety-message { padding: 6px 10px; margin-bottom: 8px; }
+
+@media (min-width: 900px) and (min-height: 600px) {
+  .food-safety-scan-page { display: flex; flex-direction: column; height: calc(100dvh - 24px); min-height: 0; padding: 10px 20px; overflow: hidden; }
+  .food-safety-scan-page > * { width: 100%; flex-shrink: 0; }
+  .food-safety-scan-page .food-safety-scans-section { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; }
+  .food-safety-scan-page .food-safety-scans-section > * { flex-shrink: 0; }
+  .food-safety-scan-page .food-safety-record-table-scroll { flex: 1 1 0; min-height: 0; max-height: none; }
+  .food-safety-scan-page .food-safety-history-section { margin-bottom: 0; }
 }
 
 @media (max-width: 680px) {

@@ -813,6 +813,18 @@ export class DatabaseService implements IDatabaseService {
         FOREIGN KEY (cycleId) REFERENCES food_safety_tin_cat_cycles(id) ON DELETE CASCADE
       );
 
+      CREATE TABLE IF NOT EXISTS food_safety_tin_cat_scan_edits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scanId INTEGER NOT NULL REFERENCES food_safety_tin_cat_scans(id) ON DELETE CASCADE,
+        originalAssetCode TEXT NOT NULL,
+        newAssetCode TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        editedBy TEXT NOT NULL,
+        editedAt TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scan_edits_scan ON food_safety_tin_cat_scan_edits(scanId, id);
+      CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scans_date ON food_safety_tin_cat_scans(scannedAt);
+
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_reports_site_date ON inventory_audit_reports(site, reportDate);
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_report_rows_report ON inventory_audit_report_rows(reportId);
       CREATE INDEX IF NOT EXISTS idx_inventory_audit_sessions_site_status ON inventory_audit_sessions(site, status);
@@ -3953,12 +3965,63 @@ export class DatabaseService implements IDatabaseService {
       GROUP BY c.id
     `).get(cycleId) as any;
     if (!cycle) return null;
-    cycle.scans = this.db.prepare(`
-      SELECT id, cycleId, assetCode, scannedBy, scannedAt
-      FROM food_safety_tin_cat_scans WHERE cycleId = ?
-      ORDER BY scannedAt DESC, id DESC
-    `).all(cycleId);
+    cycle.scans = await this.getFoodSafetyTinCatScans({ cycleId });
     return cycle;
+  }
+
+  async getFoodSafetyTinCatScans(filters: { startDate?: string; endDate?: string; search?: string; cycleId?: number; scanId?: number } = {}): Promise<any[]> {
+    for (const date of [filters.startDate, filters.endDate]) {
+      if (date !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) {
+        throw new Error('A valid YYYY-MM-DD scan date is required.');
+      }
+    }
+    if (filters.startDate && filters.endDate && filters.startDate > filters.endDate) throw new Error('Start date must not be after end date.');
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (filters.startDate) { conditions.push('s.scannedAt >= ?'); params.push(filters.startDate); }
+    if (filters.endDate) { conditions.push('substr(s.scannedAt, 1, 10) <= ?'); params.push(filters.endDate); }
+    if (filters.cycleId !== undefined) { conditions.push('s.cycleId = ?'); params.push(filters.cycleId); }
+    if (filters.scanId !== undefined) { conditions.push('s.id = ?'); params.push(filters.scanId); }
+    const search = String(filters.search || '').trim().toLowerCase();
+    if (search) {
+      conditions.push(`(instr(lower(s.assetCode || ' ' || s.scannedBy || ' ' || c.startedBy || ' ' || c.status || ' ' || c.id), ?) > 0
+        OR EXISTS (SELECT 1 FROM food_safety_tin_cat_scan_edits e WHERE e.scanId = s.id
+          AND instr(lower(e.originalAssetCode || ' ' || e.newAssetCode || ' ' || e.reason || ' ' || e.editedBy), ?) > 0))`);
+      params.push(search, search);
+    }
+    const scans = this.db.prepare(`
+      SELECT s.*, c.status AS cycleStatus, c.targetCount AS cycleTargetCount,
+        c.startedBy AS cycleStartedBy, c.startedAt AS cycleStartedAt, c.dueAt AS cycleDueAt, c.completedAt AS cycleCompletedAt
+      FROM food_safety_tin_cat_scans s JOIN food_safety_tin_cat_cycles c ON c.id = s.cycleId
+      ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
+      ORDER BY s.scannedAt DESC, s.id DESC
+    `).all(...params) as any[];
+    const edits = this.db.prepare('SELECT * FROM food_safety_tin_cat_scan_edits WHERE scanId = ? ORDER BY id');
+    return scans.map(scan => ({ ...scan, edits: edits.all(scan.id) }));
+  }
+
+  async updateFoodSafetyTinCatScan(scanId: number, assetCodeValue: string, reasonValue: string, editedBy: string): Promise<any> {
+    const assetCode = normalizeTinCatCode(assetCodeValue);
+    const reason = String(reasonValue || '').trim();
+    const userName = String(editedBy || '').trim();
+    if (!Number.isInteger(scanId) || scanId <= 0) throw new Error('Valid scan ID is required.');
+    if (!assetCode || assetCode.length > 120) throw new Error('A valid tin-cat barcode is required.');
+    if (!reason) throw new Error('A correction reason is required.');
+    if (!userName) throw new Error('Signed-in user is required to correct a scan.');
+    const save = this.db.transaction(() => {
+      const scan = this.db.prepare('SELECT * FROM food_safety_tin_cat_scans WHERE id = ?').get(scanId) as any;
+      if (!scan) throw new Error('Tin-cat scan not found.');
+      this.db.prepare('UPDATE food_safety_tin_cat_scans SET assetCode = ? WHERE id = ?').run(assetCode, scanId);
+      this.db.prepare(`INSERT INTO food_safety_tin_cat_scan_edits (scanId, originalAssetCode, newAssetCode, reason, editedBy, editedAt)
+        VALUES (?, ?, ?, ?, ?, ?)`).run(scanId, scan.assetCode, assetCode, reason, userName, getLocalISOString(new Date()));
+    });
+    try {
+      save.immediate();
+    } catch (error: any) {
+      if (error?.code === 'SQLITE_CONSTRAINT_UNIQUE') throw new Error('This barcode is already scanned in this cycle.');
+      throw error;
+    }
+    return (await this.getFoodSafetyTinCatScans({ scanId }))[0];
   }
 
   async createFoodSafetyTinCatCycle(startedBy: string): Promise<any> {
@@ -3998,28 +4061,25 @@ export class DatabaseService implements IDatabaseService {
     if (!assetCode || assetCode.length > 120) throw new Error('A valid tin-cat barcode is required.');
     if (!userName) throw new Error('Signed-in user is required to record a scan.');
 
-    const cycle = this.db.prepare('SELECT * FROM food_safety_tin_cat_cycles WHERE id = ?').get(normalizedCycleId) as any;
-    if (!cycle) throw new Error('Food Safety cycle not found.');
-    const nowDate = new Date();
-    const now = getLocalISOString(nowDate);
-    if (cycle.status !== 'open') throw new Error('This Food Safety cycle is not open.');
-    if (new Date(cycle.dueAt).getTime() <= nowDate.getTime()) {
-      this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updatedAt = ? WHERE id = ?`).run(now, normalizedCycleId);
-      throw new Error('This Food Safety cycle is overdue. Start a new cycle to continue scanning.');
-    }
-
-    const existingScan = this.db.prepare(`
-      SELECT * FROM food_safety_tin_cat_scans WHERE cycleId = ? AND assetCode = ?
-    `).get(normalizedCycleId, assetCode) as any;
-    if (existingScan) return { duplicate: true, scan: existingScan, cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
-
-    const scanCount = Number((this.db.prepare(`SELECT COUNT(*) AS count FROM food_safety_tin_cat_scans WHERE cycleId = ?`).get(normalizedCycleId) as any).count);
-    if (scanCount >= Number(cycle.targetCount)) {
-      this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, normalizedCycleId);
-      throw new Error('This Food Safety cycle is already complete.');
-    }
-
     const saveScan = this.db.transaction(() => {
+      const cycle = this.db.prepare('SELECT * FROM food_safety_tin_cat_cycles WHERE id = ?').get(normalizedCycleId) as any;
+      if (!cycle) throw new Error('Food Safety cycle not found.');
+      const existingScan = this.db.prepare('SELECT * FROM food_safety_tin_cat_scans WHERE cycleId = ? AND assetCode = ?').get(normalizedCycleId, assetCode) as any;
+      if (existingScan) return { duplicate: true, scan: existingScan };
+      const nowDate = new Date();
+      const now = getLocalISOString(nowDate);
+      if (cycle.status !== 'open') throw new Error('This Food Safety cycle is not open.');
+      if (new Date(cycle.dueAt).getTime() <= nowDate.getTime()) {
+        this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updatedAt = ? WHERE id = ?`).run(now, normalizedCycleId);
+        return { error: 'This Food Safety cycle is overdue. Start a new cycle to continue scanning.' };
+      }
+
+      const scanCount = Number((this.db.prepare(`SELECT COUNT(*) AS count FROM food_safety_tin_cat_scans WHERE cycleId = ?`).get(normalizedCycleId) as any).count);
+      if (scanCount >= Number(cycle.targetCount)) {
+        this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, normalizedCycleId);
+        return { error: 'This Food Safety cycle is already complete.' };
+      }
+
       this.db.prepare(`
         INSERT INTO food_safety_tin_cat_scans (cycleId, assetCode, scannedBy, scannedAt)
         VALUES (?, ?, ?, ?)
@@ -4028,10 +4088,11 @@ export class DatabaseService implements IDatabaseService {
       if (count >= Number(cycle.targetCount)) {
         this.db.prepare(`UPDATE food_safety_tin_cat_cycles SET status = 'completed', completedAt = ?, updatedAt = ? WHERE id = ?`).run(now, now, normalizedCycleId);
       }
-      return this.db.prepare(`SELECT * FROM food_safety_tin_cat_scans WHERE cycleId = ? AND assetCode = ?`).get(normalizedCycleId, assetCode);
+      return { duplicate: false, scan: this.db.prepare(`SELECT * FROM food_safety_tin_cat_scans WHERE cycleId = ? AND assetCode = ?`).get(normalizedCycleId, assetCode) };
     });
-    const scan = saveScan();
-    return { duplicate: false, scan, cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+    const result = saveScan.immediate();
+    if (result.error) throw new Error(result.error);
+    return { ...result, cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
   }
 
   async getInventoryAuditReports(filters?: { site?: string }): Promise<any[]> {

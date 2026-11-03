@@ -821,6 +821,17 @@ export class DatabaseService implements IDatabaseService {
           UNIQUE(cycle_id, asset_code)
         );
 
+        CREATE TABLE IF NOT EXISTS food_safety_tin_cat_scan_edits (
+          id SERIAL PRIMARY KEY,
+          scan_id INTEGER NOT NULL REFERENCES food_safety_tin_cat_scans(id) ON DELETE CASCADE,
+          original_asset_code TEXT NOT NULL,
+          new_asset_code TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          edited_by TEXT NOT NULL,
+          edited_at TIMESTAMP NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scan_edits_scan ON food_safety_tin_cat_scan_edits(scan_id, id);
+        CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scans_date ON food_safety_tin_cat_scans(scanned_at);
         CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_cycles_status ON food_safety_tin_cat_cycles(status, started_at);
         CREATE INDEX IF NOT EXISTS idx_fs_tin_cat_scans_cycle ON food_safety_tin_cat_scans(cycle_id, scanned_at);
         CREATE UNIQUE INDEX IF NOT EXISTS idx_fs_tin_cat_one_open_cycle ON food_safety_tin_cat_cycles(status) WHERE status = 'open';
@@ -3965,12 +3976,68 @@ export class DatabaseService implements IDatabaseService {
       GROUP BY c.id
     `, [cycleId]);
     if (!cycleResult.rows.length) return null;
-    const scansResult = await this.pool.query(`
-      SELECT id, cycle_id, asset_code, scanned_by, scanned_at
-      FROM food_safety_tin_cat_scans WHERE cycle_id = $1
-      ORDER BY scanned_at DESC, id DESC
-    `, [cycleId]);
-    return { ...this.toCamelCase(cycleResult.rows[0]), scans: this.toCamelCase(scansResult.rows) };
+    return { ...this.toCamelCase(cycleResult.rows[0]), scans: await this.getFoodSafetyTinCatScans({ cycleId }) };
+  }
+
+  async getFoodSafetyTinCatScans(filters: { startDate?: string; endDate?: string; search?: string; cycleId?: number; scanId?: number } = {}): Promise<any[]> {
+    for (const date of [filters.startDate, filters.endDate]) {
+      if (date !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) {
+        throw new Error('A valid YYYY-MM-DD scan date is required.');
+      }
+    }
+    if (filters.startDate && filters.endDate && filters.startDate > filters.endDate) throw new Error('Start date must not be after end date.');
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (filters.startDate) { params.push(filters.startDate); conditions.push(`s.scanned_at >= $${params.length}::date`); }
+    if (filters.endDate) { params.push(filters.endDate); conditions.push(`s.scanned_at < ($${params.length}::date + INTERVAL '1 day')`); }
+    if (filters.cycleId !== undefined) { params.push(filters.cycleId); conditions.push(`s.cycle_id = $${params.length}`); }
+    if (filters.scanId !== undefined) { params.push(filters.scanId); conditions.push(`s.id = $${params.length}`); }
+    const search = String(filters.search || '').trim().toLowerCase();
+    if (search) {
+      params.push(search);
+      conditions.push(`(strpos(lower(s.asset_code || ' ' || s.scanned_by || ' ' || c.started_by || ' ' || c.status || ' ' || c.id), $${params.length}) > 0
+        OR EXISTS (SELECT 1 FROM food_safety_tin_cat_scan_edits e WHERE e.scan_id = s.id
+          AND strpos(lower(e.original_asset_code || ' ' || e.new_asset_code || ' ' || e.reason || ' ' || e.edited_by), $${params.length}) > 0))`);
+    }
+    const result = await this.pool.query(`
+      SELECT s.*, c.status AS cycle_status, c.target_count AS cycle_target_count,
+        c.started_by AS cycle_started_by, c.started_at AS cycle_started_at, c.due_at AS cycle_due_at, c.completed_at AS cycle_completed_at,
+        COALESCE((SELECT json_agg(e ORDER BY e.id) FROM food_safety_tin_cat_scan_edits e WHERE e.scan_id = s.id), '[]'::json) AS edits
+      FROM food_safety_tin_cat_scans s JOIN food_safety_tin_cat_cycles c ON c.id = s.cycle_id
+      ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
+      ORDER BY s.scanned_at DESC, s.id DESC
+    `, params);
+    return this.toCamelCase(result.rows);
+  }
+
+  async updateFoodSafetyTinCatScan(scanId: number, assetCodeValue: string, reasonValue: string, editedBy: string): Promise<any> {
+    const assetCode = normalizeTinCatCode(assetCodeValue);
+    const reason = String(reasonValue || '').trim();
+    const userName = String(editedBy || '').trim();
+    if (!Number.isInteger(scanId) || scanId <= 0) throw new Error('Valid scan ID is required.');
+    if (!assetCode || assetCode.length > 120) throw new Error('A valid tin-cat barcode is required.');
+    if (!reason) throw new Error('A correction reason is required.');
+    if (!userName) throw new Error('Signed-in user is required to correct a scan.');
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const owner = await client.query('SELECT cycle_id FROM food_safety_tin_cat_scans WHERE id = $1', [scanId]);
+      if (!owner.rows.length) throw new Error('Tin-cat scan not found.');
+      await client.query('SELECT id FROM food_safety_tin_cat_cycles WHERE id = $1 FOR UPDATE', [owner.rows[0].cycle_id]);
+      const result = await client.query('SELECT * FROM food_safety_tin_cat_scans WHERE id = $1 FOR UPDATE', [scanId]);
+      if (!result.rows.length) throw new Error('Tin-cat scan not found.');
+      await client.query('UPDATE food_safety_tin_cat_scans SET asset_code = $1 WHERE id = $2', [assetCode, scanId]);
+      await client.query(`INSERT INTO food_safety_tin_cat_scan_edits (scan_id, original_asset_code, new_asset_code, reason, edited_by, edited_at)
+        VALUES ($1, $2, $3, $4, $5, $6)`, [scanId, result.rows[0].asset_code, assetCode, reason, userName, getLocalISOString(new Date())]);
+      await client.query('COMMIT');
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      if (error?.code === '23505') throw new Error('This barcode is already scanned in this cycle.');
+      throw error;
+    } finally {
+      client.release();
+    }
+    return (await this.getFoodSafetyTinCatScans({ scanId }))[0];
   }
 
   async createFoodSafetyTinCatCycle(startedBy: string): Promise<any> {
@@ -4032,19 +4099,18 @@ export class DatabaseService implements IDatabaseService {
       const cycleResult = await client.query('SELECT * FROM food_safety_tin_cat_cycles WHERE id = $1 FOR UPDATE', [normalizedCycleId]);
       if (!cycleResult.rows.length) throw new Error('Food Safety cycle not found.');
       const cycle = this.toCamelCase(cycleResult.rows[0]);
+      const existing = await client.query(`SELECT * FROM food_safety_tin_cat_scans WHERE cycle_id = $1 AND asset_code = $2`, [normalizedCycleId, assetCode]);
+      if (existing.rows.length) {
+        await client.query('COMMIT');
+        committed = true;
+        return { duplicate: true, scan: this.toCamelCase(existing.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+      }
       if (cycle.status !== 'open') throw new Error('This Food Safety cycle is not open.');
       if (new Date(cycle.dueAt).getTime() <= nowDate.getTime()) {
         await client.query(`UPDATE food_safety_tin_cat_cycles SET status = 'overdue', updated_at = $1 WHERE id = $2`, [now, normalizedCycleId]);
         await client.query('COMMIT');
         committed = true;
         throw new Error('This Food Safety cycle is overdue. Start a new cycle to continue scanning.');
-      }
-
-      const existing = await client.query(`SELECT * FROM food_safety_tin_cat_scans WHERE cycle_id = $1 AND asset_code = $2`, [normalizedCycleId, assetCode]);
-      if (existing.rows.length) {
-        await client.query('COMMIT');
-        committed = true;
-        return { duplicate: true, scan: this.toCamelCase(existing.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
       }
 
       const countResult = await client.query('SELECT COUNT(*)::INTEGER AS scanned_count FROM food_safety_tin_cat_scans WHERE cycle_id = $1', [normalizedCycleId]);
@@ -4070,7 +4136,7 @@ export class DatabaseService implements IDatabaseService {
       if (!committed) await client.query('ROLLBACK');
       if (error?.code === '23505') {
         const duplicate = await this.pool.query('SELECT * FROM food_safety_tin_cat_scans WHERE cycle_id = $1 AND asset_code = $2', [normalizedCycleId, assetCode]);
-        return { duplicate: true, scan: this.toCamelCase(duplicate.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
+        if (duplicate.rows.length) return { duplicate: true, scan: this.toCamelCase(duplicate.rows[0]), cycle: await this.getFoodSafetyTinCatCycle(normalizedCycleId) };
       }
       throw error;
     } finally {

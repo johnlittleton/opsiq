@@ -53,6 +53,7 @@ import InboundDockCheckerForm from './pages/InboundDockCheckerForm';
 import DockCheckerHistory from './pages/DockCheckerHistory';
 import InventoryAuditor from './pages/InventoryAuditor';
 import FoodSafetyTinCats from './pages/FoodSafetyTinCats';
+import FoodSafetyTinCatHistory from './pages/FoodSafetyTinCatHistory';
 import ContainerForecast from './pages/ContainerForecast';
 import DispatchDashboard from './pages/DispatchDashboard';
 import LoadBalancer from './pages/LoadBalancer';
@@ -95,6 +96,7 @@ const ROUTES_WITH_SHARED_TITLE_BAR = new Set([
   '/dock-checker/history',
   '/inventory-auditor',
   '/food-safety-tin-cats',
+  '/food-safety-tin-cats/history',
   '/container-forecast',
   '/container-forecast-history',
   '/dispatch-dashboard',
@@ -152,6 +154,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
       <Route path="/inventory-auditor" element={<InventoryAuditor />} />
       <Route path="/food-safety-tin-cats" element={<FoodSafetyTinCats />} />
+      <Route path="/food-safety-tin-cats/history" element={<FoodSafetyTinCatHistory />} />
       <Route path="/container-forecast" element={<ContainerForecast />} />
       <Route path="/container-forecast-history" element={<ContainerForecast historyMode />} />
       <Route path="/dispatch-dashboard" element={<DispatchDashboard />} />

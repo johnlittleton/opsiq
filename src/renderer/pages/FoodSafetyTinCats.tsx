@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../services/config';
 import { FOOD_SAFETY_CYCLE_DAYS, FOOD_SAFETY_TIN_CAT_TARGET, getTinCatProgress, getTinCatStatus, normalizeTinCatCode } from '../../shared/foodSafetyTinCats';
 import './FoodSafetyTinCats.css';
+import TinCatRecords from './TinCatRecords';
 
 interface TinCatScan {
   id: number;
@@ -11,6 +12,7 @@ interface TinCatScan {
   assetCode: string;
   scannedBy: string;
   scannedAt: string;
+  edits?: { originalAssetCode: string; newAssetCode: string; reason: string; editedBy: string; editedAt: string }[];
 }
 
 interface TinCatCycle {
@@ -50,6 +52,7 @@ export default function FoodSafetyTinCats() {
   const [busy, setBusy] = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
   const selectedCycleIdRef = useRef<number | null>(null);
+  const scanBusyRef = useRef(false);
 
   const tokenHeaders = useMemo(() => sessionHeaders(sessionToken), [sessionToken]);
 
@@ -138,9 +141,10 @@ export default function FoodSafetyTinCats() {
 
   const handleScan = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedCycle || !isActiveCycle || busy) return;
+    if (!selectedCycle || !isActiveCycle || scanBusyRef.current || busy) return;
     const normalized = normalizeTinCatCode(assetCode);
     if (!normalized) return;
+    scanBusyRef.current = true;
     setBusy(true);
     setMessage('');
     try {
@@ -152,19 +156,21 @@ export default function FoodSafetyTinCats() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || 'Unable to record scan.');
       setSelectedCycle(payload.cycle);
-      await loadCycles();
       setAssetCode('');
       setMessage(payload.duplicate ? `${normalized} was already scanned in this cycle.` : `${normalized} scanned successfully.`);
       setMessageKind(payload.duplicate ? 'warning' : 'success');
       if (payload.cycle?.status === 'completed') setMessage('All 147 tin cats scanned. This inspection cycle is complete.');
-      requestAnimationFrame(() => scanInputRef.current?.focus());
+      void loadCycles().catch(() => {
+        setMessage('Scan saved, but cycle totals could not refresh. Refresh before continuing.');
+        setMessageKind('warning');
+      });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Unable to record scan.');
       setMessageKind('error');
-      setAssetCode('');
-      requestAnimationFrame(() => scanInputRef.current?.focus());
     } finally {
+      scanBusyRef.current = false;
       setBusy(false);
+      requestAnimationFrame(() => { scanInputRef.current?.focus(); scanInputRef.current?.select(); });
     }
   };
 
@@ -174,7 +180,7 @@ export default function FoodSafetyTinCats() {
   const cycleStatus = selectedCycle ? getTinCatStatus(selectedCycle.scannedCount, selectedCycle.dueAt) : 'open';
 
   return (
-    <main className="food-safety-page">
+    <main className="food-safety-page food-safety-scan-page">
       <header className="food-safety-header">
         <div className="food-safety-title">
           <p>FOOD SAFETY / BIWEEKLY INSPECTION</p>
@@ -182,6 +188,7 @@ export default function FoodSafetyTinCats() {
         </div>
         <div className="food-safety-header-actions">
           <span>{executiveName}</span>
+          <button type="button" onClick={() => navigate('/food-safety-tin-cats/history')}>History</button>
           <button type="button" onClick={() => void loadCycles()}>Refresh</button>
           <button type="button" onClick={logout}>Logout</button>
         </div>
@@ -237,10 +244,11 @@ export default function FoodSafetyTinCats() {
                         ref={scanInputRef}
                         autoFocus
                         autoComplete="off"
+                        onKeyDown={(event) => { if (event.key === 'Tab' && assetCode.trim()) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}
                         placeholder="Click here, then scan"
                         value={assetCode}
                         onChange={(event) => setAssetCode(event.target.value)}
-                        disabled={busy}
+                        readOnly={busy}
                       />
                       <button type="submit" disabled={busy || !assetCode.trim()}>{busy ? 'Saving...' : 'Record Scan'}</button>
                     </div>
@@ -253,35 +261,11 @@ export default function FoodSafetyTinCats() {
                   <h2>Scanned Tin Cats</h2>
                   <span>{selectedCycle.scans?.length || 0} recorded</span>
                 </div>
-                {!selectedCycle.scans?.length ? <p className="food-safety-empty">No tin cats scanned in this cycle yet.</p> : (
-                  <div className="food-safety-scan-list">
-                    {selectedCycle.scans.map((scan) => (
-                      <div className="food-safety-scan-row-item" key={scan.id}>
-                        <strong>{scan.assetCode}</strong><span>{scan.scannedBy}</span><time>{formatDateTime(scan.scannedAt)}</time>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <TinCatRecords scans={selectedCycle.scans || []} period={`Inspection Cycle #${selectedCycle.id}`} onUpdated={async () => { await loadCycle(selectedCycle.id); await loadCycles(); }} />
               </section>
             </>
           )}
 
-          <section className="food-safety-history-section">
-            <div className="food-safety-section-heading"><h2>Inspection History</h2><span>{cycles.length} cycles</span></div>
-            {!cycles.length ? <p className="food-safety-empty">No previous cycles yet.</p> : (
-              <div className="food-safety-cycle-list">
-                {cycles.map((cycle) => (
-                  <button type="button" key={cycle.id} className={selectedCycleId === cycle.id ? 'is-selected' : ''} onClick={() => {
-                    selectedCycleIdRef.current = cycle.id;
-                    setSelectedCycleId(cycle.id);
-                    setMessage('');
-                  }}>
-                    <strong>Cycle #{cycle.id}</strong><span>{Number(cycle.scannedCount) || 0}/{cycle.targetCount} scans</span><span>{formatDateTime(cycle.startedAt)}</span><span className={`food-safety-status is-${getTinCatStatus(cycle.scannedCount, cycle.dueAt)}`}>{getTinCatStatus(cycle.scannedCount, cycle.dueAt)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
         </>
       )}
     </main>

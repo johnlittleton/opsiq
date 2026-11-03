@@ -1081,6 +1081,19 @@ const getAuthorizedUser = async (authorizationHeader?: string): Promise<SessionU
   return (await db.validateSession(sessionToken)) as SessionUser | null;
 };
 
+const requireRole = async (req: express.Request, res: express.Response, roles: SessionUser['role'][]): Promise<SessionUser | null> => {
+  const user = await getAuthorizedUser(req.headers.authorization);
+  if (!user) {
+    res.status(401).json({ error: 'Authentication required.' });
+    return null;
+  }
+  if (!roles.includes(user.role)) {
+    res.status(403).json({ error: 'Only managers or executives can correct tin-cat scans.' });
+    return null;
+  }
+  return user;
+};
+
 const buildKioskFallbackReply = (message: string, employeeName?: string): string => {
   const lower = message.toLowerCase();
   const firstName = employeeName?.split(' ')[0];
@@ -2432,6 +2445,40 @@ app.get('/api/dock-checker/history', async (req, res) => {
 });
 
 // ==================== INVENTORY AUDITOR API ====================
+
+app.get('/api/food-safety/tin-cats/scans', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    for (const key of ['startDate', 'endDate', 'search']) {
+      if (req.query[key] !== undefined && typeof req.query[key] !== 'string') return res.status(400).json({ error: `${key} must be a string.` });
+    }
+    res.json(await db.getFoodSafetyTinCatScans({
+      startDate: req.query.startDate as string | undefined,
+      endDate: req.query.endDate as string | undefined,
+      search: req.query.search as string | undefined,
+    }));
+  } catch (error: any) {
+    res.status(/date/i.test(error?.message || '') ? 400 : 500).json({ error: error?.message || 'Failed to load tin-cat scan history.' });
+  }
+});
+
+app.put('/api/food-safety/tin-cats/scans/:scanId', async (req, res) => {
+  try {
+    const user = await requireRole(req, res, ['manager', 'executive']);
+    if (!user) return;
+    const scanId = Number(req.params.scanId);
+    if (!Number.isInteger(scanId) || scanId <= 0) return res.status(400).json({ error: 'Valid scan ID is required.' });
+    if (typeof req.body?.assetCode !== 'string' || typeof req.body?.reason !== 'string') {
+      return res.status(400).json({ error: 'assetCode and reason must be strings.' });
+    }
+    res.json(await db.updateFoodSafetyTinCatScan(scanId, req.body.assetCode, req.body.reason, user.name));
+  } catch (error: any) {
+    const message = error?.message || 'Failed to correct tin-cat scan.';
+    const status = /not found/i.test(message) ? 404 : /already scanned/i.test(message) ? 409 : /required/i.test(message) ? 400 : 500;
+    res.status(status).json({ error: message });
+  }
+});
 
 app.get('/api/food-safety/tin-cats/cycles', async (req, res) => {
   try {
