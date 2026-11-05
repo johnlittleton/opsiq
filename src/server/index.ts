@@ -10,6 +10,7 @@ import { PDFParse } from 'pdf-parse';
 import { ChildProcess, spawn } from 'child_process';
 // Use factory to switch between SQLite (local) and Postgres (Railway)
 import { db } from './db-factory';
+import { FacService, createFacRouter } from './facService';
 import { CameraCounterEvent, CameraEdgeStore, CameraEdgeStoreError } from './camera-edge-store';
 import { ArgusCompatError, ArgusCompatService } from './argus-compat-service';
 import { WindowCaptureError, WindowCaptureService } from './window-capture-service';
@@ -2445,6 +2446,11 @@ app.get('/api/dock-checker/history', async (req, res) => {
 });
 
 // ==================== INVENTORY AUDITOR API ====================
+
+app.use('/api/fac', createFacRouter(
+  () => (db as typeof db & { getFacService(): FacService }).getFacService(),
+  getAuthorizedUser,
+));
 
 app.get('/api/food-safety/tin-cats/scans', async (req, res) => {
   try {

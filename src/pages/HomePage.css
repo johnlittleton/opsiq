@@ -575,9 +575,6 @@
     grid-template-columns: repeat(8, minmax(0, 1fr));
   }
   .home-page__category-grid--compact > * { grid-column: span 2; }
-  .home-page__category-grid--compact > :nth-child(5) { grid-column: 2 / span 2; }
-  .home-page__category-grid--compact > :nth-child(6) { grid-column: 4 / span 2; }
-  .home-page__category-grid--compact > :nth-child(7) { grid-column: 6 / span 2; }
   .home-page__category-grid--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .home-page__category-card { min-height: 68px; padding: 9px 11px; gap: 9px; }
   .home-page__category-icon { width: 36px; font-size: 1.1rem; }

@@ -45,6 +45,7 @@ import DowntimeHistory from './pages/DowntimeHistory';
 import PalletTracker from './pages/PalletTracker';
 import PalletInventoryHistory from './pages/PalletInventoryHistory';
 import InventoryControlDashboard from './pages/InventoryControlDashboard';
+import ForcedAirCooling from './pages/ForcedAirCooling';
 import StorageBilling from './pages/StorageBilling';
 import ExtraServices from './pages/ExtraServices';
 import AIDualEntry from './pages/AIDualEntry';
@@ -97,6 +98,10 @@ const ROUTES_WITH_SHARED_TITLE_BAR = new Set([
   '/dock-checker/history',
   '/inventory-auditor',
   '/inventory-dashboard',
+  '/fac-dashboard',
+  '/fac-tracker',
+  '/fac-schedule',
+  '/fac-history',
   '/food-safety-tin-cats',
   '/food-safety-tin-cats/history',
   '/container-forecast',
@@ -156,6 +161,10 @@ const AppRoutes: React.FC = () => {
       <Route path="/dock-checker/history" element={<DockCheckerHistory />} />
       <Route path="/inventory-auditor" element={<InventoryAuditor />} />
       <Route path="/inventory-dashboard" element={<InventoryControlDashboard />} />
+      <Route path="/fac-dashboard" element={<ForcedAirCooling mode="dashboard" />} />
+      <Route path="/fac-tracker" element={<ForcedAirCooling mode="tracker" />} />
+      <Route path="/fac-schedule" element={<ForcedAirCooling mode="schedule" />} />
+      <Route path="/fac-history" element={<ForcedAirCooling mode="history" />} />
       <Route path="/food-safety-tin-cats" element={<FoodSafetyTinCats />} />
       <Route path="/food-safety-tin-cats/history" element={<FoodSafetyTinCatHistory />} />
       <Route path="/container-forecast" element={<ContainerForecast />} />

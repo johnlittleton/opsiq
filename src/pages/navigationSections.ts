@@ -54,6 +54,18 @@ export function getNavigationSections(userRole: string, hasRestrictedAccess: boo
       ],
     },
     {
+      id: 'forced-air-cooling',
+      title: 'Forced Air Cooling (FAC)',
+      icon: '❄️',
+      description: 'Schedule cooling loads, scan pallets, and monitor cooler timers',
+      tools: [
+        { icon: '❄️', title: 'FAC Dashboard', description: 'Monitor cooling loads in Coolers 2, 3, 6 and 7', path: '/fac-dashboard' },
+        { icon: '🏷️', title: 'FAC Tracker', description: 'Capture pallets and manage cooling loads', path: '/fac-tracker' },
+        { icon: '📅', title: 'FAC Schedule', description: 'Plan 45-minute cooler slots', path: '/fac-schedule' },
+        { icon: '📜', title: 'FAC History', description: 'Review completed loads and full cooling reports', path: '/fac-history' },
+      ],
+    },
+    {
       id: 'production',
       title: 'Production',
       icon: '🏭',

@@ -20,6 +20,7 @@ import { IDatabaseService } from './database-interface';
 import { normalizeEstimatedCompletionTime } from '../shared/estimatedCompletionTime';
 import { DEFAULT_KIOSK_EMPLOYEES, VALID_KIOSK_DEPARTMENTS } from './kiosk-employees';
 import { FOOD_SAFETY_CYCLE_DAYS, FOOD_SAFETY_TIN_CAT_TARGET, normalizeTinCatCode } from '../shared/foodSafetyTinCats';
+import { FacService, createSqliteFacStorage } from './facService';
 
 // Helper to get local time as ISO string (without UTC conversion)
 function getLocalISOString(date: Date = new Date()): string {
@@ -86,6 +87,12 @@ function normalizeAnalyticsDateRange(startDate?: string, endDate?: string): { st
 
 export class DatabaseService implements IDatabaseService {
   private db: Database.Database;
+  private facService?: FacService;
+
+  getFacService(): FacService {
+    return this.facService ??= new FacService(createSqliteFacStorage(this.db));
+  }
+
   private static readonly MAX_REASONABLE_PALLETS = 200;
   private static readonly MAX_REASONABLE_TRUCK_PALLETS = 60;
   private static readonly UNPAID_BREAK_AND_LUNCH_MINUTES = 60;
