@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../services/config';
-import { buildContainerForecastPrintHtml } from '../data/containerForecastPrint';
+import { buildContainerForecastHistoryPrintHtml, buildContainerForecastPrintHtml } from '../data/containerForecastPrint';
 import './ContainerForecast.css';
 
 type ReleaseStatus = 'Pending' | 'Released' | 'On Hold' | 'Not Required';
@@ -89,6 +89,7 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
   const [locations, setLocations] = useState<string[]>([]);
   const [options, setOptions] = useState<ForecastOptions>({ vessels: [], steamshipLines: [], customers: [], commodities: [], carriers: [], locations: [] });
   const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [vesselFilter, setVesselFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [releaseFilter, setReleaseFilter] = useState('');
@@ -96,6 +97,8 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
   const [etaEnd, setEtaEnd] = useState('');
   const [historyStart, setHistoryStart] = useState('');
   const [historyEnd, setHistoryEnd] = useState('');
+  const [appliedHistoryStart, setAppliedHistoryStart] = useState('');
+  const [appliedHistoryEnd, setAppliedHistoryEnd] = useState('');
   const [form, setForm] = useState<ForecastForm>(emptyForm);
   const [containerNumbers, setContainerNumbers] = useState('');
   const [tirFile, setTirFile] = useState<File | null>(null);
@@ -114,7 +117,7 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
     if (vesselFilter) params.set('vessel', vesselFilter);
     if (locationFilter) params.set('location', locationFilter);
     if (releaseFilter) params.set('releaseStatus', releaseFilter);
-    if (search.trim()) params.set('search', search.trim());
+    if (appliedSearch.trim()) params.set('search', appliedSearch.trim());
     const response = await fetch(`${API_BASE}/api/dispatch/container-forecasts?${params}`, { headers });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(payload?.error || 'Failed to load container forecasts.');
@@ -122,7 +125,7 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
     setRecords(rows);
     setVessels(Array.from(new Set(rows.map((row) => row.vessel).filter(Boolean))).sort((a, b) => a.localeCompare(b)));
     setLocations(Array.from(new Set(rows.map((row) => row.dropOffLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b)));
-  }, [headers, vesselFilter, locationFilter, releaseFilter, search]);
+  }, [headers, vesselFilter, locationFilter, releaseFilter, appliedSearch]);
 
   const loadSummary = useCallback(async () => {
     const params = new URLSearchParams();
@@ -289,16 +292,15 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
     }
   };
 
-  const handlePrint = async (record: ContainerForecastRecord) => {
-    const printHtml = buildContainerForecastPrintHtml(record as unknown as Record<string, unknown>);
+  const printDocument = async (printHtml: string, title: string) => {
     if (window.electron?.printHTML) {
       const result = await window.electron.printHTML(printHtml);
-      if (!result.success) setError(result.error || 'Unable to print container record.');
+      if (!result.success) setError(result.error || `Unable to print ${title}.`);
       return;
     }
     const printWindow = window.open('', '_blank', 'width=850,height=700');
     if (!printWindow) {
-      setError('Allow pop-ups to print the container record.');
+      setError('Allow pop-ups to print this report.');
       return;
     }
     printWindow.document.open();
@@ -306,6 +308,17 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
     printWindow.document.close();
     printWindow.focus();
     window.setTimeout(() => printWindow.print(), 250);
+  };
+
+  const handlePrint = async (record: ContainerForecastRecord) => {
+    const printHtml = buildContainerForecastPrintHtml(record as unknown as Record<string, unknown>);
+    await printDocument(printHtml, 'container record');
+  };
+
+  const handlePrintHistory = async () => {
+    if (!displayedRecords.length) return;
+    const printHtml = buildContainerForecastHistoryPrintHtml(displayedRecords as unknown as Record<string, unknown>[]);
+    await printDocument(printHtml, 'container history');
   };
 
   const updateForm = <K extends keyof ForecastForm>(key: K, value: ForecastForm[K]) => setForm((current) => ({ ...current, [key]: value }));
@@ -326,11 +339,11 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
         .filter((value) => value < today);
       const historyDates = completed ? [text(record.updatedAt).slice(0, 10)] : pastDates;
       if (!completed && !historyDates.length) return false;
-      if (historyStart && !historyDates.some((date) => date >= historyStart)) return false;
-      if (historyEnd && !historyDates.some((date) => date <= historyEnd)) return false;
+      if (appliedHistoryStart && !historyDates.some((date) => date >= appliedHistoryStart)) return false;
+      if (appliedHistoryEnd && !historyDates.some((date) => date <= appliedHistoryEnd)) return false;
       return true;
     });
-  }, [records, historyMode, historyStart, historyEnd]);
+  }, [records, historyMode, appliedHistoryStart, appliedHistoryEnd]);
 
   return (
     <main className="container-forecast-page">
@@ -375,14 +388,15 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
       </aside>}
 
       <section className={`container-forecast-records${historyMode ? ' is-history' : ''}`}>
-        <div className="container-forecast-section-heading"><div><p>{historyMode ? 'PAST VESSEL / DELIVERY ETAS' : 'CONTAINER DISPATCH'}</p><h2>{historyMode ? 'Historical container records' : 'Forecast records'}</h2></div><span>{displayedRecords.length} records</span></div>
+        <div className="container-forecast-section-heading"><div><p>{historyMode ? 'PAST VESSEL / DELIVERY ETAS' : 'CONTAINER DISPATCH'}</p><h2>{historyMode ? 'Historical container records' : 'Forecast records'}</h2></div>{historyMode ? <div className="container-forecast-history-actions"><span>{displayedRecords.length} records</span><button type="button" disabled={loading || !displayedRecords.length} onClick={() => void handlePrintHistory()}>Print History</button></div> : <span>{displayedRecords.length} records</span>}</div>
         {historyMode && <div className="container-forecast-date-filters container-forecast-history-filters">
           <label>From<input type="date" value={historyStart} max={historyEnd || undefined} onChange={(event) => setHistoryStart(event.target.value)} /></label>
           <label>Through<input type="date" value={historyEnd} min={historyStart || undefined} onChange={(event) => setHistoryEnd(event.target.value)} /></label>
-          {(historyStart || historyEnd) && <button type="button" onClick={() => { setHistoryStart(''); setHistoryEnd(''); }}>Clear dates</button>}
+          {(historyStart || historyEnd || appliedHistoryStart || appliedHistoryEnd) && <button type="button" onClick={() => { setHistoryStart(''); setHistoryEnd(''); setAppliedHistoryStart(''); setAppliedHistoryEnd(''); }}>Clear dates</button>}
         </div>}
         <div className="container-forecast-filters">
-          <input aria-label="Search forecasts" placeholder="Search vessel, container, chassis, pickup, location..." value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input aria-label="Search forecasts" placeholder="Search vessel, container, chassis, pickup, location..." value={search} onChange={(event) => { setSearch(event.target.value); if (!historyMode) setAppliedSearch(event.target.value); }} />
+          {historyMode && <button type="button" className="container-forecast-search-button" onClick={() => { setAppliedSearch(search.trim()); setAppliedHistoryStart(historyStart); setAppliedHistoryEnd(historyEnd); }}>Search</button>}
           <select aria-label="Filter vessel" value={vesselFilter} onChange={(event) => setVesselFilter(event.target.value)}><option value="">All vessels</option>{vessels.map((vessel) => <option key={vessel}>{vessel}</option>)}</select>
           <select aria-label="Filter drop-off location" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}><option value="">All locations</option>{locations.map((location) => <option key={location}>{location}</option>)}</select>
           <select aria-label="Filter release status" value={releaseFilter} onChange={(event) => setReleaseFilter(event.target.value)}><option value="">All release statuses</option>{['Pending', 'Released', 'On Hold', 'Not Required'].map((status) => <option key={status}>{status}</option>)}</select>

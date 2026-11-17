@@ -132,6 +132,13 @@
 .container-forecast-section-heading { margin-bottom: 12px; }
 .container-forecast-section-heading h2 { margin: 0; font-size: 1.12rem; }
 .container-forecast-section-heading > span { color: var(--cf-muted); font-size: 0.8rem; white-space: nowrap; }
+.container-forecast-history-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; }
+.container-forecast-history-actions > span { color: var(--cf-muted); font-size: 0.8rem; white-space: nowrap; }
+.container-forecast-history-actions button,
+.container-forecast-search-button { min-height: 36px; border: 1px solid #ef343a; border-radius: 4px; padding: 0 12px; background: #c9181e; color: #fff; cursor: pointer; font: inherit; font-size: 0.78rem; font-weight: 800; }
+.container-forecast-history-actions button:hover,
+.container-forecast-search-button:hover { background: #e31e24; }
+.container-forecast-history-actions button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .container-forecast-date-filters,
 .container-forecast-filters {
@@ -216,7 +223,9 @@
 .container-forecast-actions button:hover { border-color: #ef343a; background: #3a1c1d; }
 .container-forecast-actions button:focus-visible,
 .container-forecast-header-actions button:focus-visible,
-.container-forecast-date-filters button:focus-visible { outline: 2px solid var(--cf-accent); outline-offset: 2px; }
+.container-forecast-date-filters button:focus-visible,
+.container-forecast-history-actions button:focus-visible,
+.container-forecast-search-button:focus-visible { outline: 2px solid var(--cf-accent); outline-offset: 2px; }
 .container-forecast-actions button.is-delete { color: #ff9a94; }
 
 .container-forecast-records:not(.is-history) .container-forecast-section-heading,

@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { buildContainerForecastPrintHtml } from './containerForecastPrint';
+import { buildContainerForecastHistoryPrintHtml, buildContainerForecastPrintHtml } from './containerForecastPrint';
 
 const html = buildContainerForecastPrintHtml({
   vessel: 'MAERSK <ONE>', containerNumber: 'MNBU1234567', chassis: 'CH-1', weight: 52100,
@@ -16,3 +16,15 @@ assert.ok(!html.includes('<script>bad()</script>'));
 assert.ok(html.includes('&lt;script&gt;bad()&lt;/script&gt;'));
 assert.ok(html.includes('Overweight Permit'));
 console.log('PASS: printed container sheet includes load details and safely escapes user input');
+
+const historyHtml = buildContainerForecastHistoryPrintHtml([
+  { vessel: 'VESSEL <ONE>', containerNumber: 'CONT1', customer: 'Customer A', commodity: 'Produce', dropOffLocation: 'Vineland', dispatchStatus: 'Done' },
+  { vessel: 'VESSEL TWO', containerNumber: 'CONT2', fullPickupLastFreeDay: '2026-11-05', emptyLastFreeDay: '2026-11-08' },
+]);
+assert.ok(historyHtml.includes('2 containers'));
+assert.ok(historyHtml.includes('CONT1'));
+assert.ok(historyHtml.includes('Vineland'));
+assert.ok(historyHtml.includes('Full Pickup Last Free Day'));
+assert.ok(historyHtml.includes('VESSEL &lt;ONE&gt;'));
+assert.ok(!historyHtml.includes('VESSEL <ONE>'));
+console.log('PASS: history print report includes all selected containers and safely escapes user input');
