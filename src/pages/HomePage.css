@@ -540,6 +540,29 @@
   text-align: right;
 }
 
+.home-page__category-card--dispatch {
+  border-color: rgba(227, 30, 36, 0.72);
+  background: linear-gradient(135deg, #242424, #111 78%);
+  box-shadow: var(--shadow), inset 3px 0 #e31e24;
+}
+
+.home-page__category-card--dispatch:hover,
+.home-page__category-card--dispatch:focus-visible {
+  border-color: #ef343a;
+  background: linear-gradient(135deg, #351719, #171717 78%);
+  box-shadow: var(--shadow-heavy), 0 0 20px rgba(227, 30, 36, 0.16), inset 3px 0 #e31e24;
+}
+
+.home-page__category-card--dispatch .home-page__category-icon {
+  border-color: rgba(227, 30, 36, 0.5);
+  background: rgba(227, 30, 36, 0.14);
+}
+
+.home-page__category-card--dispatch .home-page__category-copy em,
+.home-page__category-card--dispatch .home-page__category-arrow {
+  color: #ff5358;
+}
+
 @media (min-width: 900px) and (max-height: 850px) {
   .home-page {
     padding: 8px 18px 12px;

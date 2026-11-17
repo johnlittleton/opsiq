@@ -138,6 +138,28 @@
   text-align: right;
 }
 
+.navigation-tool-card--dispatch {
+  border-color: rgba(227, 30, 36, 0.72);
+  background: linear-gradient(135deg, #242424, #111 78%);
+  box-shadow: inset 3px 0 #e31e24;
+}
+
+.navigation-tool-card--dispatch:hover,
+.navigation-tool-card--dispatch:focus-visible {
+  border-color: #ef343a;
+  background: linear-gradient(135deg, #351719, #171717 78%);
+  box-shadow: 0 8px 24px #0008, 0 0 20px rgba(227, 30, 36, 0.16), inset 3px 0 #e31e24;
+}
+
+.navigation-tool-card--dispatch .navigation-tool-icon {
+  border-color: rgba(227, 30, 36, 0.5);
+  background: rgba(227, 30, 36, 0.14);
+}
+
+.navigation-tool-card--dispatch .navigation-tool-arrow {
+  color: #ff5358;
+}
+
 @media (max-width: 600px) {
   .navigation-section-page {
     padding: 58px 14px 24px;

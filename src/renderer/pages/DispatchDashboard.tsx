@@ -16,7 +16,8 @@ export default function DispatchDashboard() {
   const navigate = useNavigate();
   const { sessionToken } = useAuth();
   const [records, setRecords] = useState<DispatchForecastRecord[]>([]);
-  const [horizonDays, setHorizonDays] = useState(14);
+  const horizonDays = 7;
+  const [locationFilter, setLocationFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -53,9 +54,17 @@ export default function DispatchDashboard() {
     return () => window.clearInterval(timer);
   }, [loadRecords]);
 
-  const metrics = useMemo(() => getDispatchHeadsUp(records, horizonDays), [records, horizonDays]);
-  const dockSchedule = useMemo(() => getDispatchDockSchedule(appointments, records, checkins, scheduleDate), [appointments, records, checkins, scheduleDate]);
-
+  const visibleRecords = useMemo(() => records.filter((record) => !locationFilter || record.dropOffLocation === locationFilter), [records, locationFilter]);
+  const locationOptions = useMemo(() => Array.from(new Set(records.map((record) => record.dropOffLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
+  const metrics = useMemo(() => getDispatchHeadsUp(visibleRecords, horizonDays), [visibleRecords, horizonDays]);
+  const dockSchedule = useMemo(() => getDispatchDockSchedule(appointments, records, checkins, scheduleDate)
+    .filter(({ record }) => !locationFilter || record.dropOffLocation === locationFilter), [appointments, records, checkins, scheduleDate, locationFilter]);
+  const utilization = useMemo(() => {
+    const drivers = new Set(dockSchedule.map(({ driver }) => driver.trim()).filter(Boolean));
+    const trucks = new Set(dockSchedule.map(({ truck }) => truck.trim()).filter(Boolean));
+    const scheduled = dockSchedule.length;
+    return { drivers: drivers.size, trucks: trucks.size, scheduled, driverPercent: scheduled ? Math.min(100, Math.round(drivers.size / scheduled * 100)) : 0, truckPercent: scheduled ? Math.min(100, Math.round(trucks.size / scheduled * 100)) : 0 };
+  }, [dockSchedule]);
   useEffect(() => {
     const controller = new AbortController();
     const loadSchedule = async () => {
@@ -97,15 +106,15 @@ export default function DispatchDashboard() {
           <span>Upcoming vessel arrivals, releases, deliveries, and empty returns</span>
         </div>
         <div className="dispatch-dashboard__actions">
-          <label>Vessel ETA horizon
-            <select value={horizonDays} onChange={(event) => setHorizonDays(Number(event.target.value))}>
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
+          <label>Drop-off location
+            <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+              <option value="">All locations</option>{locationOptions.map((location) => <option key={location} value={location}>{location}</option>)}
             </select>
           </label>
+          <button type="button" className="dispatch-dashboard__secondary" onClick={() => navigate('/dispatch-calendar')}>Calendar</button>
           <button type="button" className="dispatch-dashboard__secondary" onClick={() => { void loadRecords(true); setScheduleRefresh((current) => current + 1); }} disabled={refreshing}>{refreshing ? 'Refreshing…' : 'Refresh'}</button>
           <button type="button" className="dispatch-dashboard__secondary" onClick={() => navigate('/container-forecast-history')}>History</button>
+          <button type="button" className="dispatch-dashboard__secondary" onClick={() => navigate('/empty-container-returns')}>Empty Returns</button>
           <button type="button" className="dispatch-dashboard__primary" onClick={() => navigate('/container-forecast')}>Open Forecast</button>
         </div>
       </header>
@@ -113,10 +122,20 @@ export default function DispatchDashboard() {
       {error && <div className="dispatch-dashboard__error" role="alert">{error}</div>}
 
       <section className="dispatch-dashboard__metrics" aria-label="Dispatch summary">
-        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--vessel"><span>Vessels arriving · {horizonDays}d</span><strong>{loading ? '—' : metrics.incoming.length}</strong><small>containers with vessel ETA in range</small></article>
-        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--release"><span>Release attention</span><strong>{loading ? '—' : metrics.releasesNeeded.length}</strong><small>pending or on-hold containers</small></article>
-        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--delivery"><span>Delivery · next 48h</span><strong>{loading ? '—' : metrics.deliveriesSoon.length}</strong><small>scheduled delivery ETAs</small></article>
-        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--return"><span>Empty return · 7d</span><strong>{loading ? '—' : metrics.emptyReturnsSoon.length}</strong><small>returns due this week</small></article>
+        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--vessel"><span>Vessels arriving · 7d</span><strong>{loading ? '—' : new Set(metrics.incoming.map((record) => record.vessel)).size}</strong><small>{metrics.incoming.length} containers expected</small></article>
+        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--release"><span>Containers released</span><strong>{loading ? '—' : metrics.released.length}</strong><small>ready for pickup</small></article>
+        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--pickup"><span>Pending pickup</span><strong>{loading ? '—' : metrics.pendingPickup.length}</strong><small>released, not dispatched</small></article>
+        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--delivery"><span>Full load LFD · 7d</span><strong>{loading ? '—' : metrics.fullPickupsSoon.length}</strong><small>last free day for pickup</small></article>
+        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--return"><span>Empty return LFD · 7d</span><strong>{loading ? '—' : metrics.emptyReturnsSoon.length}</strong><small>last free day for return</small></article>
+        <article className="dispatch-dashboard__metric dispatch-dashboard__metric--released"><span>Delivery · next 48h</span><strong>{loading ? '—' : metrics.deliveriesSoon.length}</strong><small>scheduled deliveries</small></article>
+      </section>
+
+      <section className="dispatch-dashboard__utilization" aria-label="Truck versus driver utilization">
+        <div className="dispatch-dashboard__section-heading"><div><p>TODAY'S APPOINTMENTS</p><h2>Truck vs. driver utilization</h2></div><span>{utilization.scheduled} scheduled containers</span></div>
+        <div className="dispatch-dashboard__utilization-grid">
+          <div><span>Driver assignments</span><strong>{scheduleLoading ? '—' : `${utilization.drivers} / ${utilization.scheduled}`}</strong><div className="dispatch-dashboard__utilization-track"><i style={{ width: `${utilization.driverPercent}%` }} /></div></div>
+          <div><span>Trucks checked in</span><strong>{scheduleLoading ? '—' : `${utilization.trucks} / ${utilization.scheduled}`}</strong><div className="dispatch-dashboard__utilization-track is-truck"><i style={{ width: `${utilization.truckPercent}%` }} /></div></div>
+        </div>
       </section>
 
       <section className="dispatch-dashboard__dock-schedule" aria-label="Daily dock container schedule">
@@ -147,36 +166,6 @@ export default function DispatchDashboard() {
         )}
       </section>
 
-      <section className="dispatch-dashboard__attention">
-        <div className="dispatch-dashboard__section-heading">
-          <div><p>PRIORITY QUEUE</p><h2>Containers needing attention</h2></div>
-          <span>{loading ? 'Loading…' : `${metrics.attentionRecords.length} containers`}</span>
-        </div>
-        {loading ? <p className="dispatch-dashboard__empty">Loading dispatch forecast…</p> : error ? <p className="dispatch-dashboard__empty">Dispatch data is unavailable.</p> : metrics.attentionRecords.length === 0 ? (
-          <div className="dispatch-dashboard__empty-state"><strong>No immediate dispatch flags</strong><span>Nothing is arriving in the selected window, awaiting release, due for delivery, or returning empty within the next week.</span></div>
-        ) : (
-          <div className="dispatch-dashboard__table-wrap">
-            <table className="dispatch-dashboard__table">
-              <thead><tr><th>Container</th><th>Vessel</th><th>Drop-off</th><th>Vessel ETA</th><th>Release</th><th>Delivery ETA</th><th>Port Appt</th><th>Driver / Load</th><th>Attention</th></tr></thead>
-              <tbody>
-                {metrics.attentionRecords.map((record) => (
-                  <tr key={record.id}>
-                    <td className="dispatch-dashboard__container">{record.containerNumber}</td>
-                    <td>{record.vessel}</td>
-                    <td>{record.dropOffLocation}</td>
-                    <td>{formatDispatchDate(record.vesselEta)}</td>
-                    <td><span className={`dispatch-dashboard__release is-${record.releaseStatus.toLowerCase().replace(/\s+/g, '-')}`}>{record.releaseStatus}</span></td>
-                    <td>{formatDispatchDate(record.deliveryEta)}</td>
-                    <td>{record.portAppointmentNumber || '—'}</td>
-                    <td>{record.driverLoad || '—'}</td>
-                    <td><div className="dispatch-dashboard__flags">{getDispatchAttentionReasons(record, metrics).map((reason) => <span key={reason}>{reason}</span>)}</div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </main>
   );
 }

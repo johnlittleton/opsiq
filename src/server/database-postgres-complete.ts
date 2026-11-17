@@ -693,10 +693,15 @@ export class DatabaseService implements IDatabaseService {
 
         CREATE TABLE IF NOT EXISTS container_forecasts (
           id SERIAL PRIMARY KEY,
+          steamship_line TEXT,
           vessel TEXT NOT NULL,
           container_number TEXT NOT NULL UNIQUE,
+          customer TEXT,
+          commodity TEXT,
+          carrier TEXT,
           chassis TEXT,
           weight REAL,
+          addon_charge REAL,
           overweight_permit BOOLEAN NOT NULL DEFAULT false,
           permit_number TEXT,
           nd_nt_number TEXT,
@@ -709,9 +714,14 @@ export class DatabaseService implements IDatabaseService {
           delivery_eta TEXT,
           drop_off_location TEXT NOT NULL,
           empty_return_date TEXT,
+          empty_last_free_day TEXT,
+          full_pickup_last_free_day TEXT,
           empty_return_driver TEXT,
           vessel_eta TEXT,
           release_status TEXT NOT NULL DEFAULT 'Pending',
+          dispatch_status TEXT NOT NULL DEFAULT 'Pending',
+          tir_document_file TEXT,
+          delivery_order_file TEXT,
           notes TEXT,
           created_by TEXT NOT NULL,
           updated_by TEXT NOT NULL,
@@ -917,6 +927,19 @@ export class DatabaseService implements IDatabaseService {
           console.log('⚠️ Could not drop shift_sessions constraint:', error.message);
         }
       }
+
+      await client.query(`
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS steamship_line TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS customer TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS commodity TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS carrier TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS addon_charge REAL;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS empty_last_free_day TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS full_pickup_last_free_day TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS dispatch_status TEXT NOT NULL DEFAULT 'Pending';
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS tir_document_file TEXT;
+        ALTER TABLE container_forecasts ADD COLUMN IF NOT EXISTS delivery_order_file TEXT;
+      `);
 
       // Add pickup_number column if it doesn't exist (migration)
       await client.query(`
@@ -1678,27 +1701,34 @@ export class DatabaseService implements IDatabaseService {
     if (!vessel || !containerNumber || !dropOffLocation) throw new Error('Vessel, full container number, and drop-off location are required.');
     const now = getLocalISOString();
     const result = await this.pool.query(`INSERT INTO container_forecasts (
-      vessel, container_number, chassis, weight, overweight_permit, permit_number, nd_nt_number, ratecon_number, rate_amount,
-      pickup_number, pickup_scac, driver_load, port_appointment_number, delivery_eta, drop_off_location, empty_return_date,
-      empty_return_driver, vessel_eta, release_status, notes, created_by, updated_by, created_at, updated_at
-    ) VALUES (${Array.from({ length: 24 }, (_, i) => `$${i + 1}`).join(', ')}) RETURNING *`, [
-      vessel, containerNumber, data.chassis || null, data.weight ?? null, Boolean(data.overweightPermit),
+      steamship_line, vessel, container_number, customer, commodity, carrier, chassis, weight, addon_charge, overweight_permit,
+      permit_number, nd_nt_number, ratecon_number, rate_amount, pickup_number, pickup_scac, driver_load, port_appointment_number,
+      delivery_eta, drop_off_location, empty_return_date, empty_last_free_day, full_pickup_last_free_day, empty_return_driver,
+      vessel_eta, release_status, dispatch_status, tir_document_file, delivery_order_file, notes, created_by, updated_by, created_at, updated_at
+    ) VALUES (${Array.from({ length: 34 }, (_, i) => `$${i + 1}`).join(', ')}) RETURNING *`, [
+      data.steamshipLine || null, vessel, containerNumber, data.customer || null, data.commodity || null, data.carrier || null,
+      data.chassis || null, data.weight ?? null, data.addonCharge ?? null, Boolean(data.overweightPermit),
       data.permitNumber || null, data.ndNtNumber || null, data.rateconNumber || null, data.rateAmount ?? null,
       data.pickupNumber || null, data.pickupScac || null, data.driverLoad || null, data.portAppointmentNumber || null,
-      data.deliveryEta || null, dropOffLocation, data.emptyReturnDate || null, data.emptyReturnDriver || null,
-      data.vesselEta || null, data.releaseStatus || 'Pending', data.notes || null, actor, actor, now, now,
+      data.deliveryEta || null, dropOffLocation, data.emptyReturnDate || null, data.emptyLastFreeDay || null,
+      data.fullPickupLastFreeDay || null, data.emptyReturnDriver || null, data.vesselEta || null,
+      data.releaseStatus || 'Pending', data.dispatchStatus || 'Pending', data.tirDocumentFile || null,
+      data.deliveryOrderFile || null, data.notes || null, actor, actor, now, now,
     ]);
     return this.toCamelCase(result.rows[0]);
   }
 
   async updateContainerForecast(id: number, data: any, actor: string): Promise<any> {
     const columns: Record<string, string> = {
-      vessel: 'vessel', containerNumber: 'container_number', chassis: 'chassis', weight: 'weight',
+      steamshipLine: 'steamship_line', vessel: 'vessel', containerNumber: 'container_number', customer: 'customer',
+      commodity: 'commodity', carrier: 'carrier', chassis: 'chassis', weight: 'weight', addonCharge: 'addon_charge',
       overweightPermit: 'overweight_permit', permitNumber: 'permit_number', ndNtNumber: 'nd_nt_number',
       rateconNumber: 'ratecon_number', rateAmount: 'rate_amount', pickupNumber: 'pickup_number', pickupScac: 'pickup_scac',
       driverLoad: 'driver_load', portAppointmentNumber: 'port_appointment_number', deliveryEta: 'delivery_eta',
-      dropOffLocation: 'drop_off_location', emptyReturnDate: 'empty_return_date', emptyReturnDriver: 'empty_return_driver',
-      vesselEta: 'vessel_eta', releaseStatus: 'release_status', notes: 'notes',
+      dropOffLocation: 'drop_off_location', emptyReturnDate: 'empty_return_date', emptyLastFreeDay: 'empty_last_free_day',
+      fullPickupLastFreeDay: 'full_pickup_last_free_day', emptyReturnDriver: 'empty_return_driver',
+      vesselEta: 'vessel_eta', releaseStatus: 'release_status', dispatchStatus: 'dispatch_status',
+      tirDocumentFile: 'tir_document_file', deliveryOrderFile: 'delivery_order_file', notes: 'notes',
     };
     const fields: string[] = [];
     const values: any[] = [];

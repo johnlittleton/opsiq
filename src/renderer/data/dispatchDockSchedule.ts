@@ -15,7 +15,7 @@ export interface DispatchDockAppointment {
 }
 
 type ContainerRecord = DispatchForecastRecord & { pickupNumber?: string | null };
-type ScheduleCheckin = Pick<DockCheckin, 'id' | 'appointmentId' | 'pickupNumber' | 'driverName' | 'doorId' | 'status' | 'closedAt'>;
+type ScheduleCheckin = Pick<DockCheckin, 'id' | 'appointmentId' | 'pickupNumber' | 'driverName' | 'plateNumber' | 'doorId' | 'status' | 'closedAt'>;
 const normalizeReference = (value?: string | null) => (value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 export function getDispatchDockSchedule(appointments: DispatchDockAppointment[], records: ContainerRecord[], checkins: ScheduleCheckin[], date: string) {
@@ -29,7 +29,7 @@ export function getDispatchDockSchedule(appointments: DispatchDockAppointment[],
           const appointmentStatus = appointment.status.toLowerCase();
           const terminalStatus = ['cancelled', 'canceled', 'completed', 'shipped'].includes(appointmentStatus);
           const status = terminalStatus ? appointment.status : checkin?.closedAt ? 'Completed' : checkin?.status || appointment.status || 'Scheduled';
-          return { appointment, record, status, driver: checkin?.driverName || record.driverLoad || '', doorId: checkin?.doorId || appointment.doorId };
+          return { appointment, record, status, driver: checkin?.driverName || record.driverLoad || '', truck: checkin?.plateNumber || '', doorId: checkin?.doorId || appointment.doorId };
         });
     }).sort((first, second) => first.appointment.appointmentTime.localeCompare(second.appointment.appointmentTime) || Number(first.doorId) - Number(second.doorId));
 }

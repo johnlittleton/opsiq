@@ -5,10 +5,15 @@ import { DatabaseService } from './database';
 const nativeDb = new Database(':memory:');
 nativeDb.exec(`CREATE TABLE container_forecasts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  steamshipLine TEXT,
   vessel TEXT NOT NULL,
   containerNumber TEXT NOT NULL UNIQUE,
+  customer TEXT,
+  commodity TEXT,
+  carrier TEXT,
   chassis TEXT,
   weight REAL,
+  addonCharge REAL,
   overweightPermit INTEGER NOT NULL DEFAULT 0,
   permitNumber TEXT,
   ndNtNumber TEXT,
@@ -21,9 +26,14 @@ nativeDb.exec(`CREATE TABLE container_forecasts (
   deliveryEta TEXT,
   dropOffLocation TEXT NOT NULL,
   emptyReturnDate TEXT,
+  emptyLastFreeDay TEXT,
+  fullPickupLastFreeDay TEXT,
   emptyReturnDriver TEXT,
   vesselEta TEXT,
   releaseStatus TEXT NOT NULL DEFAULT 'Pending',
+  dispatchStatus TEXT NOT NULL DEFAULT 'Pending',
+  tirDocumentFile TEXT,
+  deliveryOrderFile TEXT,
   notes TEXT,
   createdBy TEXT NOT NULL,
   updatedBy TEXT NOT NULL,
@@ -39,12 +49,17 @@ async function run() {
       vessel: 'MAERSK TEST', containerNumber: 'mnbu3845659', chassis: 'DCLZ415196', weight: 61271,
       overweightPermit: true, permitNumber: 'PERMIT-1', ndNtNumber: 'NT643', rateconNumber: 'RC-1',
       rateAmount: 625, pickupNumber: '7623', pickupScac: 'HOLT', driverLoad: 'BRYAN',
+      steamshipLine: 'MAERSK', customer: 'Sample Customer', commodity: 'Frozen', carrier: 'HOLT', addonCharge: 25,
       portAppointmentNumber: 'PORT-1', deliveryEta: '2026-11-02T15:00', dropOffLocation: 'Outside Yard A',
-      vesselEta: '2026-10-30', emptyReturnDate: '2026-11-03', emptyReturnDriver: 'BRYAN', releaseStatus: 'Released',
+      vesselEta: '2026-10-30', emptyReturnDate: '2026-11-03', emptyLastFreeDay: '2026-11-04',
+      fullPickupLastFreeDay: '2026-11-05', emptyReturnDriver: 'BRYAN', releaseStatus: 'Released',
     }, 'Test User');
     assert.equal(first.containerNumber, 'MNBU3845659');
     assert.equal(first.createdBy, 'Test User');
     assert.equal(first.overweightPermit, 1);
+    assert.equal(first.steamshipLine, 'MAERSK');
+    assert.equal(first.addonCharge, 25);
+    assert.equal(first.fullPickupLastFreeDay, '2026-11-05');
     await assert.rejects(database.createContainerForecast({ vessel: 'OTHER', containerNumber: 'MNBU3845659', dropOffLocation: 'Other' }, 'Test User'));
 
     await database.createContainerForecast({ vessel: 'MAERSK TEST', containerNumber: 'MSCU0000001', dropOffLocation: 'Outside Yard A', vesselEta: '2026-11-01' }, 'Test User');
@@ -59,8 +74,9 @@ async function run() {
     assert.equal(summary.find((row: any) => row.vessel === 'MAERSK TEST')?.containerCount, 1);
     assert.equal(summary.find((row: any) => row.dropOffLocation === 'Americold Vineland')?.overweightCount, 1);
 
-    const updated = await database.updateContainerForecast(first.id, { releaseStatus: 'On Hold', weight: 62000 }, 'Dispatcher');
+    const updated = await database.updateContainerForecast(first.id, { releaseStatus: 'On Hold', weight: 62000, dispatchStatus: 'Dispatched' }, 'Dispatcher');
     assert.equal(updated.releaseStatus, 'On Hold');
+    assert.equal(updated.dispatchStatus, 'Dispatched');
     assert.equal(updated.updatedBy, 'Dispatcher');
     assert.equal(await database.deleteContainerForecast(first.id), true);
     assert.equal(await database.deleteContainerForecast(first.id), false);

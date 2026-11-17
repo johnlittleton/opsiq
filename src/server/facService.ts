@@ -15,6 +15,8 @@ export interface FacLoad {
   runNumber: string;
   receivedNumber: string;
   containerNumber: string;
+  incomingTemperature: number | null;
+  targetTemperature: number | null;
   famous: boolean;
   billed: boolean;
   notes: string;
@@ -26,7 +28,7 @@ export const FAC_TARGET_MS = 45 * 60 * 1000;
 const coolers = [2, 3, 6, 7];
 const customers = ['Four Star', 'Vanguard', 'Buffalo Repack', 'Fresh Taste', 'ESU'];
 const textFields = ['arrivalDate', 'workOrder', 'runNumber', 'receivedNumber', 'containerNumber', 'notes'] as const;
-const metadataFields = ['cooler', 'customer', 'scheduledStart', 'famous', 'billed', ...textFields];
+const metadataFields = ['cooler', 'customer', 'scheduledStart', 'incomingTemperature', 'targetTemperature', 'famous', 'billed', ...textFields];
 
 export class FacError extends Error {
   constructor(message: string, public readonly status = 400, public readonly code?: string) {
@@ -152,6 +154,14 @@ function metadata(value: unknown): Partial<FacLoad> {
     if (typeof body.customer !== 'string' || !customers.includes(body.customer)) throw new FacError('Invalid customer.');
     patch.customer = body.customer;
   }
+  for (const key of ['incomingTemperature', 'targetTemperature'] as const) {
+    if (!(key in body)) continue;
+    const value = body[key];
+    if (value === null || value === '') patch[key] = null;
+    else if (typeof value !== 'number' || !Number.isFinite(value) || value < -100 || value > 150) {
+      throw new FacError(`${key} must be a temperature from -100 to 150 °F or null.`);
+    } else patch[key] = value;
+  }
   for (const key of textFields) {
     if (!(key in body)) continue;
     if (typeof body[key] !== 'string' || body[key].length > 10000) throw new FacError(`${key} must be a string of at most 10000 characters.`);
@@ -205,7 +215,7 @@ export class FacService {
         cooler: patch.cooler!, customer: patch.customer!, arrivalDate: patch.arrivalDate!,
         status: patch.scheduledStart ? 'scheduled' : 'ready', scheduledStart: null,
         startedAt: null, releasedAt: null, workOrder: '', runNumber: '', receivedNumber: '',
-        containerNumber: '', famous: false, billed: false, notes: '', ...patch,
+        containerNumber: '', incomingTemperature: null, targetTemperature: null, famous: false, billed: false, notes: '', ...patch,
         createdBy: userName, pallets: [],
       };
       this.checkBooking(load, loads);

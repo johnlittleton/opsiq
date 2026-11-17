@@ -36,7 +36,7 @@ export function NavigationSectionPage() {
       </header>
       <section className="navigation-section-tools" aria-label={`${section.title} tools`}>
         {section.tools.map((tool) => (
-          <button type="button" className="navigation-tool-card" key={tool.path} onClick={() => navigate(tool.path)}>
+          <button type="button" className={`navigation-tool-card${section.id === 'dispatch' ? ' navigation-tool-card--dispatch' : ''}`} key={tool.path} onClick={() => navigate(tool.path)}>
             <span className="navigation-tool-icon" aria-hidden="true">{tool.icon}</span>
             <span className="navigation-tool-copy">
               <strong>{tool.title}</strong>

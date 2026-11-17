@@ -58,6 +58,8 @@ import FoodSafetyTinCats from './pages/FoodSafetyTinCats';
 import FoodSafetyTinCatHistory from './pages/FoodSafetyTinCatHistory';
 import ContainerForecast from './pages/ContainerForecast';
 import DispatchDashboard from './pages/DispatchDashboard';
+import DispatchCalendar from './pages/DispatchCalendar';
+import EmptyContainerReturnReport from './pages/EmptyContainerReturnReport';
 import LoadBalancer from './pages/LoadBalancer';
 import CustomerPortal from './pages/CustomerPortal';
 import CustomerPortalAdmin from './pages/CustomerPortalAdmin';
@@ -107,6 +109,8 @@ const ROUTES_WITH_SHARED_TITLE_BAR = new Set([
   '/container-forecast',
   '/container-forecast-history',
   '/dispatch-dashboard',
+  '/dispatch-calendar',
+  '/empty-container-returns',
   '/production-kpi-history',
   '/production-labor-planner',
   '/production-labor-planner-history',
@@ -170,6 +174,8 @@ const AppRoutes: React.FC = () => {
       <Route path="/container-forecast" element={<ContainerForecast />} />
       <Route path="/container-forecast-history" element={<ContainerForecast historyMode />} />
       <Route path="/dispatch-dashboard" element={<DispatchDashboard />} />
+      <Route path="/dispatch-calendar" element={<DispatchCalendar />} />
+      <Route path="/empty-container-returns" element={<EmptyContainerReturnReport />} />
       <Route path="/load-balancer" element={<LoadBalancer />} />
       <Route path="/load-calculator" element={<Navigate to="/load-balancer" replace />} />
       <Route path="/appointment-history" element={<AppointmentHistory />} />

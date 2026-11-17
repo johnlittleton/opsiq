@@ -24,7 +24,7 @@ test('rush load persists metadata, duplicate pallets, manual timestamps and comp
   const filename = path.join(directory, 'fac.sqlite');
   let { database, service } = fixture(filename);
   try {
-    const load = await service.create({ ...base, workOrder: 'WO1', runNumber: 'R1', receivedNumber: 'REC1', containerNumber: 'C1', famous: true, notes: 'Keep cold' }, 'Server User');
+    const load = await service.create({ ...base, workOrder: 'WO1', runNumber: 'R1', receivedNumber: 'REC1', containerNumber: 'C1', incomingTemperature: 48.5, targetTemperature: 34, famous: true, notes: 'Keep cold' }, 'Server User');
     assert.equal(load.status, 'ready');
     assert.equal(load.createdBy, 'Server User');
     assert.equal(load.startedAt, null);
@@ -52,6 +52,8 @@ test('rush load persists metadata, duplicate pallets, manual timestamps and comp
     assert.equal(persisted.runNumber, 'R1');
     assert.equal(persisted.receivedNumber, 'REC1');
     assert.equal(persisted.containerNumber, 'C1');
+    assert.equal(persisted.incomingTemperature, 48.5);
+    assert.equal(persisted.targetTemperature, 34);
     assert.equal(persisted.famous, true);
     assert.equal(persisted.billed, true);
     assert.equal(persisted.notes, 'Keep cold');
@@ -119,6 +121,7 @@ test('validates metadata and rejects client-owned identities, lifecycle state, t
     for (const bad of [
       { ...base, cooler: 4 }, { ...base, customer: 'Unknown' }, { ...base, arrivalDate: '2026-02-30' },
       { ...base, famous: 'false' }, { ...base, scheduledStart: 'tomorrow' }, { ...base, createdBy: 'Forged' },
+      { ...base, incomingTemperature: '48' }, { ...base, incomingTemperature: 151 }, { ...base, targetTemperature: -101 },
       { ...base, scheduledStart: '2026-02-30T12:00:00Z' },
       { ...base, startedAt: now }, { ...base, releasedAt: now }, { ...base, status: 'cooling' }, { ...base, pallets: ['P1'] },
     ]) await assert.rejects(async () => service.create(bad, 'Tester'), FacError);

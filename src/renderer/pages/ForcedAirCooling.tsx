@@ -8,7 +8,7 @@ import { buildFacReportHtml, coolingElapsed, FAC_COOLERS, FAC_CUSTOMERS, FAC_TAR
 import './ForcedAirCooling.css';
 
 type Mode = 'dashboard' | 'tracker' | 'schedule' | 'history';
-type Metadata = Pick<FacLoad, 'cooler' | 'customer' | 'arrivalDate' | 'workOrder' | 'runNumber' | 'receivedNumber' | 'containerNumber' | 'famous' | 'billed' | 'notes'> & { scheduledStart: string };
+type Metadata = Pick<FacLoad, 'cooler' | 'customer' | 'arrivalDate' | 'workOrder' | 'runNumber' | 'receivedNumber' | 'containerNumber' | 'famous' | 'billed' | 'notes'> & { scheduledStart: string; incomingTemperature: string; targetTemperature: string };
 type Scan = { loadId: number; palletId: string };
 class FacApiError extends Error {
   constructor(message: string, readonly code?: string) { super(message); }
@@ -21,7 +21,7 @@ const duration = (milliseconds: number) => {
 };
 const defaults = (date: string, scheduled: boolean, cooler = 2): Metadata => ({
   cooler, customer: FAC_CUSTOMERS[0], arrivalDate: date, scheduledStart: scheduled ? `${date}T08:00` : '',
-  workOrder: '', runNumber: '', receivedNumber: '', containerNumber: '', famous: false, billed: false, notes: '',
+  workOrder: '', runNumber: '', receivedNumber: '', containerNumber: '', incomingTemperature: '', targetTemperature: '', famous: false, billed: false, notes: '',
 });
 const tabs = [
   { mode: 'dashboard', label: 'Dashboard', Icon: Fan }, { mode: 'tracker', label: 'Tracker', Icon: ScanBarcode },
@@ -131,7 +131,7 @@ export default function ForcedAirCooling({ mode = 'dashboard' }: { mode?: Mode }
   }
 
   function openEditor(load?: FacLoad, cooler = 2) {
-    setEditor(load ? { id: load.id, status: load.status, data: { ...load, scheduledStart: localDateTime(load.scheduledStart) } }
+    setEditor(load ? { id: load.id, status: load.status, data: { ...load, incomingTemperature: load.incomingTemperature == null ? '' : String(load.incomingTemperature), targetTemperature: load.targetTemperature == null ? '' : String(load.targetTemperature), scheduledStart: localDateTime(load.scheduledStart) } }
       : { id: null, status: mode === 'schedule' ? 'scheduled' : 'ready', data: defaults(date, mode === 'schedule', cooler) });
   }
   async function saveMetadata(event: React.FormEvent) {
@@ -144,6 +144,8 @@ export default function ForcedAirCooling({ mode = 'dashboard' }: { mode?: Mode }
       : { cooler: data.cooler, customer: data.customer, arrivalDate: data.arrivalDate, workOrder: data.workOrder,
         runNumber: data.runNumber, receivedNumber: data.receivedNumber, containerNumber: data.containerNumber,
         famous: data.famous, billed: data.billed, notes: data.notes,
+        incomingTemperature: data.incomingTemperature.trim() === '' ? null : Number(data.incomingTemperature),
+        targetTemperature: data.targetTemperature.trim() === '' ? null : Number(data.targetTemperature),
         scheduledStart: data.scheduledStart ? new Date(data.scheduledStart).toISOString() : null };
     await action(async () => {
       const load = await write<FacLoad>(current.id === null ? '' : `/${current.id}`, current.id === null ? 'POST' : 'PUT', body);
@@ -280,11 +282,11 @@ export default function ForcedAirCooling({ mode = 'dashboard' }: { mode?: Mode }
         {selected && pending(selected) && <button disabled={disabled || uncommitted || !selected.pallets.length} onClick={() => { void startLoad(selected); }}><Play size={16} />Start cooling</button>}
         {selected?.status === 'cooling' && <button disabled={disabled} onClick={() => releaseLoad(selected)}><Square size={16} />Release</button>}
       </section>}
-      <div className="fac-table-scroll"><table className="fac-table"><thead><tr><th>Load</th><th>Cooler</th><th>Customer</th><th>Status</th><th>{mode === 'schedule' ? 'Planned slot' : 'Arrival'}</th><th>WO / Run</th><th>Received No</th><th>Container</th><th>Famous</th><th>Billed</th><th>Pallets</th><th>Started / Released</th><th>Actions</th></tr></thead><tbody>{visible.map(load => <tr key={load.id} className={load.id === selectedId ? 'fac-selected' : ''}><td>#{load.id}</td><td>{load.cooler}</td><td>{load.customer}</td><td><span className={`fac-status ${load.status}`}>{load.status}</span></td><td>{mode === 'schedule' ? <>{timestamp(load.scheduledStart)}<br /><span className="fac-muted">to {timestamp(new Date(Date.parse(load.scheduledStart!) + FAC_TARGET_MS).toISOString())}</span></> : load.arrivalDate}</td><td>{load.workOrder || '-'} / {load.runNumber || '-'}</td><td>{load.receivedNumber || '-'}</td><td>{load.containerNumber || '-'}</td><td>{load.famous ? 'Yes' : 'No'}</td><td>{load.billed ? 'Yes' : 'No'}</td><td>{load.pallets.length}</td><td>{timestamp(load.startedAt)}<br />{timestamp(load.releasedAt)}</td><td>{loadActions(load)}</td></tr>)}</tbody></table>{loaded && !visible.length && <p className="fac-empty">No {mode === 'schedule' ? 'planned slots for this date' : 'matching loads'}.</p>}</div>
+      <div className="fac-table-scroll"><table className="fac-table"><thead><tr><th>Load</th><th>Cooler</th><th>Customer</th><th>Status</th><th>{mode === 'schedule' ? 'Planned slot' : 'Arrival'}</th>{mode === 'schedule' && <th>In / Target °F</th>}<th>WO / Run</th><th>Received No</th><th>Container</th><th>Famous</th><th>Billed</th><th>Pallets</th><th>Started / Released</th><th>Actions</th></tr></thead><tbody>{visible.map(load => <tr key={load.id} className={load.id === selectedId ? 'fac-selected' : ''}><td>#{load.id}</td><td>{load.cooler}</td><td>{load.customer}</td><td><span className={`fac-status ${load.status}`}>{load.status}</span></td><td>{mode === 'schedule' ? <>{timestamp(load.scheduledStart)}<br /><span className="fac-muted">to {timestamp(new Date(Date.parse(load.scheduledStart!) + FAC_TARGET_MS).toISOString())}</span></> : load.arrivalDate}</td>{mode === 'schedule' && <td>{load.incomingTemperature == null ? '-' : load.incomingTemperature} / {load.targetTemperature == null ? '-' : load.targetTemperature}</td>}<td>{load.workOrder || '-'} / {load.runNumber || '-'}</td><td>{load.receivedNumber || '-'}</td><td>{load.containerNumber || '-'}</td><td>{load.famous ? 'Yes' : 'No'}</td><td>{load.billed ? 'Yes' : 'No'}</td><td>{load.pallets.length}</td><td>{timestamp(load.startedAt)}<br />{timestamp(load.releasedAt)}</td><td>{loadActions(load)}</td></tr>)}</tbody></table>{loaded && !visible.length && <p className="fac-empty">No {mode === 'schedule' ? 'planned slots for this date' : 'matching loads'}.</p>}</div>
     </>}
 
     {selected && <section className="fac-detail" aria-label={`Load ${selected.id} details`}><div className="fac-section-heading"><h2>Load #{selected.id} / {selected.customer}</h2><div className="fac-actions">{loadActions(selected)}<button title="Close details" aria-label="Close details" disabled={disabled || uncommitted} onClick={() => setSelectedId(null)}><X size={16} /></button></div></div>
-      <dl><dt>Cooler / Status</dt><dd>{selected.cooler} / {selected.status}</dd><dt>Arrival</dt><dd>{selected.arrivalDate}</dd><dt>Work order / Run</dt><dd>{selected.workOrder || '-'} / {selected.runNumber || '-'}</dd><dt>Received No</dt><dd>{selected.receivedNumber || '-'}</dd><dt>Container</dt><dd>{selected.containerNumber || '-'}</dd><dt>Famous / Billed</dt><dd>{selected.famous ? 'Yes' : 'No'} / {selected.billed ? 'Yes' : 'No'}</dd><dt>Planned</dt><dd>{timestamp(selected.scheduledStart)}</dd><dt>Started / Released</dt><dd>{timestamp(selected.startedAt)} / {timestamp(selected.releasedAt)}</dd><dt>Elapsed / Remaining</dt><dd>{duration(coolingElapsed(selected, now))} / {duration(FAC_TARGET_MS - coolingElapsed(selected, now))}</dd><dt>Created by</dt><dd>{selected.createdBy}</dd><dt>Notes</dt><dd className="fac-notes">{selected.notes || '-'}</dd></dl>
+      <dl><dt>Cooler / Status</dt><dd>{selected.cooler} / {selected.status}</dd><dt>Arrival</dt><dd>{selected.arrivalDate}</dd><dt>Incoming / Target Temp</dt><dd>{selected.incomingTemperature == null ? '-' : `${selected.incomingTemperature} °F`} / {selected.targetTemperature == null ? '-' : `${selected.targetTemperature} °F`}</dd><dt>Work order / Run</dt><dd>{selected.workOrder || '-'} / {selected.runNumber || '-'}</dd><dt>Received No</dt><dd>{selected.receivedNumber || '-'}</dd><dt>Container</dt><dd>{selected.containerNumber || '-'}</dd><dt>Famous / Billed</dt><dd>{selected.famous ? 'Yes' : 'No'} / {selected.billed ? 'Yes' : 'No'}</dd><dt>Planned</dt><dd>{timestamp(selected.scheduledStart)}</dd><dt>Started / Released</dt><dd>{timestamp(selected.startedAt)} / {timestamp(selected.releasedAt)}</dd><dt>Elapsed / Remaining</dt><dd>{duration(coolingElapsed(selected, now))} / {duration(FAC_TARGET_MS - coolingElapsed(selected, now))}</dd><dt>Created by</dt><dd>{selected.createdBy}</dd><dt>Notes</dt><dd className="fac-notes">{selected.notes || '-'}</dd></dl>
       <h3>Pallet IDs ({selected.pallets.length})</h3><ul className="fac-pallets">{selected.pallets.map(pallet => <li key={pallet}>{pallet}</li>)}</ul>{!selected.pallets.length && <p className="fac-muted">No pallets captured.</p>}
     </section>}
 
@@ -297,6 +299,8 @@ export default function ForcedAirCooling({ mode = 'dashboard' }: { mode?: Mode }
           <label>Cooler<select value={editor.data.cooler} onChange={event => setEditor({ ...editor, data: { ...editor.data, cooler: Number(event.target.value) } })}>{FAC_COOLERS.map(cooler => <option key={cooler}>{cooler}</option>)}</select></label>
           <label>Arrival date<input type="date" required value={editor.data.arrivalDate} onChange={event => setEditor({ ...editor, data: { ...editor.data, arrivalDate: event.target.value } })} /></label>
           <label>Planned start (local)<input type="datetime-local" required={mode === 'schedule' && editor.id === null} value={editor.data.scheduledStart} onChange={event => setEditor({ ...editor, data: { ...editor.data, scheduledStart: event.target.value } })} /></label>
+          <label>Incoming temperature (°F)<input type="number" step="0.1" min="-100" max="150" value={editor.data.incomingTemperature} onChange={event => setEditor({ ...editor, data: { ...editor.data, incomingTemperature: event.target.value } })} placeholder="As received" /></label>
+          <label>Target setpoint (°F)<input type="number" step="0.1" min="-100" max="150" value={editor.data.targetTemperature} onChange={event => setEditor({ ...editor, data: { ...editor.data, targetTemperature: event.target.value } })} placeholder="Required temperature" /></label>
           {(['workOrder', 'runNumber', 'receivedNumber', 'containerNumber'] as const).map((field, index) => <label key={field}>{['Work order', 'Run number', 'Received No', 'Container number'][index]}<input maxLength={10000} value={editor.data[field]} onChange={event => setEditor({ ...editor, data: { ...editor.data, [field]: event.target.value } })} /></label>)}
           <label className="fac-form-wide">Notes<textarea rows={3} maxLength={10000} value={editor.data.notes} onChange={event => setEditor({ ...editor, data: { ...editor.data, notes: event.target.value } })} /></label>
         </fieldset>

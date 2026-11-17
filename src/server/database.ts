@@ -689,10 +689,15 @@ export class DatabaseService implements IDatabaseService {
 
       CREATE TABLE IF NOT EXISTS container_forecasts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        steamshipLine TEXT,
         vessel TEXT NOT NULL,
         containerNumber TEXT NOT NULL UNIQUE,
+        customer TEXT,
+        commodity TEXT,
+        carrier TEXT,
         chassis TEXT,
         weight REAL,
+        addonCharge REAL,
         overweightPermit INTEGER NOT NULL DEFAULT 0,
         permitNumber TEXT,
         ndNtNumber TEXT,
@@ -705,9 +710,14 @@ export class DatabaseService implements IDatabaseService {
         deliveryEta TEXT,
         dropOffLocation TEXT NOT NULL,
         emptyReturnDate TEXT,
+        emptyLastFreeDay TEXT,
+        fullPickupLastFreeDay TEXT,
         emptyReturnDriver TEXT,
         vesselEta TEXT,
         releaseStatus TEXT NOT NULL DEFAULT 'Pending',
+        dispatchStatus TEXT NOT NULL DEFAULT 'Pending',
+        tirDocumentFile TEXT,
+        deliveryOrderFile TEXT,
         notes TEXT,
         createdBy TEXT NOT NULL,
         updatedBy TEXT NOT NULL,
@@ -897,6 +907,16 @@ export class DatabaseService implements IDatabaseService {
       CREATE UNIQUE INDEX IF NOT EXISTS idx_shift_active_unique 
       ON shift_sessions(date, shiftNumber) WHERE status = 'active';
     `);
+
+    const forecastColumns = (this.db.pragma('table_info(container_forecasts)') as any[]).map((column) => column.name);
+    const forecastMigrations: Record<string, string> = {
+      steamshipLine: 'TEXT', customer: 'TEXT', commodity: 'TEXT', carrier: 'TEXT', addonCharge: 'REAL',
+      emptyLastFreeDay: 'TEXT', fullPickupLastFreeDay: 'TEXT', dispatchStatus: "TEXT NOT NULL DEFAULT 'Pending'",
+      tirDocumentFile: 'TEXT', deliveryOrderFile: 'TEXT',
+    };
+    for (const [column, definition] of Object.entries(forecastMigrations)) {
+      if (!forecastColumns.includes(column)) this.db.exec(`ALTER TABLE container_forecasts ADD COLUMN ${column} ${definition}`);
+    }
 
     const palletInventoryColumns = (this.db.pragma('table_info(pallet_tracker_inventory)') as any[]).map((column) => column.name);
     if (!palletInventoryColumns.includes('customer')) {
@@ -1742,27 +1762,34 @@ export class DatabaseService implements IDatabaseService {
     if (!vessel || !containerNumber || !dropOffLocation) throw new Error('Vessel, full container number, and drop-off location are required.');
     const now = getLocalISOString();
     const result = this.db.prepare(`INSERT INTO container_forecasts (
-      vessel, containerNumber, chassis, weight, overweightPermit, permitNumber, ndNtNumber, rateconNumber, rateAmount,
-      pickupNumber, pickupScac, driverLoad, portAppointmentNumber, deliveryEta, dropOffLocation, emptyReturnDate,
-      emptyReturnDriver, vesselEta, releaseStatus, notes, createdBy, updatedBy, createdAt, updatedAt
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      vessel, containerNumber, data.chassis || null, data.weight ?? null, data.overweightPermit ? 1 : 0,
+      steamshipLine, vessel, containerNumber, customer, commodity, carrier, chassis, weight, addonCharge, overweightPermit,
+      permitNumber, ndNtNumber, rateconNumber, rateAmount, pickupNumber, pickupScac, driverLoad, portAppointmentNumber,
+      deliveryEta, dropOffLocation, emptyReturnDate, emptyLastFreeDay, fullPickupLastFreeDay, emptyReturnDriver, vesselEta,
+      releaseStatus, dispatchStatus, tirDocumentFile, deliveryOrderFile, notes, createdBy, updatedBy, createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      data.steamshipLine || null, vessel, containerNumber, data.customer || null, data.commodity || null, data.carrier || null,
+      data.chassis || null, data.weight ?? null, data.addonCharge ?? null, data.overweightPermit ? 1 : 0,
       data.permitNumber || null, data.ndNtNumber || null, data.rateconNumber || null, data.rateAmount ?? null,
       data.pickupNumber || null, data.pickupScac || null, data.driverLoad || null, data.portAppointmentNumber || null,
-      data.deliveryEta || null, dropOffLocation, data.emptyReturnDate || null, data.emptyReturnDriver || null,
-      data.vesselEta || null, data.releaseStatus || 'Pending', data.notes || null, actor, actor, now, now,
+      data.deliveryEta || null, dropOffLocation, data.emptyReturnDate || null, data.emptyLastFreeDay || null,
+      data.fullPickupLastFreeDay || null, data.emptyReturnDriver || null, data.vesselEta || null,
+      data.releaseStatus || 'Pending', data.dispatchStatus || 'Pending', data.tirDocumentFile || null,
+      data.deliveryOrderFile || null, data.notes || null, actor, actor, now, now,
     );
     return this.db.prepare('SELECT * FROM container_forecasts WHERE id = ?').get(result.lastInsertRowid);
   }
 
   async updateContainerForecast(id: number, data: any, actor: string): Promise<any> {
     const columns: Record<string, string> = {
-      vessel: 'vessel', containerNumber: 'containerNumber', chassis: 'chassis', weight: 'weight',
+      steamshipLine: 'steamshipLine', vessel: 'vessel', containerNumber: 'containerNumber', customer: 'customer',
+      commodity: 'commodity', carrier: 'carrier', chassis: 'chassis', weight: 'weight', addonCharge: 'addonCharge',
       overweightPermit: 'overweightPermit', permitNumber: 'permitNumber', ndNtNumber: 'ndNtNumber',
       rateconNumber: 'rateconNumber', rateAmount: 'rateAmount', pickupNumber: 'pickupNumber', pickupScac: 'pickupScac',
       driverLoad: 'driverLoad', portAppointmentNumber: 'portAppointmentNumber', deliveryEta: 'deliveryEta',
-      dropOffLocation: 'dropOffLocation', emptyReturnDate: 'emptyReturnDate', emptyReturnDriver: 'emptyReturnDriver',
-      vesselEta: 'vesselEta', releaseStatus: 'releaseStatus', notes: 'notes',
+      dropOffLocation: 'dropOffLocation', emptyReturnDate: 'emptyReturnDate', emptyLastFreeDay: 'emptyLastFreeDay',
+      fullPickupLastFreeDay: 'fullPickupLastFreeDay', emptyReturnDriver: 'emptyReturnDriver',
+      vesselEta: 'vesselEta', releaseStatus: 'releaseStatus', dispatchStatus: 'dispatchStatus',
+      tirDocumentFile: 'tirDocumentFile', deliveryOrderFile: 'deliveryOrderFile', notes: 'notes',
     };
     const fields: string[] = [];
     const values: any[] = [];

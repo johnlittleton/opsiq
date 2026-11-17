@@ -13,6 +13,8 @@ export interface FacLoad {
   runNumber: string;
   receivedNumber: string;
   containerNumber: string;
+  incomingTemperature?: number | null;
+  targetTemperature?: number | null;
   famous: boolean;
   billed: boolean;
   notes: string;
@@ -54,6 +56,7 @@ export function facReportSheets(loads: FacLoad[]): InventoryReportSheet[] {
       'Load ID': load.id, Cooler: load.cooler, Customer: load.customer, Status: load.status,
       'Arrival Date': load.arrivalDate, 'Work Order': load.workOrder, Run: load.runNumber,
       'Received No': load.receivedNumber, Container: load.containerNumber,
+      'Incoming Temperature (°F)': load.incomingTemperature ?? '', 'Target Temperature (°F)': load.targetTemperature ?? '',
       Famous: load.famous ? 'Yes' : 'No', Billed: load.billed ? 'Yes' : 'No', Notes: load.notes,
       'Scheduled Start': load.scheduledStart || '', 'Started At': load.startedAt || '',
       'Released At': load.releasedAt || '', 'Cooling Minutes': Number((coolingElapsed(load, Date.now()) / 60000).toFixed(2)),

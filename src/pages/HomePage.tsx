@@ -158,7 +158,7 @@ export const HomePage: React.FC = () => {
 
       <section className={`home-page__category-grid home-page__category-grid--${viewMode}`} aria-label="OpsIQ navigation sections">
         {navigationSections.map((section) => (
-          <button type="button" className="home-page__category-card" key={section.id} onClick={() => navigate(`/navigation/${section.id}`)}>
+          <button type="button" className={`home-page__category-card${section.id === 'dispatch' ? ' home-page__category-card--dispatch' : ''}`} key={section.id} onClick={() => navigate(`/navigation/${section.id}`)}>
             <span className="home-page__category-icon" aria-hidden="true">{section.icon}</span>
             <span className="home-page__category-copy">
               <strong>{section.title}</strong>

@@ -73,7 +73,11 @@ const railwayVolumeRoot = String(
 const dockCheckerPrimaryUploadsDir = railwayVolumeRoot
   ? path.join(railwayVolumeRoot, 'dock-checker-uploads')
   : path.join(process.cwd(), 'data', 'dock-checker-uploads');
+const dispatchDocumentsDir = railwayVolumeRoot
+  ? path.join(railwayVolumeRoot, 'dispatch-documents')
+  : path.join(process.cwd(), 'data', 'dispatch-documents');
 const dockCheckerLegacyUploadsDir = path.join(process.cwd(), 'data', 'dock-checker-uploads');
+fs.mkdirSync(dispatchDocumentsDir, { recursive: true });
 
 const dockCheckerStaticDirs = Array.from(
   new Set([dockCheckerPrimaryUploadsDir, dockCheckerLegacyUploadsDir])
@@ -112,6 +116,20 @@ const inventoryAuditorPdfUpload = multer({
       return;
     }
     cb(new Error('Only PDF files are allowed.'));
+  },
+});
+
+const dispatchDocumentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const mime = String(file.mimetype || '').toLowerCase();
+    const ext = path.extname(String(file.originalname || '')).toLowerCase();
+    if (mime === 'application/pdf' || mime.startsWith('image/') || ['.doc', '.docx'].includes(ext)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Upload a PDF, image, or Word document.'));
   },
 });
 
@@ -3620,6 +3638,67 @@ app.get('/api/dispatch/container-forecasts', async (req, res) => {
   }
 });
 
+app.get('/api/dispatch/container-forecasts/options', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const entries = await db.listContainerForecasts();
+    const getOptions = (key: string): string[] => Array.from(new Set<string>(entries.map((entry: any) => String(entry[key] || '').trim()).filter((value: string) => Boolean(value)))).sort((first, second) => first.localeCompare(second));
+    res.json({
+      vessels: getOptions('vessel'), steamshipLines: getOptions('steamshipLine'), customers: getOptions('customer'),
+      commodities: getOptions('commodity'), carriers: getOptions('carrier'), locations: getOptions('dropOffLocation'),
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to load container options.' });
+  }
+});
+
+app.post('/api/dispatch/container-forecasts/:id/documents/:type', dispatchDocumentUpload.single('file'), async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const id = Number(req.params.id);
+    const type = String(req.params.type || '');
+    if (!Number.isInteger(id) || id <= 0 || !['tir', 'delivery-order'].includes(type)) return res.status(400).json({ error: 'Valid container and document type are required.' });
+    if (!req.file) return res.status(400).json({ error: 'Choose a document to upload.' });
+    const records = await db.listContainerForecasts();
+    if (!records.some((record: any) => Number(record.id) === id)) return res.status(404).json({ error: 'Container forecast not found.' });
+    const safeOriginal = String(req.file.originalname || 'document').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100);
+    const filename = `${id}-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeOriginal}`;
+    const filePath = path.join(dispatchDocumentsDir, filename);
+    await fs.promises.writeFile(filePath, req.file.buffer, { flag: 'wx' });
+    const field = type === 'tir' ? 'tirDocumentFile' : 'deliveryOrderFile';
+    try {
+      await db.updateContainerForecast(id, { [field]: filename }, user.name);
+    } catch (error) {
+      await fs.promises.unlink(filePath).catch(() => undefined);
+      throw error;
+    }
+    res.json({ filename, originalName: safeOriginal });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message || 'Failed to upload document.' });
+  }
+});
+
+app.get('/api/dispatch/container-forecasts/:id/documents/:type', async (req, res) => {
+  try {
+    const user = await getAuthorizedUser(req.headers.authorization);
+    if (!user) return res.status(401).json({ error: 'Authentication required.' });
+    const id = Number(req.params.id);
+    const type = String(req.params.type || '');
+    if (!Number.isInteger(id) || id <= 0 || !['tir', 'delivery-order'].includes(type)) return res.status(400).json({ error: 'Valid container and document type are required.' });
+    const records = await db.listContainerForecasts();
+    const record = records.find((entry: any) => Number(entry.id) === id);
+    const filename = type === 'tir' ? record?.tirDocumentFile : record?.deliveryOrderFile;
+    if (!filename) return res.status(404).json({ error: 'No document has been uploaded.' });
+    const filePath = path.join(dispatchDocumentsDir, path.basename(String(filename)));
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'The saved document file is unavailable.' });
+    res.download(filePath, path.basename(String(filename)).replace(/^\d+-(tir|delivery-order)-\d+-[a-z0-9]+-/i, ''));
+  } catch (error: any) {
+    res.status(500).json({ error: error?.message || 'Failed to retrieve document.' });
+  }
+});
+
 app.get('/api/dispatch/container-forecasts/summary', async (req, res) => {
   try {
     const user = await getAuthorizedUser(req.headers.authorization);
@@ -3639,7 +3718,7 @@ app.post('/api/dispatch/container-forecasts', async (req, res) => {
     const user = await getAuthorizedUser(req.headers.authorization);
     if (!user) return res.status(401).json({ error: 'Authentication required.' });
     const body = req.body || {};
-    const optionalNumbers = ['weight', 'rateAmount'];
+    const optionalNumbers = ['weight', 'rateAmount', 'addonCharge'];
     const normalized = { ...body };
     for (const field of optionalNumbers) {
       if (body[field] === '' || body[field] == null) normalized[field] = null;
@@ -3662,7 +3741,7 @@ app.put('/api/dispatch/container-forecasts/:id', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Valid forecast ID is required.' });
     const body = { ...(req.body || {}) };
-    for (const field of ['weight', 'rateAmount']) {
+    for (const field of ['weight', 'rateAmount', 'addonCharge']) {
       if (body[field] === '') body[field] = null;
       else if (body[field] != null && (!Number.isFinite(Number(body[field])) || Number(body[field]) < 0)) return res.status(400).json({ error: `${field} must be a non-negative number.` });
       else if (body[field] != null) body[field] = Number(body[field]);
