@@ -1,0 +1,29 @@
+.vessel-arrivals-page {
+  display: flex;
+  height: calc(100vh - 28px);
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vessel-arrivals-page .container-forecast-header {
+  width: min(100%, 1800px);
+  flex: 0 0 auto;
+}
+
+.vessel-arrivals-report {
+  width: min(100%, 1800px);
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 auto;
+}
+
+.vessel-arrivals-report .container-forecast-report-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+}
+
+@media (max-width: 760px) {
+  .vessel-arrivals-page { height: calc(100vh - 58px); }
+  .vessel-arrivals-page .container-forecast-header { align-items: flex-start; }
+  .vessel-arrivals-page .container-forecast-header-actions { grid-column: auto; }
+}

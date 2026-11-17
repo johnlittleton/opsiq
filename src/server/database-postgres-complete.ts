@@ -4077,6 +4077,28 @@ export class DatabaseService implements IDatabaseService {
     return (await this.getFoodSafetyTinCatScans({ scanId }))[0];
   }
 
+  async deleteFoodSafetyTinCatScan(scanId: number): Promise<{ scanId: number; cycleId: number; scannedCount: number }> {
+    if (!Number.isInteger(scanId) || scanId <= 0) throw new Error('Valid scan ID is required.');
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const owner = await client.query('SELECT cycle_id FROM food_safety_tin_cat_scans WHERE id = $1', [scanId]);
+      if (!owner.rows.length) throw new Error('Tin-cat scan not found.');
+      const cycleId = Number(owner.rows[0].cycle_id);
+      await client.query('SELECT id FROM food_safety_tin_cat_cycles WHERE id = $1 FOR UPDATE', [cycleId]);
+      const deleted = await client.query('DELETE FROM food_safety_tin_cat_scans WHERE id = $1 RETURNING id', [scanId]);
+      if (!deleted.rows.length) throw new Error('Tin-cat scan not found.');
+      const count = await client.query('SELECT COUNT(*)::INTEGER AS scanned_count FROM food_safety_tin_cat_scans WHERE cycle_id = $1', [cycleId]);
+      await client.query('COMMIT');
+      return { scanId, cycleId, scannedCount: Number(count.rows[0].scanned_count) };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async createFoodSafetyTinCatCycle(startedBy: string): Promise<any> {
     const userName = String(startedBy || '').trim();
     if (!userName) throw new Error('Signed-in user is required to start a cycle.');

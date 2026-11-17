@@ -98,7 +98,8 @@ export function getNavigationSections(userRole: string, hasRestrictedAccess: boo
       description: 'Forecast vessel arrivals and container deliveries',
       tools: [
         { icon: '🧭', title: 'Dispatch Heads-Up', description: 'Monitor arrivals, releases, deliveries, and empty returns', path: '/dispatch-dashboard' },
-        { icon: '🚢', title: 'Vessel & Container Forecast', description: 'Track vessel arrivals, delivery locations, and release status', path: '/container-forecast' },
+        { icon: '📦', title: 'Container Forecast', description: 'Manage container details, dispatch status, and delivery dates', path: '/container-forecast' },
+        { icon: '🚢', title: 'Arrivals by Vessel', description: 'Review incoming vessels and containers by delivery location', path: '/vessel-arrivals' },
       ],
     },
   ];

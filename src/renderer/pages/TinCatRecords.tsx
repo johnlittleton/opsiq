@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Pencil, Printer, X } from 'lucide-react';
+import { Pencil, Printer, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../services/config';
 import { buildTinCatReportHtml, matchesTinCatSearch, type TinCatScanRecord } from '../data/tinCatReports';
@@ -11,7 +11,7 @@ export default function TinCatRecords({ scans, period, onUpdated, search: contro
   search?: string;
   onSearchChange?: (search: string) => void;
 }) {
-  const { executiveName, sessionToken } = useAuth();
+  const { executiveName, sessionToken, userRole } = useAuth();
   const [localSearch, setLocalSearch] = useState('');
   const search = controlledSearch ?? localSearch;
   const [editing, setEditing] = useState<TinCatScanRecord | null>(null);
@@ -63,6 +63,27 @@ export default function TinCatRecords({ scans, period, onUpdated, search: contro
     } finally { setBusy(false); }
   };
 
+  const deleteScan = async (scan: TinCatScanRecord) => {
+    if (busy || !window.confirm(`Remove scan ${scan.assetCode} from cycle #${scan.cycleId}? This cannot be undone.`)) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch(`${API_BASE}/api/food-safety/tin-cats/scans/${scan.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${sessionToken || localStorage.getItem('opsiq-session-token') || ''}` },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'Unable to remove Tin Cat scan.');
+      await onUpdated();
+      setNotice(`${scan.assetCode} was removed. Cycle total: ${payload.scannedCount} scans.`);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Unable to remove Tin Cat scan.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return <>
     <div className="food-safety-record-tools">
       <input type="search" aria-label="Search tin cat scans" placeholder="Search tin cat, inspector, cycle or correction..." value={search} onChange={(event) => { setLocalSearch(event.target.value); onSearchChange?.(event.target.value); }} />
@@ -76,7 +97,7 @@ export default function TinCatRecords({ scans, period, onUpdated, search: contro
         {filtered.map((scan) => <tr key={scan.id}>
           <td><strong>{scan.assetCode}</strong></td><td>#{scan.cycleId}</td><td>{scan.scannedBy}</td><td>{new Date(scan.scannedAt).toLocaleString()}</td>
           <td>{scan.edits?.length ? <details><summary>{scan.edits.length} corrections</summary>{scan.edits.map((edit, index) => <p key={index}>{edit.originalAssetCode} to {edit.newAssetCode}<br />{edit.reason}<br />{edit.editedBy} / {new Date(edit.editedAt).toLocaleString()}</p>)}</details> : 'None'}</td>
-          <td><div className="food-safety-record-actions"><button type="button" title="Print inspection record" aria-label={`Print ${scan.assetCode}`} onClick={() => void printRecords([scan], true)}><Printer size={16} /></button><button type="button" title="Edit inspection record" aria-label={`Edit ${scan.assetCode}`} onClick={() => { setEditing(scan); setAssetCode(scan.assetCode); setReason(''); setError(''); setNotice(''); }}><Pencil size={16} /></button></div></td>
+          <td><div className="food-safety-record-actions"><button type="button" title="Print inspection record" aria-label={`Print ${scan.assetCode}`} disabled={busy} onClick={() => void printRecords([scan], true)}><Printer size={16} /></button><button type="button" title="Edit inspection record" aria-label={`Edit ${scan.assetCode}`} disabled={busy} onClick={() => { setEditing(scan); setAssetCode(scan.assetCode); setReason(''); setError(''); setNotice(''); }}><Pencil size={16} /></button>{['manager', 'executive'].includes(userRole) && <button type="button" className="is-delete" title="Remove erroneous scan" aria-label={`Remove scan ${scan.assetCode}`} disabled={busy} onClick={() => void deleteScan(scan)}><Trash2 size={16} /></button>}</div></td>
         </tr>)}
       </tbody></table>
     </div>}

@@ -44,14 +44,6 @@ export interface ContainerForecastRecord {
   updatedAt?: string;
 };
 
-interface VesselLocationSummary {
-  vessel: string;
-  dropOffLocation: string;
-  containerCount: number;
-  releasedCount: number;
-  overweightCount: number;
-}
-
 interface ForecastOptions {
   vessels: string[];
   steamshipLines: string[];
@@ -84,7 +76,6 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
   const navigate = useNavigate();
   const { executiveName, sessionToken } = useAuth();
   const [records, setRecords] = useState<ContainerForecastRecord[]>([]);
-  const [summary, setSummary] = useState<VesselLocationSummary[]>([]);
   const [vessels, setVessels] = useState<string[]>([]);
   const [locations, setLocations] = useState<string[]>([]);
   const [options, setOptions] = useState<ForecastOptions>({ vessels: [], steamshipLines: [], customers: [], commodities: [], carriers: [], locations: [] });
@@ -93,8 +84,6 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
   const [vesselFilter, setVesselFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [releaseFilter, setReleaseFilter] = useState('');
-  const [etaStart, setEtaStart] = useState('');
-  const [etaEnd, setEtaEnd] = useState('');
   const [historyStart, setHistoryStart] = useState('');
   const [historyEnd, setHistoryEnd] = useState('');
   const [appliedHistoryStart, setAppliedHistoryStart] = useState('');
@@ -127,16 +116,6 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
     setLocations(Array.from(new Set(rows.map((row) => row.dropOffLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b)));
   }, [headers, vesselFilter, locationFilter, releaseFilter, appliedSearch]);
 
-  const loadSummary = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (etaStart) params.set('startDate', etaStart);
-    if (etaEnd) params.set('endDate', etaEnd);
-    const response = await fetch(`${API_BASE}/api/dispatch/container-forecasts/summary?${params}`, { headers });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(payload?.error || 'Failed to load vessel report.');
-    setSummary(Array.isArray(payload) ? payload : []);
-  }, [headers, etaStart, etaEnd]);
-
   const loadOptions = useCallback(async () => {
     const response = await fetch(`${API_BASE}/api/dispatch/container-forecasts/options`, { headers });
     const payload = await response.json().catch(() => null);
@@ -150,21 +129,15 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
     setLoading(true);
     setError('');
     try {
-      await Promise.all([loadRecords(), loadSummary(), loadOptions()]);
+      await Promise.all([loadRecords(), loadOptions()]);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Failed to load container forecasts.');
     } finally {
       setLoading(false);
     }
-  }, [loadRecords, loadSummary, loadOptions]);
+  }, [loadRecords, loadOptions]);
 
   useEffect(() => { void loadAll(); }, [loadAll]);
-
-  const groupedSummary = useMemo(() => {
-    const map = new Map<string, VesselLocationSummary[]>();
-    for (const row of summary) map.set(row.vessel, [...(map.get(row.vessel) || []), row]);
-    return Array.from(map.entries());
-  }, [summary]);
 
   const openNew = () => {
     setEditingId(null);
@@ -348,11 +321,12 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
   return (
     <main className="container-forecast-page">
       <header className="container-forecast-header">
-        <div><p>DISPATCH / {historyMode ? 'HISTORY' : 'FORECASTING'}</p><h1>{historyMode ? 'Container History' : 'Vessel & Container Forecast'}</h1></div>
+        <div><p>DISPATCH / {historyMode ? 'HISTORY' : 'FORECASTING'}</p><h1>{historyMode ? 'Container History' : 'Container Forecast'}</h1></div>
         <div className="container-forecast-header-actions">
           {historyMode
             ? <button type="button" onClick={() => navigate('/container-forecast')}>← Forecast</button>
             : <button type="button" onClick={() => navigate('/container-forecast-history')}>History</button>}
+          {!historyMode && <button type="button" onClick={() => navigate('/vessel-arrivals')}>Arrivals by Vessel</button>}
           {!historyMode && <button type="button" onClick={() => navigate('/empty-container-returns')}>Empty Return Report</button>}
           <button type="button" onClick={() => void loadAll()}>Refresh</button>
           {!historyMode && <button type="button" onClick={openNew}>＋ Add Container</button>}
@@ -363,30 +337,6 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
       {error && <div className="container-forecast-error" role="alert">{error}</div>}
 
       <div className={`container-forecast-workspace${historyMode ? ' is-history' : ''}`}>
-      {!historyMode && <aside className="container-forecast-report">
-        <div className="container-forecast-section-heading"><div><p>ARRIVALS BY VESSEL</p><h2>Forecast by drop-off location</h2></div><span>{summary.reduce((sum, row) => sum + Number(row.containerCount || 0), 0)} containers</span></div>
-        <div className="container-forecast-date-filters">
-          <label>Vessel ETA from<input type="date" value={etaStart} onChange={(event) => setEtaStart(event.target.value)} /></label>
-          <label>Through<input type="date" value={etaEnd} onChange={(event) => setEtaEnd(event.target.value)} /></label>
-          {(etaStart || etaEnd) && <button type="button" onClick={() => { setEtaStart(''); setEtaEnd(''); }}>Clear date filter</button>}
-        </div>
-        {groupedSummary.length === 0 ? <p className="container-forecast-empty">No forecast containers match this ETA range.</p> : (
-          <div className="container-forecast-report-grid">
-            {groupedSummary.map(([vessel, rows]) => (
-              <section className="container-forecast-vessel-summary" key={vessel}>
-                <div className="container-forecast-vessel-heading"><div><span>VESSEL</span><h3>{vessel}</h3></div><strong><small>CONTAINERS</small>{rows.reduce((sum, row) => sum + Number(row.containerCount || 0), 0)}</strong></div>
-                <div className="container-forecast-vessel-locations">
-                  {rows.map((row) => <div className="container-forecast-location-row" key={`${vessel}-${row.dropOffLocation}`}>
-                    <div><span>{row.dropOffLocation}</span><small>{row.releasedCount} released · {row.overweightCount} overweight</small></div>
-                    <strong>{row.containerCount}</strong>
-                  </div>)}
-                </div>
-              </section>
-            ))}
-          </div>
-        )}
-      </aside>}
-
       <section className={`container-forecast-records${historyMode ? ' is-history' : ''}`}>
         <div className="container-forecast-section-heading"><div><p>{historyMode ? 'PAST VESSEL / DELIVERY ETAS' : 'CONTAINER DISPATCH'}</p><h2>{historyMode ? 'Historical container records' : 'Forecast records'}</h2></div>{historyMode ? <div className="container-forecast-history-actions"><span>{displayedRecords.length} records</span><button type="button" disabled={loading || !displayedRecords.length} onClick={() => void handlePrintHistory()}>Print History</button></div> : <span>{displayedRecords.length} records</span>}</div>
         {historyMode && <div className="container-forecast-date-filters container-forecast-history-filters">
@@ -395,60 +345,47 @@ export default function ContainerForecast({ historyMode = false }: { historyMode
           {(historyStart || historyEnd || appliedHistoryStart || appliedHistoryEnd) && <button type="button" onClick={() => { setHistoryStart(''); setHistoryEnd(''); setAppliedHistoryStart(''); setAppliedHistoryEnd(''); }}>Clear dates</button>}
         </div>}
         <div className="container-forecast-filters">
-          <input aria-label="Search forecasts" placeholder="Search vessel, container, chassis, pickup, location..." value={search} onChange={(event) => { setSearch(event.target.value); if (!historyMode) setAppliedSearch(event.target.value); }} />
-          {historyMode && <button type="button" className="container-forecast-search-button" onClick={() => { setAppliedSearch(search.trim()); setAppliedHistoryStart(historyStart); setAppliedHistoryEnd(historyEnd); }}>Search</button>}
+          <input aria-label="Search forecasts" placeholder="Search vessel, container, chassis, pickup, location..." value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setAppliedSearch(search.trim()); if (historyMode) { setAppliedHistoryStart(historyStart); setAppliedHistoryEnd(historyEnd); } } }} />
+          <button type="button" className="container-forecast-search-button" onClick={() => { setAppliedSearch(search.trim()); if (historyMode) { setAppliedHistoryStart(historyStart); setAppliedHistoryEnd(historyEnd); } }}>Search</button>
           <select aria-label="Filter vessel" value={vesselFilter} onChange={(event) => setVesselFilter(event.target.value)}><option value="">All vessels</option>{vessels.map((vessel) => <option key={vessel}>{vessel}</option>)}</select>
           <select aria-label="Filter drop-off location" value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}><option value="">All locations</option>{locations.map((location) => <option key={location}>{location}</option>)}</select>
           <select aria-label="Filter release status" value={releaseFilter} onChange={(event) => setReleaseFilter(event.target.value)}><option value="">All release statuses</option>{['Pending', 'Released', 'On Hold', 'Not Required'].map((status) => <option key={status}>{status}</option>)}</select>
         </div>
-        {loading ? <p className="container-forecast-empty">Loading forecast...</p> : displayedRecords.length === 0 ? <p className="container-forecast-empty">{historyMode ? 'No historical containers match these dates and filters.' : 'No containers match these filters.'}</p> : (
+        {loading ? <p className="container-forecast-empty">Loading forecast...</p> : displayedRecords.length === 0 ? <p className="container-forecast-empty">{historyMode ? 'No historical containers match these dates and filters.' : 'No containers match these filters.'}</p> : historyMode ? (
           <div className="container-forecast-card-list">
-            {displayedRecords.map((record) => (
-              <article className="container-forecast-record-card" key={record.id}>
-                <header className="container-forecast-record-card-heading">
-                  <div className="container-forecast-record-card-title"><span>CONTAINER</span><h3>{record.containerNumber}</h3><p>{record.vessel}{record.steamshipLine ? ` · ${record.steamshipLine}` : ''}</p></div>
-                  <div className="container-forecast-record-card-statuses">
-                    <span className={`container-forecast-release is-${record.releaseStatus.toLowerCase().replace(/\s+/g, '-')}`}>{record.releaseStatus}</span>
-                    <span className={`container-forecast-dispatch is-${String(record.dispatchStatus || 'Pending').toLowerCase()}`}>{record.dispatchStatus || 'Pending'}</span>
-                  </div>
-                </header>
-                <div className="container-forecast-record-details">
-                  <section><h4>Load & destination</h4><dl className="container-forecast-detail-grid">
-                    <div><dt>Customer</dt><dd>{record.customer || '—'}</dd></div>
-                    <div><dt>Commodity</dt><dd>{record.commodity || '—'}</dd></div>
-                    <div><dt>Drop-off</dt><dd>{record.dropOffLocation || '—'}</dd></div>
-                    <div><dt>Chassis</dt><dd>{record.chassis || '—'}</dd></div>
-                    <div><dt>Weight</dt><dd>{record.weight == null ? '—' : `${record.weight} lb`}</dd></div>
-                    <div><dt>Overweight permit</dt><dd>{isChecked(record.overweightPermit) ? `Yes · ${record.permitNumber || 'No permit number'}` : 'No'}</dd></div>
-                    <div><dt>ND/NT number</dt><dd>{record.ndNtNumber || '—'}</dd></div>
-                  </dl></section>
-                  <section><h4>Dispatch & timing</h4><dl className="container-forecast-detail-grid">
-                    <div><dt>Carrier</dt><dd>{record.carrier || '—'}</dd></div>
-                    <div><dt>Driver / load</dt><dd>{record.driverLoad || '—'}</dd></div>
-                    <div><dt>Pickup number / SCAC</dt><dd>{record.pickupNumber || '—'}<small>{record.pickupScac || 'SCAC not set'}</small></dd></div>
-                    <div><dt>Port appointment</dt><dd>{record.portAppointmentNumber || '—'}</dd></div>
-                    <div><dt>Vessel ETA</dt><dd>{displayDate(record.vesselEta)}</dd></div>
-                    <div><dt>Delivery ETA</dt><dd>{displayDate(record.deliveryEta)}</dd></div>
-                    <div><dt>Full pickup LFD</dt><dd>{displayDate(record.fullPickupLastFreeDay)}</dd></div>
-                    <div><dt>Empty return LFD</dt><dd>{displayDate(record.emptyLastFreeDay || record.emptyReturnDate)}<small>{record.emptyReturnDriver || 'No return driver assigned'}</small></dd></div>
-                  </dl></section>
-                  <section><h4>Rates & documents</h4><dl className="container-forecast-detail-grid">
-                    <div><dt>Ratecon number</dt><dd>{record.rateconNumber || '—'}</dd></div>
-                    <div><dt>Rate</dt><dd>{record.rateAmount == null ? '—' : `$${Number(record.rateAmount).toFixed(2)}`}</dd></div>
-                    <div><dt>Add-on charge</dt><dd>{record.addonCharge == null ? '—' : `$${Number(record.addonCharge).toFixed(2)}`}</dd></div>
-                  </dl></section>
-                </div>
-                <div className="container-forecast-actions">
-                  {record.tirDocumentFile && <button type="button" onClick={() => void downloadDocument(record, 'tir')}>TIR</button>}
-                  {record.deliveryOrderFile && <button type="button" onClick={() => void downloadDocument(record, 'delivery-order')}>Delivery Order</button>}
-                  <button type="button" onClick={() => void handlePrint(record)}>Print</button>
-                  {!historyMode && <><button type="button" onClick={() => openEdit(record)}>Edit</button>{String(record.dispatchStatus || '').toLowerCase() !== 'dispatched' && <button type="button" onClick={() => void updateDispatchStatus(record, 'Dispatched')}>Dispatched</button>}<button type="button" onClick={() => void updateDispatchStatus(record, 'Done')}>Done</button><button type="button" className="is-delete" onClick={() => void handleDelete(record)}>Delete</button></>}
-                </div>
-              </article>
-            ))}
+            {displayedRecords.map((record) => <article className="container-forecast-record-card" key={record.id}>
+              <header className="container-forecast-record-card-heading"><div className="container-forecast-record-card-title"><span>CONTAINER</span><h3>{record.containerNumber}</h3><p>{record.vessel}{record.steamshipLine ? ` · ${record.steamshipLine}` : ''}</p></div><div className="container-forecast-record-card-statuses"><span className={`container-forecast-release is-${record.releaseStatus.toLowerCase().replace(/\s+/g, '-')}`}>{record.releaseStatus}</span><span className={`container-forecast-dispatch is-${String(record.dispatchStatus || 'Pending').toLowerCase()}`}>{record.dispatchStatus || 'Pending'}</span></div></header>
+              <div className="container-forecast-record-details">
+                <section><h4>Load & destination</h4><dl className="container-forecast-detail-grid"><div><dt>Customer</dt><dd>{record.customer || '—'}</dd></div><div><dt>Commodity</dt><dd>{record.commodity || '—'}</dd></div><div><dt>Drop-off</dt><dd>{record.dropOffLocation || '—'}</dd></div><div><dt>Chassis</dt><dd>{record.chassis || '—'}</dd></div><div><dt>Weight</dt><dd>{record.weight == null ? '—' : `${record.weight} lb`}</dd></div><div><dt>Overweight permit</dt><dd>{isChecked(record.overweightPermit) ? `Yes · ${record.permitNumber || 'No permit number'}` : 'No'}</dd></div><div><dt>ND/NT number</dt><dd>{record.ndNtNumber || '—'}</dd></div></dl></section>
+                <section><h4>Dispatch & timing</h4><dl className="container-forecast-detail-grid"><div><dt>Carrier</dt><dd>{record.carrier || '—'}</dd></div><div><dt>Driver / load</dt><dd>{record.driverLoad || '—'}</dd></div><div><dt>Pickup number / SCAC</dt><dd>{record.pickupNumber || '—'}<small>{record.pickupScac || 'SCAC not set'}</small></dd></div><div><dt>Port appointment</dt><dd>{record.portAppointmentNumber || '—'}</dd></div><div><dt>Vessel ETA</dt><dd>{displayDate(record.vesselEta)}</dd></div><div><dt>Delivery ETA</dt><dd>{displayDate(record.deliveryEta)}</dd></div><div><dt>Full pickup LFD</dt><dd>{displayDate(record.fullPickupLastFreeDay)}</dd></div><div><dt>Empty return LFD</dt><dd>{displayDate(record.emptyLastFreeDay || record.emptyReturnDate)}<small>{record.emptyReturnDriver || 'No return driver assigned'}</small></dd></div></dl></section>
+                <section><h4>Rates & documents</h4><dl className="container-forecast-detail-grid"><div><dt>Ratecon number</dt><dd>{record.rateconNumber || '—'}</dd></div><div><dt>Rate</dt><dd>{record.rateAmount == null ? '—' : `$${Number(record.rateAmount).toFixed(2)}`}</dd></div><div><dt>Add-on charge</dt><dd>{record.addonCharge == null ? '—' : `$${Number(record.addonCharge).toFixed(2)}`}</dd></div></dl></section>
+              </div>
+              <div className="container-forecast-actions">{record.tirDocumentFile && <button type="button" onClick={() => void downloadDocument(record, 'tir')}>TIR</button>}{record.deliveryOrderFile && <button type="button" onClick={() => void downloadDocument(record, 'delivery-order')}>Delivery Order</button>}<button type="button" onClick={() => void handlePrint(record)}>Print</button></div>
+            </article>)}
+          </div>
+        ) : (
+          <div className="container-forecast-sheet-wrap">
+            <table className="container-forecast-sheet">
+              <thead><tr><th>Vessel ETA</th><th>Container</th><th>Vessel / SSL</th><th>Customer / Commodity</th><th>Drop-off</th><th>Carrier / Driver</th><th>Chassis / Weight</th><th>OW / Permit #</th><th>ND/NT #</th><th>Ratecon / Rate / Add-on</th><th>Pickup / SCAC</th><th>Port Appt</th><th>Delivery ETA</th><th>Full Pickup LFD</th><th>Empty Return LFD</th><th>Release</th><th>Dispatch</th><th>Documents / Actions</th></tr></thead>
+              <tbody>{displayedRecords.map((record) => <tr key={record.id}>
+                <td>{displayDate(record.vesselEta)}</td><td className="container-forecast-sheet-container">{record.containerNumber}</td>
+                <td>{record.vessel}<small>{record.steamshipLine || 'SSL not set'}</small></td>
+                <td>{record.customer || '—'}<small>{record.commodity || '—'}</small></td><td>{record.dropOffLocation || '—'}</td>
+                <td>{record.carrier || '—'}<small>{record.driverLoad || 'Driver not assigned'}</small></td>
+                <td>{record.chassis || '—'}<small>{record.weight == null ? '—' : `${record.weight} lb`}</small></td>
+                <td>{isChecked(record.overweightPermit) ? 'Yes' : 'No'}<small>{record.permitNumber || '—'}</small></td><td>{record.ndNtNumber || '—'}</td>
+                <td>{record.rateconNumber || '—'}<small>{record.rateAmount == null ? 'Rate —' : `Rate $${Number(record.rateAmount).toFixed(2)}`} · {record.addonCharge == null ? 'Add-on —' : `Add-on $${Number(record.addonCharge).toFixed(2)}`}</small></td>
+                <td>{record.pickupNumber || '—'}<small>{record.pickupScac || '—'}</small></td><td>{record.portAppointmentNumber || '—'}</td>
+                <td>{displayDate(record.deliveryEta)}</td><td>{displayDate(record.fullPickupLastFreeDay)}</td><td>{displayDate(record.emptyLastFreeDay || record.emptyReturnDate)}<small>{record.emptyReturnDriver || ''}</small></td>
+                <td><span className={`container-forecast-release is-${record.releaseStatus.toLowerCase().replace(/\s+/g, '-')}`}>{record.releaseStatus}</span></td>
+                <td><span className={`container-forecast-dispatch is-${String(record.dispatchStatus || 'Pending').toLowerCase()}`}>{record.dispatchStatus || 'Pending'}</span></td>
+                <td><div className="container-forecast-sheet-actions">{record.tirDocumentFile && <button type="button" onClick={() => void downloadDocument(record, 'tir')}>TIR</button>}{record.deliveryOrderFile && <button type="button" onClick={() => void downloadDocument(record, 'delivery-order')}>Delivery Order</button>}<button type="button" onClick={() => void handlePrint(record)}>Print</button><button type="button" onClick={() => openEdit(record)}>Edit</button>{String(record.dispatchStatus || '').toLowerCase() !== 'dispatched' && <button type="button" onClick={() => void updateDispatchStatus(record, 'Dispatched')}>Dispatched</button>}<button type="button" onClick={() => void updateDispatchStatus(record, 'Done')}>Done</button><button type="button" className="is-delete" onClick={() => void handleDelete(record)}>Delete</button></div></td>
+              </tr>)}</tbody>
+            </table>
           </div>
         )}
       </section>
+
       </div>
 
       {formOpen && (

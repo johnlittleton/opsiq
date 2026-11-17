@@ -2504,6 +2504,19 @@ app.put('/api/food-safety/tin-cats/scans/:scanId', async (req, res) => {
   }
 });
 
+app.delete('/api/food-safety/tin-cats/scans/:scanId', async (req, res) => {
+  try {
+    const user = await requireRole(req, res, ['manager', 'executive']);
+    if (!user) return;
+    const scanId = Number(req.params.scanId);
+    if (!Number.isInteger(scanId) || scanId <= 0) return res.status(400).json({ error: 'Valid scan ID is required.' });
+    res.json(await db.deleteFoodSafetyTinCatScan(scanId));
+  } catch (error: any) {
+    const message = error?.message || 'Failed to remove tin-cat scan.';
+    res.status(/not found/i.test(message) ? 404 : /valid scan id/i.test(message) ? 400 : 500).json({ error: message });
+  }
+});
+
 app.get('/api/food-safety/tin-cats/cycles', async (req, res) => {
   try {
     const user = await getAuthorizedUser(req.headers.authorization);

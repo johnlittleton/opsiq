@@ -57,6 +57,7 @@ import InventoryAuditor from './pages/InventoryAuditor';
 import FoodSafetyTinCats from './pages/FoodSafetyTinCats';
 import FoodSafetyTinCatHistory from './pages/FoodSafetyTinCatHistory';
 import ContainerForecast from './pages/ContainerForecast';
+import VesselArrivals from './pages/VesselArrivals';
 import DispatchDashboard from './pages/DispatchDashboard';
 import DispatchCalendar from './pages/DispatchCalendar';
 import EmptyContainerReturnReport from './pages/EmptyContainerReturnReport';
@@ -107,6 +108,7 @@ const ROUTES_WITH_SHARED_TITLE_BAR = new Set([
   '/food-safety-tin-cats',
   '/food-safety-tin-cats/history',
   '/container-forecast',
+  '/vessel-arrivals',
   '/container-forecast-history',
   '/dispatch-dashboard',
   '/dispatch-calendar',
@@ -172,6 +174,7 @@ const AppRoutes: React.FC = () => {
       <Route path="/food-safety-tin-cats" element={<FoodSafetyTinCats />} />
       <Route path="/food-safety-tin-cats/history" element={<FoodSafetyTinCatHistory />} />
       <Route path="/container-forecast" element={<ContainerForecast />} />
+      <Route path="/vessel-arrivals" element={<VesselArrivals />} />
       <Route path="/container-forecast-history" element={<ContainerForecast historyMode />} />
       <Route path="/dispatch-dashboard" element={<DispatchDashboard />} />
       <Route path="/dispatch-calendar" element={<DispatchCalendar />} />

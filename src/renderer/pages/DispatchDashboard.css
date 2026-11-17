@@ -16,7 +16,7 @@
 
 .dispatch-dashboard__header,
 .dispatch-dashboard__metrics,
-.dispatch-dashboard__dock-schedule,
+.dispatch-dashboard__daily-schedule,
 .dispatch-dashboard__utilization,
 .dispatch-dashboard__calendar,
 .dispatch-dashboard__error {
@@ -181,10 +181,20 @@
 .dispatch-dashboard__calendar-day small.is-empty { border-left-color: #fff; background: #292929; color: #fff; }
 .dispatch-dashboard__calendar-day small.dispatch-dashboard__calendar-more { border-left: 0; background: transparent; color: var(--dispatch-muted); }
 
-.dispatch-dashboard__dock-schedule { order: 1; margin-top: 12px; margin-bottom: 0; }
 .dispatch-dashboard__schedule-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; color: var(--dispatch-muted); font-size: 0.77rem; }
 .dispatch-dashboard__schedule-controls label { display: grid; gap: 5px; }
 .dispatch-dashboard__schedule-controls input { min-height: 36px; box-sizing: border-box; border: 1px solid #505050; border-radius: 4px; padding: 5px 8px; background: #171717; color: var(--dispatch-ink); font: inherit; color-scheme: dark; }
+.dispatch-dashboard__daily-schedule { order: 1; margin-top: 12px; margin-bottom: 0; }
+.dispatch-dashboard__daily-table-wrap { height: min(78vh, 760px); min-height: 500px; overflow: auto; scrollbar-gutter: stable; border: 1px solid var(--dispatch-border); border-radius: 4px; }
+.dispatch-dashboard__daily-table { width: 100%; min-width: 1120px; border-collapse: collapse; text-align: left; font-size: 0.73rem; }
+.dispatch-dashboard__daily-table th { position: sticky; top: 0; z-index: 1; background: #242424; color: #fff; font-size: 0.66rem; text-transform: uppercase; }
+.dispatch-dashboard__daily-table th,
+.dispatch-dashboard__daily-table td { border-bottom: 1px solid #383838; padding: 6px 8px; vertical-align: top; }
+.dispatch-dashboard__daily-table th { padding: 8px; }
+.dispatch-dashboard__daily-table tbody tr:nth-child(even) { background: #151515; }
+.dispatch-dashboard__daily-table tbody tr:hover { background: #291819; }
+.dispatch-dashboard__daily-table td small { display: block; margin-top: 3px; color: var(--dispatch-muted); font-size: 0.67rem; }
+.dispatch-dashboard__daily-container { color: #fff; font-family: Consolas, monospace; font-weight: 800; white-space: nowrap; }
 .dispatch-dashboard__dock-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; max-height: 380px; overflow: auto; scrollbar-gutter: stable; }
 .dispatch-dashboard__dock-tile { min-width: 0; border: 1px solid var(--dispatch-border); border-top: 3px solid var(--dispatch-accent); border-radius: 5px; padding: 9px; background: var(--dispatch-panel); }
 .dispatch-dashboard__dock-tile-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
@@ -289,6 +299,10 @@
   color: #ffaaa0;
 }
 
+.dispatch-dashboard__dispatch-status { display: inline-block; border: 1px solid #555; border-radius: 3px; background: #292929; color: #e5e5e5; padding: 4px 6px; font-size: 0.69rem; font-weight: 800; white-space: nowrap; }
+.dispatch-dashboard__dispatch-status.is-dispatched { border-color: #6a2427; background: #381719; color: #ffc4c6; }
+.dispatch-dashboard__dispatch-status.is-done { border-color: #777; background: #383838; color: #fff; }
+
 .dispatch-dashboard__flags {
   display: flex;
   flex-wrap: wrap;
@@ -348,6 +362,9 @@
   .dispatch-dashboard__metric { min-height: 98px; padding: 10px; }
   .dispatch-dashboard__metric strong { font-size: 1.6rem; }
   .dispatch-dashboard__utilization-grid { grid-template-columns: 1fr; gap: 14px; }
+  .dispatch-dashboard__daily-table-wrap { height: min(70vh, 640px); min-height: 460px; }
+  .dispatch-dashboard__daily-table { font-size: 0.69rem; }
+  .dispatch-dashboard__daily-table td { padding: 5px 6px; }
   .dispatch-dashboard__calendar-day { min-height: 76px; padding: 4px; }
   .dispatch-dashboard__calendar-day small { font-size: 0.58rem; }
 }

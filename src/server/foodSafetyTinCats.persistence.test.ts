@@ -9,6 +9,7 @@ import { Worker } from 'node:worker_threads';
 
 function createFixture(filename = ':memory:') {
   const nativeDb = new Database(filename);
+  nativeDb.pragma('foreign_keys = ON');
   nativeDb.exec(`
     CREATE TABLE food_safety_tin_cat_cycles (
       id INTEGER PRIMARY KEY AUTOINCREMENT, status TEXT NOT NULL DEFAULT 'open', targetCount INTEGER NOT NULL DEFAULT 147,
@@ -20,7 +21,7 @@ function createFixture(filename = ':memory:') {
     );
     CREATE UNIQUE INDEX idx_fs_tin_cat_one_open_cycle ON food_safety_tin_cat_cycles(status) WHERE status = 'open';
     CREATE TABLE food_safety_tin_cat_scan_edits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, scanId INTEGER NOT NULL REFERENCES food_safety_tin_cat_scans(id),
+      id INTEGER PRIMARY KEY AUTOINCREMENT, scanId INTEGER NOT NULL REFERENCES food_safety_tin_cat_scans(id) ON DELETE CASCADE,
       originalAssetCode TEXT NOT NULL, newAssetCode TEXT NOT NULL, reason TEXT NOT NULL,
       editedBy TEXT NOT NULL, editedAt TEXT NOT NULL
     );
@@ -187,5 +188,25 @@ test('independent SQLite worker connections serialize concurrent duplicate scans
     await Promise.all(workers.map(worker => worker.terminate()));
     nativeDb.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('removing an erroneous scan cascades its edit history and refreshes the cycle count', async () => {
+  const { nativeDb, service } = createFixture();
+  try {
+    const cycle = await service.createFoodSafetyTinCatCycle('FS Tester');
+    const first = await service.addFoodSafetyTinCatScan(cycle.id, 'TC-DELETE', 'FS Tester');
+    await service.addFoodSafetyTinCatScan(cycle.id, 'TC-KEEP', 'FS Tester');
+    await service.updateFoodSafetyTinCatScan(first.scan.id, 'TC-CORRECTED', 'Wrong first scan', 'Manager');
+
+    const removed = await service.deleteFoodSafetyTinCatScan(first.scan.id);
+    assert.deepEqual(removed, { scanId: first.scan.id, cycleId: cycle.id, scannedCount: 1 });
+    assert.deepEqual((await service.getFoodSafetyTinCatScans({ cycleId: cycle.id })).map((scan: any) => scan.assetCode), ['TC-KEEP']);
+    const remainingEdits = nativeDb.prepare('SELECT COUNT(*) AS count FROM food_safety_tin_cat_scan_edits WHERE scanId = ?').get(first.scan.id) as { count: number };
+    assert.equal(remainingEdits.count, 0);
+    await assert.rejects(service.deleteFoodSafetyTinCatScan(first.scan.id), /not found/);
+    await assert.rejects(service.deleteFoodSafetyTinCatScan(0), /valid scan ID/i);
+  } finally {
+    nativeDb.close();
   }
 });

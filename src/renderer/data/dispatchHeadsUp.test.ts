@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { getDispatchAttentionReasons, getDispatchHeadsUp, type DispatchForecastRecord } from './dispatchHeadsUp';
+import { getDispatchAttentionReasons, getDispatchDailySchedule, getDispatchHeadsUp, type DispatchForecastRecord } from './dispatchHeadsUp';
 
 const now = new Date('2026-11-02T12:00:00');
 const records: DispatchForecastRecord[] = [
@@ -24,4 +24,11 @@ assert.equal(headsUp.incoming.some((record) => record.id === 7), false);
 assert.equal(headsUp.attentionRecords.length, 2);
 assert.deepEqual(getDispatchAttentionReasons(records[0], headsUp), ['Vessel arriving', 'Release Pending', 'Delivery within 48h', 'Empty return due', 'Full load last free day']);
 assert.deepEqual(getDispatchHeadsUp(records, 7, now).incoming.map((record) => record.id), [1]);
+assert.deepEqual(getDispatchDailySchedule([
+  { ...records[0], deliveryEta: '2026-11-02T09:00:00' },
+  { ...records[1], deliveryEta: '2026-11-02T08:00:00', dispatchStatus: 'Done' },
+  { ...records[2], deliveryEta: '2026-11-03T08:00:00' },
+  { ...records[3], deliveryEta: null },
+], '2026-11-02').map((record) => record.id), [2, 1]);
 console.log('PASS: Dispatch horizon, release, delivery, empty-return counts, and attention reasons');
+console.log('PASS: daily container schedule includes all statuses for the selected delivery date and sorts by ETA');

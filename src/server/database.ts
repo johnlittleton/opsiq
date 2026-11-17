@@ -4058,6 +4058,17 @@ export class DatabaseService implements IDatabaseService {
     return (await this.getFoodSafetyTinCatScans({ scanId }))[0];
   }
 
+  async deleteFoodSafetyTinCatScan(scanId: number): Promise<{ scanId: number; cycleId: number; scannedCount: number }> {
+    if (!Number.isInteger(scanId) || scanId <= 0) throw new Error('Valid scan ID is required.');
+    return this.db.transaction(() => {
+      const scan = this.db.prepare('SELECT cycleId FROM food_safety_tin_cat_scans WHERE id = ?').get(scanId) as { cycleId: number } | undefined;
+      if (!scan) throw new Error('Tin-cat scan not found.');
+      this.db.prepare('DELETE FROM food_safety_tin_cat_scans WHERE id = ?').run(scanId);
+      const scannedCount = Number((this.db.prepare('SELECT COUNT(*) AS count FROM food_safety_tin_cat_scans WHERE cycleId = ?').get(scan.cycleId) as { count: number }).count);
+      return { scanId, cycleId: Number(scan.cycleId), scannedCount };
+    }).immediate();
+  }
+
   async createFoodSafetyTinCatCycle(startedBy: string): Promise<any> {
     const scannedBy = String(startedBy || '').trim();
     if (!scannedBy) throw new Error('Signed-in user is required to start a cycle.');

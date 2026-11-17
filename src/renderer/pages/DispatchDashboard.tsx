@@ -4,7 +4,8 @@ import { format } from 'date-fns';
 import type { DockCheckin } from '../../shared/types';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../services/config';
-import { formatDispatchDate, getDispatchAttentionReasons, getDispatchHeadsUp, type DispatchForecastRecord } from '../data/dispatchHeadsUp';
+import { buildDispatchDailySchedulePrintHtml } from '../data/containerForecastPrint';
+import { formatDispatchDate, getDispatchDailySchedule, getDispatchHeadsUp, type DispatchForecastRecord } from '../data/dispatchHeadsUp';
 import { getDispatchDockSchedule, type DispatchDockAppointment } from '../data/dispatchDockSchedule';
 import './DispatchDashboard.css';
 
@@ -57,6 +58,7 @@ export default function DispatchDashboard() {
   const visibleRecords = useMemo(() => records.filter((record) => !locationFilter || record.dropOffLocation === locationFilter), [records, locationFilter]);
   const locationOptions = useMemo(() => Array.from(new Set(records.map((record) => record.dropOffLocation).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [records]);
   const metrics = useMemo(() => getDispatchHeadsUp(visibleRecords, horizonDays), [visibleRecords, horizonDays]);
+  const dailySchedule = useMemo(() => getDispatchDailySchedule(visibleRecords, scheduleDate), [visibleRecords, scheduleDate]);
   const dockSchedule = useMemo(() => getDispatchDockSchedule(appointments, records, checkins, scheduleDate)
     .filter(({ record }) => !locationFilter || record.dropOffLocation === locationFilter), [appointments, records, checkins, scheduleDate, locationFilter]);
   const utilization = useMemo(() => {
@@ -65,6 +67,28 @@ export default function DispatchDashboard() {
     const scheduled = dockSchedule.length;
     return { drivers: drivers.size, trucks: trucks.size, scheduled, driverPercent: scheduled ? Math.min(100, Math.round(drivers.size / scheduled * 100)) : 0, truckPercent: scheduled ? Math.min(100, Math.round(trucks.size / scheduled * 100)) : 0 };
   }, [dockSchedule]);
+
+  const printDailySchedule = async () => {
+    if (!dailySchedule.length) return;
+    const dateLabel = scheduleDate === format(new Date(), 'yyyy-MM-dd') ? `Today, ${format(new Date(), 'MMMM d, yyyy')}` : format(new Date(`${scheduleDate}T12:00:00`), 'MMMM d, yyyy');
+    const printHtml = buildDispatchDailySchedulePrintHtml(dailySchedule as unknown as Record<string, unknown>[], dateLabel);
+    if (window.electron?.printHTML) {
+      const result = await window.electron.printHTML(printHtml);
+      if (!result.success) setError(result.error || 'Unable to print the container schedule.');
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=1200,height=800');
+    if (!printWindow) {
+      setError('Allow pop-ups to print the container schedule.');
+      return;
+    }
+    printWindow.document.open();
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 250);
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     const loadSchedule = async () => {
@@ -131,37 +155,45 @@ export default function DispatchDashboard() {
       </section>
 
       <section className="dispatch-dashboard__utilization" aria-label="Truck versus driver utilization">
-        <div className="dispatch-dashboard__section-heading"><div><p>TODAY'S APPOINTMENTS</p><h2>Truck vs. driver utilization</h2></div><span>{utilization.scheduled} scheduled containers</span></div>
+        <div className="dispatch-dashboard__section-heading"><div><p>SELECTED DAY UTILIZATION</p><h2>Truck vs. driver utilization</h2></div><span>{utilization.scheduled} scheduled containers</span></div>
         <div className="dispatch-dashboard__utilization-grid">
           <div><span>Driver assignments</span><strong>{scheduleLoading ? '—' : `${utilization.drivers} / ${utilization.scheduled}`}</strong><div className="dispatch-dashboard__utilization-track"><i style={{ width: `${utilization.driverPercent}%` }} /></div></div>
           <div><span>Trucks checked in</span><strong>{scheduleLoading ? '—' : `${utilization.trucks} / ${utilization.scheduled}`}</strong><div className="dispatch-dashboard__utilization-track is-truck"><i style={{ width: `${utilization.truckPercent}%` }} /></div></div>
         </div>
+        {scheduleError && <p className="dispatch-dashboard__empty" role="status">Truck and driver utilization may be incomplete: {scheduleError}</p>}
       </section>
 
-      <section className="dispatch-dashboard__dock-schedule" aria-label="Daily dock container schedule">
+      <section className="dispatch-dashboard__daily-schedule" aria-label="Daily container schedule">
         <div className="dispatch-dashboard__section-heading">
-          <div><p>DOCK APPOINTMENTS</p><h2>{scheduleDate === format(new Date(), 'yyyy-MM-dd') ? "Today's Dock Schedule" : 'Dock Schedule'}</h2></div>
+          <div><p>DELIVERIES BY DELIVERY ETA</p><h2>{scheduleDate === format(new Date(), 'yyyy-MM-dd') ? "Today's Container Schedule" : 'Container Schedule'}</h2></div>
           <div className="dispatch-dashboard__schedule-controls">
             <label>Schedule date<input type="date" value={scheduleDate} onChange={(event) => { if (event.target.value) setScheduleDate(event.target.value); }} /></label>
-            <span>{dockSchedule.length} containers</span>
+            <span>{dailySchedule.length} containers</span>
+            <button type="button" className="dispatch-dashboard__secondary" disabled={loading || !dailySchedule.length} onClick={() => void printDailySchedule()}>Print Schedule</button>
           </div>
         </div>
-        {scheduleLoading || loading ? <p className="dispatch-dashboard__empty" role="status">Loading dock schedule...</p> : scheduleError || error ? (
-          <p className="dispatch-dashboard__empty" role="alert">{scheduleError || 'Container forecasts are unavailable.'}</p>
-        ) : dockSchedule.length === 0 ? <p className="dispatch-dashboard__empty">No containers are scheduled to dock doors for this date.</p> : (
-          <div className="dispatch-dashboard__dock-grid">
-            {dockSchedule.map(({ appointment, record, status, driver, doorId }) => (
-              <article className="dispatch-dashboard__dock-tile" key={`${appointment.id}-${record.id}`}>
-                <div className="dispatch-dashboard__dock-tile-heading"><strong>Door {doorId}</strong><span className={`dispatch-dashboard__dock-status is-${status.toLowerCase().replace(/\s+/g, '-')}`}>{status}</span></div>
-                <h3>{record.containerNumber}</h3>
-                <p>{record.vessel}</p>
-                <dl>
-                  <div><dt>Appointment</dt><dd>{appointment.appointmentTime || 'Not set'}</dd></div>
-                  <div><dt>Carrier</dt><dd>{appointment.carrier || appointment.company || 'Not assigned'}</dd></div>
-                  <div><dt>Driver / Load</dt><dd>{driver || 'Not checked in'}</dd></div>
-                </dl>
-              </article>
-            ))}
+        {loading ? <p className="dispatch-dashboard__empty" role="status">Loading container schedule...</p> : error ? (
+          <p className="dispatch-dashboard__empty" role="alert">Container forecasts are unavailable.</p>
+        ) : dailySchedule.length === 0 ? <p className="dispatch-dashboard__empty">No containers have a delivery ETA for this date.</p> : (
+          <div className="dispatch-dashboard__daily-table-wrap">
+            <table className="dispatch-dashboard__daily-table">
+              <thead><tr><th>Delivery ETA</th><th>Container</th><th>Vessel / SSL</th><th>Customer / Commodity</th><th>Drop-off</th><th>Carrier / Driver</th><th>Pickup / Port Appt</th><th>Full Pickup LFD</th><th>Empty Return LFD</th><th>Release</th><th>Dispatch</th></tr></thead>
+              <tbody>{dailySchedule.map((record) => (
+                <tr key={record.id}>
+                  <td>{formatDispatchDate(record.deliveryEta)}</td>
+                  <td className="dispatch-dashboard__daily-container">{record.containerNumber}</td>
+                  <td>{record.vessel}<small>{record.steamshipLine || 'SSL not set'}</small></td>
+                  <td>{record.customer || '—'}<small>{record.commodity || 'Commodity not set'}</small></td>
+                  <td>{record.dropOffLocation || '—'}</td>
+                  <td>{record.carrier || '—'}<small>{record.driverLoad || 'Driver not assigned'}</small></td>
+                  <td>{record.pickupNumber || '—'}<small>{record.portAppointmentNumber || 'Port appointment not set'}</small></td>
+                  <td>{formatDispatchDate(record.fullPickupLastFreeDay)}</td>
+                  <td>{formatDispatchDate(record.emptyLastFreeDay || record.emptyReturnDate)}</td>
+                  <td><span className={`dispatch-dashboard__release is-${record.releaseStatus.toLowerCase().replace(/\s+/g, '-')}`}>{record.releaseStatus}</span></td>
+                  <td><span className={`dispatch-dashboard__dispatch-status is-${String(record.dispatchStatus || 'Pending').toLowerCase()}`}>{record.dispatchStatus || 'Pending'}</span></td>
+                </tr>
+              ))}</tbody>
+            </table>
           </div>
         )}
       </section>

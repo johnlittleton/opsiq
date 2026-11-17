@@ -25,6 +25,8 @@
 .food-safety-record-table summary { cursor: pointer; }
 .food-safety-record-actions { display: flex; gap: 6px; }
 .food-safety-record-actions button { width: 36px; height: 36px; padding: 0; }
+.food-safety-record-actions button.is-delete { border-color: #874044; background: #351416; color: #ffb5b8; }
+.food-safety-record-actions button.is-delete:hover:not(:disabled) { border-color: #ef343a; background: #512024; }
 .food-safety-edit-backdrop { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; padding: 16px; background: #000a; }
 .food-safety-edit-form { box-sizing: border-box; display: grid; gap: 14px; width: min(100%, 480px); max-height: 90vh; overflow: auto; padding: 20px; border: 1px solid #52646b; border-radius: 6px; background: #18252b; color: #e7eef1; }
 .food-safety-edit-form p { margin: 0; font-size: 0.8rem; }

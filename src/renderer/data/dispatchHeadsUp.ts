@@ -63,6 +63,11 @@ export function getDispatchHeadsUp(records: DispatchForecastRecord[], horizonDay
   return { incoming, releasesNeeded, released, pendingPickup, deliveriesSoon, emptyReturnsSoon, fullPickupsSoon, attentionRecords };
 }
 
+export function getDispatchDailySchedule(records: DispatchForecastRecord[], date: string): DispatchForecastRecord[] {
+  return records.filter((record) => record.deliveryEta?.slice(0, 10) === date)
+    .sort((first, second) => String(first.deliveryEta).localeCompare(String(second.deliveryEta)));
+}
+
 export function getDispatchAttentionReasons(record: DispatchForecastRecord, metrics: ReturnType<typeof getDispatchHeadsUp>): string[] {
   const reasons: string[] = [];
   if (metrics.incoming.includes(record)) reasons.push('Vessel arriving');

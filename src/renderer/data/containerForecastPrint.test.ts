@@ -1,5 +1,5 @@
 import { strict as assert } from 'node:assert';
-import { buildContainerForecastHistoryPrintHtml, buildContainerForecastPrintHtml } from './containerForecastPrint';
+import { buildContainerForecastHistoryPrintHtml, buildContainerForecastPrintHtml, buildDispatchDailySchedulePrintHtml } from './containerForecastPrint';
 
 const html = buildContainerForecastPrintHtml({
   vessel: 'MAERSK <ONE>', containerNumber: 'MNBU1234567', chassis: 'CH-1', weight: 52100,
@@ -28,3 +28,14 @@ assert.ok(historyHtml.includes('Full Pickup Last Free Day'));
 assert.ok(historyHtml.includes('VESSEL &lt;ONE&gt;'));
 assert.ok(!historyHtml.includes('VESSEL <ONE>'));
 console.log('PASS: history print report includes all selected containers and safely escapes user input');
+
+const dailyHtml = buildDispatchDailySchedulePrintHtml([
+  { containerNumber: 'CONT1', vessel: 'Vessel A', deliveryEta: 'Nov 19, 8:00 AM', dropOffLocation: 'Vineland', releaseStatus: 'Released' },
+  { containerNumber: 'CONT2', vessel: 'Vessel B', deliveryEta: 'Nov 19, 9:00 AM', dropOffLocation: 'Produce Depot', releaseStatus: 'On Hold', dispatchStatus: 'Dispatched' },
+], 'November 19, 2026');
+assert.ok(dailyHtml.includes('2 containers'));
+assert.ok(dailyHtml.includes('CONT1'));
+assert.ok(dailyHtml.includes('CONT2'));
+assert.ok(dailyHtml.includes('Produce Depot'));
+assert.ok(dailyHtml.includes('Dispatched'));
+console.log('PASS: daily schedule print report contains all selected containers');
